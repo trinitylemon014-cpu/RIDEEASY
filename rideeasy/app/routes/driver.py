@@ -96,44 +96,12 @@ def dashboard():
     profile = db.fetchone("SELECT * FROM driver_profiles WHERE user_id = ?", (user["id"],))
     vehicle = db.fetchone("SELECT * FROM vehicles WHERE driver_id = ?", (user["id"],))
 
-    # Assigned active ride
-    active_ride = db.fetchone(
-        """SELECT r.*, u.full_name as passenger_name, u.phone as passenger_phone
-        FROM rides r
-        JOIN users u ON r.passenger_id = u.id
-        WHERE r.driver_id = ? AND r.status NOT IN ('COMPLETED', 'CANCELLED')
-        ORDER BY r.created_at DESC LIMIT 1""",
+    total_earnings = db.fetchone(
+        """SELECT COALESCE(SUM(COALESCE(final_fare_ugx, estimated_fare_ugx)), 0) as total
+        FROM rides WHERE driver_id = ? AND status = 'COMPLETED'""",
         (user["id"],)
     )
 
-    # Incoming pending rides looking for drivers
-    pending_rides = []
-    if profile and profile["is_online"] and profile["verification_status"] == "APPROVED":
-        pending_rides = db.fetchall(
-            """SELECT r.*, u.full_name as passenger_name, u.phone as passenger_phone
-            FROM rides r
-            JOIN users u ON r.passenger_id = u.id
-            WHERE r.status IN ('REQUESTED', 'SEARCHING_FOR_DRIVER')
-            ORDER BY r.created_at DESC LIMIT 5"""
-        )
-
-    # Completed trips & earnings calculation
-    trips = db.fetchall(
-        """SELECT r.*, u.full_name as passenger_name
-        FROM rides r
-        JOIN users u ON r.passenger_id = u.id
-        WHERE r.driver_id = ? AND r.status = 'COMPLETED'
-        ORDER BY r.created_at DESC LIMIT 10""",
-        (user["id"],)
-    )
-
-    all_completed = db.fetchall(
-        "SELECT final_fare_ugx, estimated_fare_ugx FROM rides WHERE driver_id = ? AND status = 'COMPLETED'",
-        (user["id"],)
-    )
-    total_earnings = sum(t["final_fare_ugx"] or t["estimated_fare_ugx"] or 0 for t in all_completed)
-
-    # Real-time 7-day earnings summary with daily income trends
     earnings_summary = get_driver_earnings_summary(user["id"], db)
 
     return render_template(
@@ -141,11 +109,9 @@ def dashboard():
         user=user,
         profile=profile,
         vehicle=vehicle,
-        active_ride=active_ride,
-        pending_rides=pending_rides,
-        trips=trips,
-        total_earnings=total_earnings,
-        earnings_summary=earnings_summary
+        total_earnings=total_earnings["total"],
+        earnings_summary=earnings_summary,
+        show_dispatch_sections=False
     )
 
 @driver_bp.route("/api/earnings-summary")
@@ -177,6 +143,40 @@ def toggle_online():
     flash(msg, "info")
     return redirect(url_for("driver.dashboard"))
 
+@driver_bp.route("/requests")
+def requests_list():
+    user = AuthService.get_current_user()
+    db = get_db()
+    profile = db.fetchone("SELECT * FROM driver_profiles WHERE user_id = ?", (user["id"],))
+    pending_rides = []
+    if profile and profile["is_online"] and profile["verification_status"] == "APPROVED":
+        pending_rides = db.fetchall(
+            """SELECT r.*, u.full_name as passenger_name, u.phone as passenger_phone
+            FROM rides r
+            JOIN users u ON r.passenger_id = u.id
+            WHERE r.status IN ('REQUESTED', 'SEARCHING_FOR_DRIVER')
+            ORDER BY r.created_at DESC"""
+        )
+    return render_template(
+        "driver/requests.html",
+        user=user,
+        profile=profile,
+        pending_rides=pending_rides
+    )
+
+@driver_bp.route("/active-ride")
+def active_ride():
+    user = AuthService.get_current_user()
+    ride = get_db().fetchone(
+        """SELECT r.*, u.full_name as passenger_name, u.phone as passenger_phone
+        FROM rides r
+        JOIN users u ON r.passenger_id = u.id
+        WHERE r.driver_id = ? AND r.status NOT IN ('COMPLETED', 'CANCELLED')
+        ORDER BY r.created_at DESC LIMIT 1""",
+        (user["id"],)
+    )
+    return render_template("driver/active_ride.html", user=user, ride=ride)
+
 @driver_bp.route("/rides/<ride_id>/accept", methods=["POST"])
 def accept_ride(ride_id):
     user = AuthService.get_current_user()
@@ -185,7 +185,7 @@ def accept_ride(ride_id):
     profile = db.fetchone("SELECT * FROM driver_profiles WHERE user_id = ?", (user["id"],))
     if not profile or profile["verification_status"] != "APPROVED":
         flash("Only verified drivers can accept trips.", "error")
-        return redirect(url_for("driver.dashboard"))
+        return redirect(url_for("driver.requests_list"))
 
     # Atomically assign driver
     db.execute(
@@ -208,7 +208,7 @@ def accept_ride(ride_id):
         )
 
     flash("Ride accepted! Proceed to pickup location.", "success")
-    return redirect(url_for("driver.dashboard"))
+    return redirect(url_for("driver.active_ride"))
 
 @driver_bp.route("/rides/<ride_id>/status", methods=["POST"])
 def update_ride_status(ride_id):
@@ -231,7 +231,7 @@ def update_ride_status(ride_id):
     expected = allowed_transitions.get(ride["status"])
     if new_status != expected and new_status != "COMPLETED":
         flash(f"Invalid status transition from {ride['status']} to {new_status}.", "error")
-        return redirect(url_for("driver.dashboard"))
+        return redirect(url_for("driver.active_ride"))
 
     if new_status == "COMPLETED":
         db.execute(
@@ -243,6 +243,7 @@ def update_ride_status(ride_id):
             (user["id"],)
         )
         flash("Trip completed successfully! Fare recorded.", "success")
+        return redirect(url_for("driver.trips"))
     else:
         db.execute(
             "UPDATE rides SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
@@ -250,7 +251,7 @@ def update_ride_status(ride_id):
         )
         flash(f"Trip status updated to {new_status.replace('_', ' ').title()}.", "info")
 
-    return redirect(url_for("driver.dashboard"))
+    return redirect(url_for("driver.active_ride"))
 
 @driver_bp.route("/trips")
 def trips():
@@ -260,7 +261,7 @@ def trips():
         """SELECT r.*, u.full_name as passenger_name, u.phone as passenger_phone
         FROM rides r
         JOIN users u ON r.passenger_id = u.id
-        WHERE r.driver_id = ?
+        WHERE r.driver_id = ? AND r.status = 'COMPLETED'
         ORDER BY r.created_at DESC""",
         (user["id"],)
     )

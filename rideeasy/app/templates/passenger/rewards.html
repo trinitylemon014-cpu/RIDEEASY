@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+
+{% block title %}RideEasy Rewards — RideEasy{% endblock %}
+
+{% block content %}
+<div class="container section">
+  <div style="display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 1rem; margin-bottom: 2rem;">
+    <div>
+      <div class="metadata-row" style="margin-bottom: 0.25rem;">
+        <span style="font-weight: 700; color: var(--color-black); text-transform: uppercase;">Passenger Benefits</span>
+        <span class="metadata-separator">·</span>
+        <span>{{ rewards_summary.tier_name }}</span>
+      </div>
+      <h2>RideEasy Rewards</h2>
+      <p class="text-subtle">Earn 10 points for every kilometer traveled on completed rides.</p>
+    </div>
+    <a href="/passenger/dashboard" class="btn btn-secondary">Back to overview</a>
+  </div>
+
+  <div class="stats-grid" style="margin-bottom: 2rem;">
+    <div class="stat-card">
+      <div class="stat-label">Available Points</div>
+      <div class="stat-value">{{ rewards_summary.available_points }}</div>
+      <div class="stat-subtext">{{ rewards_summary.total_spent_points }} points redeemed</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Trip Distance</div>
+      <div class="stat-value">{{ rewards_summary.total_km }} km</div>
+      <div class="stat-subtext">Across {{ rewards_summary.completed_count }} completed rides</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Current Tier</div>
+      <div class="stat-value" style="font-size: 1.25rem;">{{ rewards_summary.tier_name }}</div>
+      <div class="stat-subtext">{{ rewards_summary.progress_pct }}% toward {{ rewards_summary.next_tier_name }}</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <div>
+        <div class="card-title">Redeemable Travel Benefits</div>
+        <div class="card-subtitle">Use your points to claim available RideEasy rewards.</div>
+      </div>
+    </div>
+    <div class="rewards-catalog-grid">
+      {% for benefit in rewards_summary.benefits %}
+        <article class="reward-benefit-card {% if benefit.can_redeem %}is-unlocked{% else %}is-locked{% endif %}">
+          <div>
+            <div style="display: flex; justify-content: space-between; gap: 0.5rem; margin-bottom: 0.5rem;">
+              <span class="text-subtle">{{ benefit.badge }}</span>
+              <strong>{{ benefit.points_cost }} pts</strong>
+            </div>
+            <h3 style="font-size: 1rem; margin: 0 0 0.5rem;">{{ benefit.title }}</h3>
+            <p>{{ benefit.description }}</p>
+          </div>
+          <div style="display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; border-top: 1px solid var(--color-light-grey); padding-top: 0.75rem;">
+            <span class="text-subtle">{{ benefit.required_km }} km required</span>
+            {% if benefit.can_redeem %}
+              <form method="POST" action="/passenger/rewards/redeem" style="margin: 0;">
+                <input type="hidden" name="reward_id" value="{{ benefit.id }}">
+                <button type="submit" class="btn btn-primary btn-sm">Redeem</button>
+              </form>
+            {% else %}
+              <span class="text-subtle">{{ benefit.needed_points }} pts to go</span>
+            {% endif %}
+          </div>
+        </article>
+      {% endfor %}
+    </div>
+  </div>
+
+  {% if rewards_summary.redemptions %}
+    <div class="card" style="margin-top: 1.5rem;">
+      <div class="card-title">Your Vouchers</div>
+      <div class="table-responsive">
+        <table class="table">
+          <thead><tr><th>Benefit</th><th>Voucher code</th><th>Points used</th><th>Status</th></tr></thead>
+          <tbody>
+            {% for voucher in rewards_summary.redemptions %}
+              <tr>
+                <td>{{ voucher.reward_title }}</td>
+                <td><strong>{{ voucher.voucher_code }}</strong></td>
+                <td>{{ voucher.points_spent }}</td>
+                <td>{{ voucher.status }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  {% endif %}
+</div>
+{% endblock %}

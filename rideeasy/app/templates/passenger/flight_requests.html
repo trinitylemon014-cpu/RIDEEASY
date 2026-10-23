@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+
+{% block title %}Flight Requests — RideEasy{% endblock %}
+
+{% block content %}
+<div class="container section">
+  <div style="display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 1rem; margin-bottom: 2rem;">
+    <div>
+      <div class="metadata-row" style="margin-bottom: 0.25rem;">
+        <span style="font-weight: 700; color: var(--color-black); text-transform: uppercase;">Passenger Travel Desk</span>
+        <span class="metadata-separator">·</span>
+        <span>Flight inquiries and quotes</span>
+      </div>
+      <h2>My Flight Requests</h2>
+    </div>
+    <a href="/passenger/flight-request" class="btn btn-primary">Book a Flight</a>
+  </div>
+
+  <div style="display: flex; gap: 0.5rem; margin-bottom: 1rem;">
+    <a href="/passenger/flight-requests" class="btn {% if not status_filter %}btn-primary{% else %}btn-secondary{% endif %} btn-sm">All requests</a>
+    <a href="/passenger/flight-requests?status=awaiting" class="btn {% if status_filter == 'awaiting' %}btn-primary{% else %}btn-secondary{% endif %} btn-sm">Awaiting response</a>
+  </div>
+
+  <div class="card">
+    {% if requests %}
+      <div class="table-responsive">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Request</th>
+              <th>Route</th>
+              <th>Travel date</th>
+              <th>Passengers</th>
+              <th>Travel partner</th>
+              <th>Status</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for item in requests %}
+              <tr>
+                <td>#{{ item.id[:8].upper() }}</td>
+                <td><strong>{{ item.departure_city }} → {{ item.destination_city }}</strong></td>
+                <td>{{ item.departure_date }}</td>
+                <td>{{ item.passenger_count }}</td>
+                <td>{{ item.company_name or 'Awaiting assignment' }}</td>
+                <td><span class="status-indicator"><span class="status-dot"></span>{{ item.status.replace('_', ' ') }}</span></td>
+                <td><a href="/passenger/flight-requests/{{ item.id }}" class="btn btn-secondary btn-sm">View details</a></td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <div style="text-align: center; padding: 3rem 1rem;">
+        <p style="margin-bottom: 1rem;">{% if status_filter == 'awaiting' %}No flight requests are awaiting a response.{% else %}You have not submitted a flight request yet.{% endif %}</p>
+        <a href="/passenger/flight-request" class="btn btn-primary">Request a Flight Quote</a>
+      </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

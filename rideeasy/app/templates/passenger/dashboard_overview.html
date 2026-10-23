@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+
+{% block title %}Passenger Overview — RideEasy{% endblock %}
+
+{% block content %}
+<div class="container section">
+  <div style="display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 1rem; margin-bottom: 2rem;">
+    <div>
+      <div class="metadata-row" style="margin-bottom: 0.25rem;">
+        <span style="font-weight: 700; color: var(--color-black); text-transform: uppercase;">Passenger Portal</span>
+        <span class="metadata-separator">·</span>
+        <span>Account #{{ user.id[:8].upper() }}</span>
+      </div>
+      <h2>Welcome, {{ user.full_name }}</h2>
+    </div>
+    <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+      <a href="/passenger/book-ride" class="btn btn-primary">Book a Ride</a>
+      <a href="/passenger/flight-request" class="btn btn-secondary">Book a Flight</a>
+    </div>
+  </div>
+
+  <div class="stats-grid" style="margin-bottom: 1.5rem;">
+    <a href="/passenger/rides" class="stat-card" style="text-decoration: none; color: inherit;">
+      <div class="stat-label">All Trips</div>
+      <div class="stat-value">{{ overview_stats.rides }}</div>
+      <div class="stat-subtext">View recent and completed rides</div>
+    </a>
+    <a href="/passenger/rides?status=awaiting" class="stat-card" style="text-decoration: none; color: inherit;">
+      <div class="stat-label">Awaiting Rides</div>
+      <div class="stat-value">{{ overview_stats.awaiting_rides }}</div>
+      <div class="stat-subtext">Waiting for a driver</div>
+    </a>
+    <a href="/passenger/flight-requests" class="stat-card" style="text-decoration: none; color: inherit;">
+      <div class="stat-label">Flight Requests</div>
+      <div class="stat-value">{{ overview_stats.flight_requests }}</div>
+      <div class="stat-subtext">Review quotes and request status</div>
+    </a>
+    <a href="/passenger/rewards" class="stat-card" style="text-decoration: none; color: inherit;">
+      <div class="stat-label">Reward Points</div>
+      <div class="stat-value">{{ rewards_summary.available_points }}</div>
+      <div class="stat-subtext">{{ rewards_summary.tier_name }}</div>
+    </a>
+  </div>
+
+  {% if notifications %}
+    <div class="card" style="margin-bottom: 1.5rem;">
+      <div class="card-header">
+        <div>
+          <div class="card-title">Recent Notifications</div>
+          <div class="card-subtitle">Updates about your rides and travel requests</div>
+        </div>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+        {% for notification in notifications[:3] %}
+          <div style="padding: 0.75rem; border: 1px solid var(--color-light-grey); border-radius: var(--radius-sm);">
+            <strong>{{ notification.title }}</strong>
+            <p style="margin: 0.25rem 0;">{{ notification.message }}</p>
+            <span class="text-subtle">{{ notification.created_at[:16] }}</span>
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+  {% endif %}
+
+  <div class="card">
+    <div class="card-header">
+      <div>
+        <div class="card-title">Recent Trips</div>
+        <div class="card-subtitle">Your latest ride activity and current status</div>
+      </div>
+      <a href="/passenger/rides" class="btn btn-secondary btn-sm">View all trips</a>
+    </div>
+    {% if recent_rides %}
+      <div class="table-responsive">
+        <table class="table">
+          <thead><tr><th>Trip</th><th>Route</th><th>Driver</th><th>Status</th><th></th></tr></thead>
+          <tbody>
+            {% for ride in recent_rides[:5] %}
+              <tr>
+                <td>#{{ ride.id[:8].upper() }}<div class="text-subtle">{{ ride.created_at[:10] }}</div></td>
+                <td>{{ ride.pickup_address }} → {{ ride.destination_address }}</td>
+                <td>{{ ride.driver_name or 'Awaiting driver' }}</td>
+                <td><span class="status-indicator"><span class="status-dot"></span>{{ ride.status.replace('_', ' ') }}</span></td>
+                <td><a href="/passenger/rides/{{ ride.id }}" class="btn btn-secondary btn-sm">Details</a></td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <div style="text-align: center; padding: 2rem 1rem;">
+        <p style="margin-bottom: 1rem;">No rides yet. Book your first ride whenever you are ready.</p>
+        <a href="/passenger/book-ride" class="btn btn-primary">Book your first ride</a>
+      </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

@@ -182,103 +182,34 @@ def get_passenger_rewards_summary(passenger_id, db):
 def dashboard():
     user = AuthService.get_current_user()
     db = get_db()
-    search_query = request.args.get("q", "").strip()
-
-    # Active and recent rides with ratings
-    recent_query = """SELECT r.*, u.full_name as driver_name, v.plate_number, v.make, v.model,
-                             rr.rating as user_rating, rr.review as user_review
-    FROM rides r
-    LEFT JOIN users u ON r.driver_id = u.id
-    LEFT JOIN vehicles v ON v.driver_id = u.id
-    LEFT JOIN ride_ratings rr ON rr.ride_id = r.id AND rr.passenger_id = r.passenger_id
-    WHERE r.passenger_id = ?"""
-    recent_params = [user["id"]]
-
-    if search_query:
-        recent_query += """ AND (
-            r.pickup_address LIKE ? OR
-            r.destination_address LIKE ? OR
-            u.full_name LIKE ? OR
-            r.created_at LIKE ? OR
-            r.id LIKE ?
-        )"""
-        q_pattern = f"%{search_query}%"
-        recent_params.extend([q_pattern, q_pattern, q_pattern, q_pattern, q_pattern])
-
-    recent_query += " ORDER BY r.created_at DESC LIMIT 10"
-    recent_rides = db.fetchall(recent_query, tuple(recent_params))
-
-    # Dedicated Completed rides with ratings
-    completed_query = """SELECT r.*, u.full_name as driver_name, u.phone as driver_phone,
-                               v.plate_number, v.make, v.model,
-                               rr.rating as user_rating, rr.review as user_review
-    FROM rides r
-    LEFT JOIN users u ON r.driver_id = u.id
-    LEFT JOIN vehicles v ON v.driver_id = u.id
-    LEFT JOIN ride_ratings rr ON rr.ride_id = r.id AND rr.passenger_id = r.passenger_id
-    WHERE r.passenger_id = ? AND r.status = 'COMPLETED'"""
-    completed_params = [user["id"]]
-
-    if search_query:
-        completed_query += """ AND (
-            r.pickup_address LIKE ? OR
-            r.destination_address LIKE ? OR
-            u.full_name LIKE ? OR
-            r.created_at LIKE ? OR
-            r.id LIKE ?
-        )"""
-        q_pattern = f"%{search_query}%"
-        completed_params.extend([q_pattern, q_pattern, q_pattern, q_pattern, q_pattern])
-
-    completed_query += " ORDER BY r.created_at DESC LIMIT 10"
-    completed_rides = db.fetchall(completed_query, tuple(completed_params))
-
-    # Confirmed Journeys & Flight Requests
-    journeys = db.fetchall(
-        """SELECT j.*, b.booking_reference_pnr, b.airline_name, b.flight_number
-        FROM confirmed_journeys j
-        JOIN flight_bookings b ON j.flight_booking_id = b.id
-        WHERE j.passenger_id = ?
-        ORDER BY j.departure_datetime ASC""",
-        (user["id"],)
-    )
-
-    flight_requests = db.fetchall(
-        """SELECT r.*, c.company_name
-        FROM flight_requests r
-        LEFT JOIN travel_companies c ON r.assigned_company_id = c.user_id
+    overview_stats = {
+        "rides": db.fetchone("SELECT COUNT(*) as count FROM rides WHERE passenger_id = ?", (user["id"],))["count"],
+        "awaiting_rides": db.fetchone(
+            "SELECT COUNT(*) as count FROM rides WHERE passenger_id = ? AND status IN ('REQUESTED', 'SEARCHING_FOR_DRIVER')",
+            (user["id"],)
+        )["count"],
+        "flight_requests": db.fetchone("SELECT COUNT(*) as count FROM flight_requests WHERE passenger_id = ?", (user["id"],))["count"]
+    }
+    recent_rides = db.fetchall(
+        """SELECT r.id, r.pickup_address, r.destination_address, r.status, r.created_at,
+                  u.full_name as driver_name
+        FROM rides r
+        LEFT JOIN users u ON r.driver_id = u.id
         WHERE r.passenger_id = ?
-        ORDER BY r.created_at DESC LIMIT 3""",
+        ORDER BY r.created_at DESC LIMIT 5""",
         (user["id"],)
     )
 
-    # Active reminders
-    reminders = db.fetchall(
-        """SELECT r.*, j.origin, j.destination, j.departure_datetime
-        FROM journey_reminders r
-        JOIN confirmed_journeys j ON r.journey_id = j.id
-        WHERE j.passenger_id = ?
-        ORDER BY r.scheduled_for ASC LIMIT 5""",
-        (user["id"],)
-    )
-
-    from app.services.notification_service import NotificationService
     notifications = NotificationService.get_user_notifications(user["id"], limit=10)
-
-    # RideEasy Rewards points, tier status, and benefits summary
     rewards_summary = get_passenger_rewards_summary(user["id"], db)
 
     return render_template(
-        "passenger/dashboard.html",
+        "passenger/dashboard_overview.html",
         user=user,
         recent_rides=recent_rides,
-        completed_rides=completed_rides,
-        journeys=journeys,
-        flight_requests=flight_requests,
-        reminders=reminders,
         notifications=notifications,
-        search_query=search_query,
-        rewards_summary=rewards_summary
+        rewards_summary=rewards_summary,
+        overview_stats=overview_stats
     )
 
 @passenger_bp.route("/rewards/redeem", methods=["POST"])
@@ -363,6 +294,12 @@ def api_rewards_summary():
         "success": True,
         "rewards": summary
     })
+
+@passenger_bp.route("/rewards")
+def rewards():
+    user = AuthService.get_current_user()
+    summary = get_passenger_rewards_summary(user["id"], get_db())
+    return render_template("passenger/rewards.html", user=user, rewards_summary=summary)
 
 @passenger_bp.route("/book-ride", methods=["GET", "POST"])
 def book_ride():
@@ -538,16 +475,66 @@ def delete_saved_route(route_id):
 def rides_list():
     user = AuthService.get_current_user()
     db = get_db()
+    status_filter = request.args.get("status", "").strip().lower()
+    if status_filter not in {"awaiting", "active", "completed"}:
+        status_filter = ""
+    search_query = request.args.get("q", "").strip()
     rides = db.fetchall(
-        """SELECT r.*, u.full_name as driver_name, u.phone as driver_phone, v.plate_number, v.make, v.model
+        """SELECT r.*, u.full_name as driver_name, u.phone as driver_phone,
+                  v.plate_number, v.make, v.model, rr.rating as user_rating, rr.review as user_review
         FROM rides r
         LEFT JOIN users u ON r.driver_id = u.id
         LEFT JOIN vehicles v ON v.driver_id = u.id
+        LEFT JOIN ride_ratings rr ON rr.ride_id = r.id AND rr.passenger_id = r.passenger_id
         WHERE r.passenger_id = ?
+        AND (
+            ? = '' OR
+            (? = 'awaiting' AND r.status IN ('REQUESTED', 'SEARCHING_FOR_DRIVER')) OR
+            (? = 'completed' AND r.status = 'COMPLETED') OR
+            (? = 'active' AND r.status NOT IN ('COMPLETED', 'CANCELLED'))
+        )
+        AND (
+            ? = '' OR r.pickup_address LIKE ? OR r.destination_address LIKE ? OR
+            COALESCE(u.full_name, '') LIKE ? OR r.created_at LIKE ? OR r.id LIKE ?
+        )
+        ORDER BY r.created_at DESC""",
+        (
+            user["id"], status_filter, status_filter, status_filter, status_filter,
+            search_query, f"%{search_query}%", f"%{search_query}%",
+            f"%{search_query}%", f"%{search_query}%", f"%{search_query}%"
+        )
+    )
+    return render_template(
+        "passenger/rides.html",
+        user=user,
+        rides=rides,
+        status_filter=status_filter,
+        search_query=search_query
+    )
+
+@passenger_bp.route("/flight-requests")
+def flight_requests():
+    user = AuthService.get_current_user()
+    status_filter = request.args.get("status", "").strip().lower()
+    status_clause = ""
+    if status_filter == "awaiting":
+        status_clause = " AND r.status IN ('SUBMITTED', 'ASSIGNED', 'QUOTED', 'CUSTOMER_APPROVED')"
+    else:
+        status_filter = ""
+    requests_list = get_db().fetchall(
+        """SELECT r.*, c.company_name
+        FROM flight_requests r
+        LEFT JOIN travel_companies c ON r.assigned_company_id = c.user_id
+        WHERE r.passenger_id = ?""" + status_clause + """
         ORDER BY r.created_at DESC""",
         (user["id"],)
     )
-    return render_template("passenger/rides.html", user=user, rides=rides)
+    return render_template(
+        "passenger/flight_requests.html",
+        user=user,
+        requests=requests_list,
+        status_filter=status_filter
+    )
 
 @passenger_bp.route("/rides/<ride_id>")
 def ride_detail(ride_id):

@@ -12,25 +12,42 @@ school_bp = Blueprint("school", __name__, url_prefix="/school")
 def before_request():
     pass
 
-@school_bp.route("/dashboard")
-def dashboard():
-    user = AuthService.get_current_user()
-    db = get_db()
-
-    school = db.fetchone("SELECT * FROM schools WHERE user_id = ?", (user["id"],))
-
-    requests = db.fetchall(
-        """SELECT r.*, u.full_name as driver_name, u.phone as driver_phone, 
+def get_school_requests(school_id):
+    return get_db().fetchall(
+        """SELECT r.*, u.full_name as driver_name, u.phone as driver_phone,
                   v.plate_number, v.make, v.model, v.category as vehicle_category
         FROM school_transport_requests r
         LEFT JOIN users u ON r.assigned_driver_id = u.id
         LEFT JOIN vehicles v ON r.assigned_vehicle_id = v.id
         WHERE r.school_id = ?
         ORDER BY r.created_at DESC""",
-        (user["id"],)
+        (school_id,)
     )
 
-    return render_template("school/dashboard.html", user=user, school=school, requests=requests)
+@school_bp.route("/dashboard")
+def dashboard():
+    user = AuthService.get_current_user()
+    db = get_db()
+
+    school = db.fetchone("SELECT * FROM schools WHERE user_id = ?", (user["id"],))
+    requests = get_school_requests(user["id"])
+    return render_template(
+        "school/dashboard.html",
+        user=user,
+        school=school,
+        requests=requests,
+        recent_requests=requests[:3]
+    )
+
+@school_bp.route("/requests")
+def requests_list():
+    user = AuthService.get_current_user()
+    return render_template(
+        "school/requests.html",
+        user=user,
+        school=get_db().fetchone("SELECT * FROM schools WHERE user_id = ?", (user["id"],)),
+        requests=get_school_requests(user["id"])
+    )
 
 @school_bp.route("/request", methods=["GET", "POST"])
 def new_request():

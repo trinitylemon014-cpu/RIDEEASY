@@ -1,5 +1,7 @@
 def test_school_can_request_coaster_charter(client):
     client.get("/auth/demo/school", follow_redirects=True)
+    assert b"School Safety & Compliance" in client.get("/school/dashboard").data
+    assert b"Transport Requests" in client.get("/school/requests").data
     response = client.post("/school/request", data={
         "vehicle_type": "COASTER",
         "passenger_count": "28",

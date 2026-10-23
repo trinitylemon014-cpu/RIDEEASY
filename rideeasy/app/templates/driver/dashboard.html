@@ -31,6 +31,12 @@
     </div>
   </div>
 
+  <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1.5rem;">
+    <a href="/driver/requests" class="btn btn-secondary btn-sm">Awaiting Requests</a>
+    <a href="/driver/active-ride" class="btn btn-secondary btn-sm">Track Live Ride</a>
+    <a href="/driver/trips" class="btn btn-secondary btn-sm">Completed Rides</a>
+  </div>
+
   <!-- Operational Statistics Grid -->
   <div class="stats-grid">
     <div class="stat-card">
@@ -182,6 +188,7 @@
     {{ earnings_summary | tojson }}
   </script>
 
+  {% if show_dispatch_sections %}
   <!-- Active Assigned Trip Control Console -->
   {% if active_ride %}
   <div class="card" style="margin-bottom: 2rem; border: 2px solid var(--color-black);">
@@ -345,5 +352,6 @@
       </div>
     {% endif %}
   </div>
+  {% endif %}
 </div>
 {% endblock %}

@@ -11,7 +11,7 @@
         <span class="metadata-separator">·</span>
         <span>Passenger Record</span>
       </div>
-      <h2>My Ride History</h2>
+      <h2>{% if status_filter == 'awaiting' %}Awaiting Rides{% elif status_filter == 'completed' %}Completed Rides{% elif status_filter == 'active' %}Active Rides{% else %}Recent Trips{% endif %}</h2>
     </div>
 
     <a href="/passenger/book-ride" class="btn btn-primary">
@@ -19,6 +19,20 @@
       Book New Ride
     </a>
   </div>
+
+  <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1rem;">
+    <a href="/passenger/rides" class="btn {% if not status_filter %}btn-primary{% else %}btn-secondary{% endif %} btn-sm">All trips</a>
+    <a href="/passenger/rides?status=awaiting" class="btn {% if status_filter == 'awaiting' %}btn-primary{% else %}btn-secondary{% endif %} btn-sm">Awaiting</a>
+    <a href="/passenger/rides?status=active" class="btn {% if status_filter == 'active' %}btn-primary{% else %}btn-secondary{% endif %} btn-sm">In progress</a>
+    <a href="/passenger/rides?status=completed" class="btn {% if status_filter == 'completed' %}btn-primary{% else %}btn-secondary{% endif %} btn-sm">Completed</a>
+  </div>
+
+  <form method="GET" action="/passenger/rides" class="card" style="margin-bottom: 1rem; display: flex; gap: 0.5rem; align-items: center;">
+    {% if status_filter %}<input type="hidden" name="status" value="{{ status_filter }}">{% endif %}
+    <label for="ride-search" class="sr-only">Search trips</label>
+    <input id="ride-search" class="form-control" type="search" name="q" value="{{ search_query }}" placeholder="Search by route, driver, date or trip reference">
+    <button type="submit" class="btn btn-secondary btn-sm">Search</button>
+  </form>
 
   <div class="card">
     {% if rides %}
@@ -31,7 +45,8 @@
               <th>Pickup & Destination</th>
               <th>Category</th>
               <th>Driver / Vehicle</th>
-              <th>Fare</th>
+              <th>Fare Paid</th>
+              <th>Rating</th>
               <th>Status</th>
               <th>Action</th>
             </tr>
@@ -60,6 +75,28 @@
                 </td>
                 <td style="font-weight: 700;">{{ r.final_fare_ugx or r.estimated_fare_ugx | ugx }}</td>
                 <td>
+                  {% if r.status == 'COMPLETED' and r.driver_name %}
+                    {% if r.user_rating %}
+                      <strong>{{ r.user_rating }}/5</strong>
+                      {% if r.user_review %}<div class="text-subtle">{{ r.user_review }}</div>{% endif %}
+                    {% else %}
+                      <form method="POST" action="/passenger/rides/{{ r.id }}/rate" style="min-width: 160px;">
+                        <input type="hidden" name="next" value="/passenger/rides?status={{ status_filter }}">
+                        <label for="rating-{{ r.id }}" class="text-subtle">Rate this ride</label>
+                        <select id="rating-{{ r.id }}" name="rating" class="form-control" required>
+                          <option value="5">5 stars</option>
+                          <option value="4">4 stars</option>
+                          <option value="3">3 stars</option>
+                          <option value="2">2 stars</option>
+                          <option value="1">1 star</option>
+                        </select>
+                        <input name="review" class="form-control" placeholder="Optional feedback" style="margin-top: 0.25rem;">
+                        <button type="submit" class="btn btn-secondary btn-sm" style="margin-top: 0.25rem;">Submit</button>
+                      </form>
+                    {% endif %}
+                  {% else %}—{% endif %}
+                </td>
+                <td>
                   {% if r.status == 'CANCELLED' %}
                     <span class="status-indicator" style="border-color: #990000; color: #990000;">
                       <span class="status-dot" style="background-color: #990000;"></span> Cancelled
@@ -76,6 +113,7 @@
                 <td>
                   {% if r.status == 'COMPLETED' %}
                     <a href="/passenger/rides/{{ r.id }}/receipt" class="btn btn-secondary btn-sm">Receipt</a>
+                    <a href="/passenger/book-ride?pickup={{ r.pickup_address | urlencode }}&destination={{ r.destination_address | urlencode }}&category={{ r.category }}" class="btn btn-primary btn-sm">Book again</a>
                   {% else %}
                     <a href="/passenger/rides/{{ r.id }}" class="btn btn-primary btn-sm">Track</a>
                   {% endif %}
@@ -87,8 +125,8 @@
       </div>
     {% else %}
       <div style="text-align: center; padding: 3rem 0;">
-        <p style="margin-bottom: 1.25rem;">You have not completed any rides yet.</p>
-        <a href="/passenger/book-ride" class="btn btn-primary">Book a Ride Now</a>
+        <p style="margin-bottom: 1.25rem;">{% if search_query %}No trips match “{{ search_query }}”.{% elif status_filter == 'awaiting' %}You have no rides awaiting a driver.{% elif status_filter == 'active' %}You have no rides in progress.{% elif status_filter == 'completed' %}You have no completed rides yet.{% else %}You have no rides yet.{% endif %}</p>
+        <a href="/passenger/book-ride" class="btn btn-primary">Book a Ride</a>
       </div>
     {% endif %}
   </div>

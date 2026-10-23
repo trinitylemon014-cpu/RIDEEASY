@@ -58,9 +58,11 @@ def test_passenger_dashboard_shows_completed_rides_and_repeat_button(client):
     client.get("/auth/demo/passenger", follow_redirects=True)
     res = client.get("/passenger/dashboard")
     assert res.status_code == 200
-    assert b"Recent Completed Rides" in res.data
-    assert b"Request Repeat Ride" in res.data
-    assert b"Fare Paid" in res.data
+    assert b"Recent Trips" in res.data
+    completed_res = client.get("/passenger/rides?status=completed")
+    assert b"Completed Rides" in completed_res.data
+    assert b"Book again" in completed_res.data
+    assert b"Fare Paid" in completed_res.data
     assert b'id="ai-support-widget"' in res.data
     assert b'id="ai-support-panel"' in res.data
     assert b'id="ai-customer-care-section"' not in res.data
@@ -159,11 +161,11 @@ def test_rate_completed_ride_workflow(client):
     assert rate_data["rating"] == 5
     assert "smooth driving" in rate_data["review"]
 
-    # 3. Verify rating is persisted in database and dashboard
-    dash_res = client.get("/passenger/dashboard")
-    assert dash_res.status_code == 200
-    assert b"5/5" in dash_res.data
-    assert b"smooth driving across Kampala" in dash_res.data
+    # 3. Verify rating is persisted on the dedicated rides page
+    rides_res = client.get("/passenger/rides?status=completed")
+    assert rides_res.status_code == 200
+    assert b"5/5" in rides_res.data
+    assert b"smooth driving across Kampala" in rides_res.data
 
     # 4. Update/edit the rating (e.g. adjust to 4 stars)
     update_res = client.post("/passenger/rides/ride_02/rate", data={
@@ -189,20 +191,43 @@ def test_dashboard_search_filtering(client):
     client.get("/auth/demo/passenger", follow_redirects=True)
 
     # Test search with query parameter
-    search_entebbe = client.get("/passenger/dashboard?q=Entebbe")
+    search_entebbe = client.get("/passenger/rides?q=Entebbe")
     assert search_entebbe.status_code == 200
     assert b"Entebbe International Airport" in search_entebbe.data
     assert b'value="Entebbe"' in search_entebbe.data
 
     # Test search with driver name
-    search_driver = client.get("/passenger/dashboard?q=David")
+    search_driver = client.get("/passenger/rides?q=David")
     assert search_driver.status_code == 200
     assert b"David" in search_driver.data
 
     # Test search with no matching keyword
-    search_none = client.get("/passenger/dashboard?q=NonExistentTown99")
+    search_none = client.get("/passenger/rides?q=NonExistentTown99")
     assert search_none.status_code == 200
-    assert b"No completed rides on record matching" in search_none.data
+    assert b"No trips match" in search_none.data
+
+def test_passenger_workspace_pages_and_awaiting_ride_filter(client):
+    client.get("/auth/demo/passenger", follow_redirects=True)
+    request_res = client.post("/passenger/book-ride", data={
+        "pickup_address": "Acacia Mall, Kololo",
+        "destination_address": "Entebbe Airport",
+        "category": "ECONOMY",
+        "payment_method": "CASH"
+    }, follow_redirects=True)
+    assert request_res.status_code == 200
+
+    active_res = client.get("/passenger/rides?status=active")
+    assert active_res.status_code == 200
+    assert b"Active Rides" in active_res.data
+    assert b"Acacia Mall, Kololo" in active_res.data
+    assert client.get("/passenger/flight-requests?status=awaiting").status_code == 200
+    assert client.get("/passenger/flight-requests").status_code == 200
+
+def test_driver_workspace_pages(client):
+    client.get("/auth/demo/driver", follow_redirects=True)
+    assert b"Awaiting Requests" in client.get("/driver/requests").data
+    assert b"Track Live Ride" in client.get("/driver/active-ride").data
+    assert b"Completed Rides" in client.get("/driver/trips").data
 
 def test_driver_weekly_earnings_summary(client):
     # 1. Login as driver
@@ -242,18 +267,22 @@ def test_driver_weekly_earnings_summary(client):
     # Verify the last day is marked as today
     assert summary["days"][-1]["is_today"] is True
 
-def test_passenger_rewards_tracker_and_redemption(client):
+def test_passenger_rewards_tracker_and_redemption(client, db):
     # 1. Login as passenger
     client.get("/auth/demo/passenger", follow_redirects=True)
 
-    # 2. View passenger dashboard and check for rewards component
-    dash_res = client.get("/passenger/dashboard")
-    assert dash_res.status_code == 200
-    assert b"RideEasy Rewards" in dash_res.data
-    assert b"Available Points Balance" in dash_res.data
-    assert b"Total Trip Distance" in dash_res.data
-    assert b"Tier Progress" in dash_res.data
-    assert b"Redeemable Travel Benefits" in dash_res.data
+    ride = db.fetchone("SELECT estimated_distance_km FROM rides WHERE id = 'ride_01'")
+    original_distance = ride["estimated_distance_km"]
+    db.execute("UPDATE rides SET estimated_distance_km = 500 WHERE id = 'ride_01'")
+
+    # 2. View the dedicated rewards page
+    rewards_res = client.get("/passenger/rewards")
+    assert rewards_res.status_code == 200
+    assert b"RideEasy Rewards" in rewards_res.data
+    assert b"Available Points" in rewards_res.data
+    assert b"Trip Distance" in rewards_res.data
+    assert b"Current Tier" in rewards_res.data
+    assert b"Redeemable Travel Benefits" in rewards_res.data
 
     # 3. Query rewards JSON API
     api_res = client.get("/passenger/rewards/api/summary")
@@ -270,16 +299,17 @@ def test_passenger_rewards_tracker_and_redemption(client):
 
     initial_pts = rewards["available_points"]
 
-    # 4. Redeem a valid benefit (UGX 5,000 Off City Ride - 350 pts)
+    # 4. Redeem the least expensive unlocked benefit
+    benefit = next(item for item in rewards["benefits"] if item["can_redeem"])
     redeem_res = client.post("/passenger/rewards/redeem", json={
-        "reward_id": "rew_city_discount_5k"
+        "reward_id": benefit["id"]
     }, headers={"X-Requested-With": "XMLHttpRequest"})
     assert redeem_res.status_code == 200
     redeem_data = redeem_res.get_json()
     assert redeem_data["success"] is True
     assert "voucher" in redeem_data
-    assert redeem_data["voucher"]["voucher_code"].startswith("RW-CITY-")
-    assert redeem_data["rewards"]["available_points"] == initial_pts - 350
+    assert redeem_data["voucher"]["title"] == benefit["title"]
+    assert redeem_data["rewards"]["available_points"] == initial_pts - benefit["points_cost"]
 
     # 5. Test invalid reward ID
     invalid_res = client.post("/passenger/rewards/redeem", json={
@@ -296,8 +326,4 @@ def test_passenger_rewards_tracker_and_redemption(client):
         assert over_res.status_code == 400
         assert "Insufficient points" in over_res.get_json()["error"]
 
-
-
-
-
-
+    db.execute("UPDATE rides SET estimated_distance_km = ? WHERE id = 'ride_01'", (original_distance,))

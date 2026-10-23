@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}School Transport Portal — RideEasy{% endblock %}
+{% block title %}School Transport Overview — RideEasy{% endblock %}
 
 {% block content %}
 <div class="container section">
@@ -8,108 +8,69 @@
     <div>
       <div class="metadata-row" style="margin-bottom: 0.25rem;">
         <span style="font-weight: 700; color: var(--color-black); text-transform: uppercase;">Educational Transport</span>
-        <span class="metadata-separator">·</span>
-        <span>Reg #{{ school.registration_number }}</span>
+        {% if school %}<span class="metadata-separator">·</span><span>Reg #{{ school.registration_number }}</span>{% endif %}
       </div>
-      <h2>{{ school.school_name }}</h2>
+      <h2>{{ school.school_name if school else 'School Transport Portal' }}</h2>
     </div>
+    <a href="/school/request" class="btn btn-primary">Book School Transport</a>
+  </div>
 
-    <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
-      <a href="/school/request" class="btn btn-primary">
-        <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M4 16c0 .88.39 1.67 1 2.22V20a1 1 0 0 0 1 1h1a1 1 0 0 0 1-1v-1h8v1a1 1 0 0 0 1 1h1a1 1 0 0 0 1-1v-1.78c.61-.55 1-1.34 1-2.22V6c0-3.5-3.58-4-8-4s-8 .5-8 4v10z"/><circle cx="7.5" cy="14.5" r="1.5"/><circle cx="16.5" cy="14.5" r="1.5"/></svg>
-        New Bus / Coaster Request
-      </a>
-      <a href="/contact" class="btn btn-secondary">School Support</a>
+  {% if school %}
+    <div class="card" style="margin-bottom: 1.5rem; border-left: 3px solid var(--color-black);">
+      <div class="card-header">
+        <div>
+          <div class="card-title">School Safety & Compliance</div>
+          <div class="card-subtitle">Verified drivers and inspected vehicles are assigned to school bookings.</div>
+        </div>
+        <span class="status-indicator"><span class="status-dot"></span>{{ school.verification_status }} SCHOOL</span>
+      </div>
+      <p class="text-subtle">Only certified Coaster and Bus drivers are dispatched for school transport.</p>
+    </div>
+  {% endif %}
+
+  <div class="stats-grid" style="margin-bottom: 1.5rem;">
+    <div class="stat-card">
+      <div class="stat-label">Total Transport Requests</div>
+      <div class="stat-value">{{ requests|length }}</div>
+      <div class="stat-subtext">Most recent requests are shown below</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Awaiting Review</div>
+      <div class="stat-value">{{ requests|selectattr('status', 'equalto', 'PENDING')|list|length }}</div>
+      <div class="stat-subtext">Requests pending assignment</div>
     </div>
   </div>
 
-  <!-- Safety & Compliance Card -->
-  <div class="card" style="margin-bottom: 2rem; border-left: 3px solid var(--color-black);">
-    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
-      <div>
-        <div style="font-weight: 700; font-size: 1rem;">Institutional School Safety Protocol</div>
-        <p style="font-size: 0.8125rem; color: var(--color-dark-grey); margin-top: 0.25rem;">
-          Only certified Coaster (30 seats) and Bus (60 seats) drivers with clean criminal records and mechanical speed governors are dispatched for school transport.
-        </p>
-      </div>
-      <span class="status-indicator">
-        <span class="status-dot"></span> {{ school.verification_status }} SCHOOL
-      </span>
-    </div>
-  </div>
-
-  <!-- Transport Requests & Charter Ledger -->
   <div class="card">
     <div class="card-header">
       <div>
-        <div class="card-title">School Bus & Coaster Bookings</div>
-        <div class="card-subtitle">Excursions, inter-school athletics, and daily academic charters</div>
+        <div class="card-title">Recent Transport Requests</div>
+        <div class="card-subtitle">Review latest school bus and coaster bookings.</div>
       </div>
-      <a href="/school/request" class="btn btn-secondary btn-sm">+ Request Charter</a>
+      <a href="/school/requests" class="btn btn-secondary btn-sm">View all requests</a>
     </div>
-
     {% if requests %}
       <div class="table-responsive">
         <table class="table">
-          <thead>
-            <tr>
-              <th>Request ID</th>
-              <th>Date & Time</th>
-              <th>Vehicle Type</th>
-              <th>Route</th>
-              <th>Students</th>
-              <th>Assigned Operator</th>
-              <th>Agreed Fare</th>
-              <th>Status</th>
-              <th>Action</th>
-            </tr>
-          </thead>
+          <thead><tr><th>Travel date</th><th>Route</th><th>Vehicle</th><th>Students</th><th>Status</th><th></th></tr></thead>
           <tbody>
-            {% for r in requests %}
+            {% for item in recent_requests %}
               <tr>
-                <td>
-                  <a href="/school/requests/{{ r.id }}" style="font-weight: 700; text-decoration: underline;">
-                    #{{ r.id[:8].upper() }}
-                  </a>
-                </td>
-                <td>
-                  <div style="font-weight: 600;">{{ r.travel_date }}</div>
-                  <div class="text-subtle">{{ r.departure_time }}</div>
-                </td>
-                <td>
-                  <strong>{{ r.vehicle_type }}</strong>
-                </td>
-                <td>
-                  <div style="font-weight: 600;">{{ r.destination }}</div>
-                  <div class="text-subtle">From: {{ r.pickup_location }}</div>
-                </td>
-                <td>{{ r.passenger_count }} Seats</td>
-                <td>
-                  {% if r.driver_name %}
-                    <div>{{ r.driver_name }}</div>
-                    <div class="text-subtle">{{ r.plate_number }} ({{ r.vehicle_category }})</div>
-                  {% else %}
-                    <span class="text-subtle">Assignment Pending</span>
-                  {% endif %}
-                </td>
-                <td style="font-weight: 700;">{{ r.agreed_price_ugx | ugx }}</td>
-                <td>
-                  <span class="status-indicator">
-                    <span class="status-dot"></span> {{ r.status.replace('_', ' ') }}
-                  </span>
-                </td>
-                <td>
-                  <a href="/school/requests/{{ r.id }}" class="btn btn-secondary btn-sm">Details</a>
-                </td>
+                <td>{{ item.travel_date }}<div class="text-subtle">{{ item.departure_time }}</div></td>
+                <td><strong>{{ item.destination }}</strong><div class="text-subtle">From: {{ item.pickup_location }}</div></td>
+                <td>{{ item.vehicle_type }}</td>
+                <td>{{ item.passenger_count }}</td>
+                <td>{{ item.status.replace('_', ' ') }}</td>
+                <td><a href="/school/requests/{{ item.id }}" class="btn btn-secondary btn-sm">Details</a></td>
               </tr>
             {% endfor %}
           </tbody>
         </table>
       </div>
     {% else %}
-      <div style="text-align: center; padding: 3rem 0; color: var(--color-medium-grey);">
-        <p style="margin-bottom: 1rem;">No transport bookings recorded for your school yet.</p>
-        <a href="/school/request" class="btn btn-primary">Book Your First Coaster or Bus</a>
+      <div style="text-align: center; padding: 2rem 1rem;">
+        <p style="margin-bottom: 1rem;">No transport bookings recorded yet.</p>
+        <a href="/school/request" class="btn btn-primary">Book your first school trip</a>
       </div>
     {% endif %}
   </div>

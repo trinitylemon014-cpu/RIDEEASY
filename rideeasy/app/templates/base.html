@@ -138,6 +138,43 @@
     </div>
   </header>
 
+  {% if current_user %}
+    <nav aria-label="Workspace navigation" style="border-bottom: 1px solid var(--color-light-grey); background: var(--color-white);">
+      <div class="container" style="display: flex; gap: 0.35rem; overflow-x: auto; padding-top: 0.5rem; padding-bottom: 0.5rem; white-space: nowrap;">
+        {% if current_user.role == 'PASSENGER' %}
+          <a href="/passenger/dashboard" class="btn btn-secondary btn-sm">Overview</a>
+          <a href="/passenger/rides" class="btn btn-secondary btn-sm">Recent Trips</a>
+          <a href="/passenger/rides?status=awaiting" class="btn btn-secondary btn-sm">Awaiting Rides</a>
+          <a href="/passenger/book-ride" class="btn btn-secondary btn-sm">Book a Ride</a>
+          <a href="/passenger/flight-request" class="btn btn-secondary btn-sm">Book a Flight</a>
+          <a href="/passenger/flight-requests" class="btn btn-secondary btn-sm">Flight Requests</a>
+          <a href="/passenger/journeys" class="btn btn-secondary btn-sm">Journeys</a>
+          <a href="/passenger/rewards" class="btn btn-secondary btn-sm">Rewards</a>
+        {% elif current_user.role == 'DRIVER' %}
+          <a href="/driver/dashboard" class="btn btn-secondary btn-sm">Overview</a>
+          <a href="/driver/requests" class="btn btn-secondary btn-sm">Awaiting Requests</a>
+          <a href="/driver/active-ride" class="btn btn-secondary btn-sm">Live Ride</a>
+          <a href="/driver/trips" class="btn btn-secondary btn-sm">Completed Rides</a>
+          <a href="/driver/verification" class="btn btn-secondary btn-sm">Verification</a>
+        {% elif current_user.role == 'SCHOOL' %}
+          <a href="/school/dashboard" class="btn btn-secondary btn-sm">Overview</a>
+          <a href="/school/requests" class="btn btn-secondary btn-sm">Transport Requests</a>
+          <a href="/school/request" class="btn btn-secondary btn-sm">Book Transport</a>
+        {% elif current_user.role == 'ADMIN' %}
+          <a href="/admin/dashboard" class="btn btn-secondary btn-sm">Overview</a>
+          <a href="/admin/users" class="btn btn-secondary btn-sm">Users</a>
+          <a href="/admin/drivers" class="btn btn-secondary btn-sm">Drivers</a>
+          <a href="/admin/schools" class="btn btn-secondary btn-sm">School Requests</a>
+          <a href="/admin/flights" class="btn btn-secondary btn-sm">Flights</a>
+          <a href="/admin/pricing" class="btn btn-secondary btn-sm">Pricing</a>
+          <a href="/admin/audit-logs" class="btn btn-secondary btn-sm">Audit Logs</a>
+        {% elif current_user.role == 'TRAVEL_COMPANY' %}
+          <a href="/travel/dashboard" class="btn btn-secondary btn-sm">Travel Partner Dashboard</a>
+        {% endif %}
+      </div>
+    </nav>
+  {% endif %}
+
   <!-- Mobile Collapsible Navigation Drawer -->
   <div id="mobile-nav-drawer" class="mobile-nav-drawer no-print">
     <a href="/" class="nav-link">Home</a>
