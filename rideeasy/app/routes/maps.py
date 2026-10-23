@@ -1,12 +1,11 @@
-from flask import Blueprint, current_app, render_template, request
-from app.services.auth_service import login_required, role_required, AuthService
+from flask import Blueprint, abort, current_app, render_template, request
+from app.services.auth_service import login_required, AuthService
 
 maps_bp = Blueprint("maps", __name__)
 
 
 @maps_bp.before_request
 @login_required
-@role_required("PASSENGER", "DRIVER", "SCHOOL", "TRAVEL_COMPANY", "ADMIN")
 def before_request():
     pass
 
@@ -15,13 +14,16 @@ def before_request():
 @maps_bp.route("/map")
 def route_planner():
     user = AuthService.get_current_user()
-    role = {
+    role_by_user_type = {
         "SCHOOL": "school",
         "DRIVER": "driver",
         "PASSENGER": "passenger",
         "TRAVEL_COMPANY": "travel",
         "ADMIN": "admin",
-    }[user["role"]]
+    }
+    role = role_by_user_type.get(user["role"]) if user else None
+    if role is None:
+        abort(403)
 
     pickup = request.args.get("pickup", "").strip()[:300]
     destination = request.args.get("destination", "").strip()[:300]
