@@ -85,6 +85,25 @@
   .demo-role-bar {
     justify-content: center;
   }
+
+  .ai-support-widget {
+    right: 0.75rem;
+    bottom: 0.75rem;
+  }
+
+  .ai-support-panel {
+    width: calc(100vw - 1.5rem);
+    height: min(590px, calc(100dvh - 6rem));
+    min-height: 300px;
+  }
+
+  .ai-support-toggle {
+    min-height: 48px;
+  }
+
+  .ai-send-label {
+    display: none;
+  }
 }
 
 @media (max-width: 480px) {

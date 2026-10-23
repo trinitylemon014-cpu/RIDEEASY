@@ -248,6 +248,57 @@
     </div>
   </footer>
 
+  {% if current_user %}
+    <div class="ai-support-widget no-print" id="ai-support-widget">
+      <section class="ai-support-panel" id="ai-support-panel" aria-labelledby="ai-support-title" hidden>
+        <header class="ai-support-header">
+          <div class="ai-support-identity">
+            <span class="ai-support-mark" aria-hidden="true">
+              <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><path d="M8 10h8M8 14h5"/></svg>
+            </span>
+            <span>
+              <strong id="ai-support-title">RideEasy Support</strong>
+              <span class="ai-support-presence"><span class="status-dot"></span> AI Concierge · Available</span>
+            </span>
+          </div>
+          <button type="button" class="ai-support-close" id="ai-support-close" aria-label="Close support chat" title="Close support chat">
+            <svg class="icon icon-sm" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </header>
+
+        <div class="ai-support-context">Official guidance on bookings, fares, payments, safety, and travel.</div>
+        <div class="ai-support-prompts" aria-label="Suggested questions">
+          <button type="button" class="ai-prompt-btn" data-query="How are ride fares calculated in RideEasy?">Fare guidance</button>
+          <button type="button" class="ai-prompt-btn" data-query="How do I book an airport transfer to Entebbe Airport (EBB)?">Airport transfers</button>
+          <button type="button" class="ai-prompt-btn" data-query="What driver vetting and vehicle safety standards do you enforce?">Safety standards</button>
+        </div>
+
+        <div class="ai-chat-thread" id="ai-chat-thread" role="log" aria-live="polite" aria-relevant="additions">
+          <div class="ai-chat-message bot">
+            <div class="ai-message-meta"><strong>RideEasy Concierge <span class="ai-message-tag">AI</span></strong><span class="text-subtle">Now</span></div>
+            <div class="ai-msg-content">Hello <strong>{{ current_user.full_name.split()[0] }}</strong>. How can I help with your RideEasy journey today?</div>
+          </div>
+        </div>
+
+        <form class="ai-chat-form" id="ai-chat-form">
+          <label class="sr-only" for="ai-chat-input">Message RideEasy Support</label>
+          <input type="text" id="ai-chat-input" class="form-control" placeholder="Ask a question..." autocomplete="off" required>
+          <button type="submit" id="ai-chat-send-btn" class="btn btn-primary" aria-label="Send message" title="Send message">
+            <span class="ai-send-label">Send</span>
+            <svg class="icon icon-sm" viewBox="0 0 24 24"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+          </button>
+        </form>
+        <div class="ai-support-footnote">AI-generated guidance. For urgent assistance, call {{ support_phone }}.</div>
+      </section>
+
+      <button type="button" class="ai-support-toggle" id="ai-support-toggle" aria-controls="ai-support-panel" aria-expanded="false" aria-label="Open RideEasy support chat">
+        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><path d="M8 10h8M8 14h5"/></svg>
+        <span>Support</span>
+        <span class="ai-support-toggle-status" aria-hidden="true"></span>
+      </button>
+    </div>
+  {% endif %}
+
   <script src="/static/js/app.js"></script>
 </body>
 </html>

@@ -574,6 +574,9 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   // 7. AI Customer Service Care Concierge (Gemini 3.8 Flash)
+  const aiSupportToggle = document.getElementById("ai-support-toggle");
+  const aiSupportPanel = document.getElementById("ai-support-panel");
+  const aiSupportClose = document.getElementById("ai-support-close");
   const aiChatForm = document.getElementById("ai-chat-form");
   const aiChatInput = document.getElementById("ai-chat-input");
   const aiChatThread = document.getElementById("ai-chat-thread");
@@ -581,6 +584,34 @@ document.addEventListener("DOMContentLoaded", () => {
   const aiPromptButtons = document.querySelectorAll(".ai-prompt-btn");
 
   const chatHistory = [];
+
+  function setAISupportOpen(isOpen) {
+    if (!aiSupportToggle || !aiSupportPanel) return;
+    aiSupportPanel.hidden = !isOpen;
+    aiSupportToggle.setAttribute("aria-expanded", String(isOpen));
+    aiSupportToggle.setAttribute("aria-label", isOpen ? "Close RideEasy support chat" : "Open RideEasy support chat");
+    if (isOpen && aiChatInput) aiChatInput.focus();
+  }
+
+  if (aiSupportToggle) {
+    aiSupportToggle.addEventListener("click", () => {
+      setAISupportOpen(aiSupportToggle.getAttribute("aria-expanded") !== "true");
+    });
+  }
+
+  if (aiSupportClose) {
+    aiSupportClose.addEventListener("click", () => {
+      setAISupportOpen(false);
+      if (aiSupportToggle) aiSupportToggle.focus();
+    });
+  }
+
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && aiSupportPanel && !aiSupportPanel.hidden) {
+      setAISupportOpen(false);
+      if (aiSupportToggle) aiSupportToggle.focus();
+    }
+  });
 
   function formatAIResponse(rawText) {
     if (!rawText) return "";
@@ -694,11 +725,11 @@ document.addEventListener("DOMContentLoaded", () => {
         if (aiSendBtn) {
           aiSendBtn.disabled = false;
           aiSendBtn.innerHTML = `
-            <span>Ask Concierge</span>
+            <span class="ai-send-label">Send</span>
             <svg class="icon icon-sm" viewBox="0 0 24 24"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
           `;
         }
-        if (aiChatInput) aiChatInput.focus();
+        if (aiChatInput && (!aiSupportPanel || !aiSupportPanel.hidden)) aiChatInput.focus();
       });
   }
 

@@ -61,7 +61,9 @@ def test_passenger_dashboard_shows_completed_rides_and_repeat_button(client):
     assert b"Recent Completed Rides" in res.data
     assert b"Request Repeat Ride" in res.data
     assert b"Fare Paid" in res.data
-    assert b"RideEasy AI Customer Care Concierge" in res.data
+    assert b'id="ai-support-widget"' in res.data
+    assert b'id="ai-support-panel"' in res.data
+    assert b'id="ai-customer-care-section"' not in res.data
 
     # Test repeat ride link with pre-filled parameters
     repeat_res = client.get("/passenger/book-ride?pickup=Victoria+Towers%2C+Nakasero+Road&destination=Garden+City+Mall&category=COMFORT")
