@@ -22,7 +22,7 @@ The platform provides four core services:
 - **Frontend**: HTML5, Modern CSS3, Vanilla JavaScript (ES2022). **No React, No Vue, No Angular, No third-party UI frameworks.**
 - **Aesthetic**: Minimalist monochrome black-and-white (`#000000`, `#111111`, `#FFFFFF`, `#F7F7F7`, `#E5E5E5`, `#777777`).
 - **Icons**: 100% black SVG line icons. **Strictly zero emojis or candy pills.**
-- **Database**: **Turso** edge-hosted libSQL as primary production database, with transparent local SQLite fallback.
+- **Database**: **Turso** edge-hosted libSQL as primary production database, with local SQLite for development. A configured but unavailable Turso database fails closed; it never silently falls back for payment records.
 - **Mobile**: Progressive Web App (PWA) with manifest & service worker, ready for native Android & iOS bundling via **Capacitor**.
 
 ---
@@ -41,15 +41,17 @@ source venv/bin/activate       # macOS / Linux
 # 3. Install dependencies
 pip install -r requirements.txt
 
-# 4. Optional: Configure your production Turso database in .env
-cp .env.example .env
-# Set TURSO_DATABASE_URL and TURSO_AUTH_TOKEN if connecting to remote Turso
+# 4. Set a private SECRET_KEY in your environment (required)
+export SECRET_KEY="$(python -c 'import secrets; print(secrets.token_hex(32))')"
+export FLASK_ENV=development
+# For production, also configure Turso, Paystack, callback URL, and EgoSMS secrets.
+# See docs/API_INTEGRATIONS.md and docs/DEPLOYMENT.md.
 
 # 5. Launch the application
 python run.py
 ```
 
-The platform will automatically initialize tables, seed demo data, and start on `http://127.0.0.1:5000`.
+The platform will automatically initialize tables, seed demo data, and start on `http://127.0.0.1:5000`. Payment checkout is disabled until a Paystack secret and public HTTPS callback URL are configured.
 
 ---
 
@@ -72,7 +74,7 @@ RideEasy includes a 1-click **Demo Switcher** at the top of every screen. You ca
 ```bash
 python3 -m pytest tests
 ```
-The test suite validates authentication, role-based access control, database seeding, fare calculation math, school transport restrictions, and aviation PNR confirmation workflows.
+The test suite validates authentication, role-based access control, database seeding, fare calculation math, Paystack payment verification and idempotent ledger allocation, school transport restrictions, and aviation PNR confirmation workflows.
 
 ---
 
@@ -89,7 +91,8 @@ rideeasy/
 │   │   ├── auth_service.py      # RBAC & password hashing
 │   │   ├── pricing_service.py   # Tariffs & Haversine distance calculator
 │   │   ├── reminder_service.py  # 5-tier travel reminder scheduler
-│   │   └── payment_service.py   # Mobile money, card & cash processing
+│   │   ├── payment_service.py   # Paystack verification, settlement ledger & rewards
+│   │   └── sms_service.py       # EgoSMS-compatible payment message delivery
 │   ├── routes/
 │   │   ├── main.py              # Homepage, about, pricing, safety, contact
 │   │   ├── auth.py              # Login, register, demo switchers

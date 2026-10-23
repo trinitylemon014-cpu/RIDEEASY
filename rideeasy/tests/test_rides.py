@@ -54,6 +54,120 @@ def test_api_fare_estimation(client):
     err_res = client.post("/api/estimate-fare", json={"pickup": ""})
     assert err_res.status_code == 400
 
+def test_route_map_is_available_to_passenger_driver_and_school(client):
+    for role, page_label in [
+        ("passenger", b"Plan your journey"),
+        ("driver", b"Plan your journey"),
+        ("school", b"Plan your journey"),
+    ]:
+        response = client.get(f"/auth/demo/{role}", follow_redirects=True)
+        assert response.status_code == 200
+        map_response = client.get("/map")
+        assert map_response.status_code == 200
+        assert page_label in map_response.data
+        assert b"route-map" in map_response.data
+        assert b"Route Map" in map_response.data
+
+    client.get("/auth/demo/school", follow_redirects=True)
+    school_map = client.get(
+        "/map?pickup=Greenhill%20Academy%20Kibuli&destination=Jinja%20Source%20of%20the%20Nile"
+    )
+    assert b'value="Greenhill Academy Kibuli"' in school_map.data
+    assert b'value="Jinja Source of the Nile"' in school_map.data
+    school_booking = client.get(
+        "/school/request?pickup=Greenhill%20Academy%20Kibuli&destination=Jinja%20Source%20of%20the%20Nile"
+    )
+    assert b'value="Greenhill Academy Kibuli"' in school_booking.data
+    assert b'value="Jinja Source of the Nile"' in school_booking.data
+
+    client.get("/auth/demo/travel", follow_redirects=True)
+    assert client.get("/map").status_code == 403
+
+def test_route_api_reports_missing_configuration(client):
+    client.get("/auth/demo/passenger", follow_redirects=True)
+    response = client.post("/api/route", json={
+        "start": "Acacia Mall, Kampala",
+        "destination": "Entebbe Airport",
+    })
+    assert response.status_code == 503
+    assert "LOCATIONIQ_API_KEY" in response.get_json()["error"]
+
+def test_route_api_returns_locationiq_road_distance(client, app, monkeypatch):
+    client.get("/auth/demo/passenger", follow_redirects=True)
+    monkeypatch.setitem(app.config, "LOCATIONIQ_API_KEY", "test-locationiq-key")
+    requests_made = []
+
+    class FakeResponse:
+        def __init__(self, body):
+            self.body = body
+
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return self.body
+
+    def fake_get(url, params, timeout):
+        requests_made.append((url, params, timeout))
+        if url.endswith("/search"):
+            latitude, longitude = (
+                ("0.334", "32.589") if params["q"] == "Acacia Mall, Kampala"
+                else ("0.0424", "32.4435")
+            )
+            return FakeResponse([{
+                "lat": latitude,
+                "lon": longitude,
+                "display_name": f"{params['q']}, Uganda",
+            }])
+        return FakeResponse({
+            "routes": [{
+                "distance": 42100,
+                "duration": 5400,
+                "geometry": {
+                    "type": "LineString",
+                    "coordinates": [[32.589, 0.334], [32.4435, 0.0424]],
+                },
+            }]
+        })
+
+    monkeypatch.setattr("app.services.location_service.requests.get", fake_get)
+    response = client.post("/api/route", json={
+        "start": "Acacia Mall, Kampala",
+        "destination": "Entebbe International Airport",
+    })
+    assert response.status_code == 200
+    route = response.get_json()["route"]
+    assert route["distance_km"] == 42.1
+    assert route["duration_minutes"] == 90
+    assert route["geometry"]["type"] == "LineString"
+    assert len(requests_made) == 3
+    assert all(call[1]["key"] == "test-locationiq-key" for call in requests_made)
+
+    map_page = client.get("/map")
+    assert b"test-locationiq-key" not in map_page.data
+
+def test_route_api_validates_addresses_and_empty_provider_results(client, app, monkeypatch):
+    client.get("/auth/demo/passenger", follow_redirects=True)
+    same_location = client.post("/api/route", json={"start": "Kampala", "destination": "kampala"})
+    assert same_location.status_code == 400
+    invalid_shape = client.post("/api/route", json=["Kampala", "Entebbe"])
+    assert invalid_shape.status_code == 400
+
+    monkeypatch.setitem(app.config, "LOCATIONIQ_API_KEY", "test-locationiq-key")
+    monkeypatch.setattr(
+        "app.services.location_service.requests.get",
+        lambda *args, **kwargs: type(
+            "FakeResponse", (),
+            {"raise_for_status": lambda self: None, "json": lambda self: []}
+        )()
+    )
+    no_results = client.post("/api/route", json={
+        "start": "No such place",
+        "destination": "Entebbe Airport",
+    })
+    assert no_results.status_code == 422
+    assert "No location found" in no_results.get_json()["error"]
+
 def test_passenger_dashboard_shows_completed_rides_and_repeat_button(client):
     client.get("/auth/demo/passenger", follow_redirects=True)
     res = client.get("/passenger/dashboard")
@@ -212,7 +326,7 @@ def test_passenger_workspace_pages_and_awaiting_ride_filter(client):
         "pickup_address": "Acacia Mall, Kololo",
         "destination_address": "Entebbe Airport",
         "category": "ECONOMY",
-        "payment_method": "CASH"
+        "payment_method": "MTN_MOMO"
     }, follow_redirects=True)
     assert request_res.status_code == 200
 
@@ -229,7 +343,24 @@ def test_driver_workspace_pages(client):
     assert b"Track Live Ride" in client.get("/driver/active-ride").data
     assert b"Completed Rides" in client.get("/driver/trips").data
 
-def test_driver_weekly_earnings_summary(client):
+def test_driver_weekly_earnings_summary(client, db):
+    import uuid
+
+    payment_id = f"pay_test_{uuid.uuid4().hex}"
+    reference = f"rideeasy_test_{uuid.uuid4().hex}"
+    db.execute(
+        """INSERT INTO payment_transactions
+           (id, ride_id, passenger_id, reference, amount_ugx, currency, status, created_at)
+           VALUES (?, 'ride_10', 'usr_pass_01', ?, 12000, 'UGX', 'PAID', CURRENT_TIMESTAMP)""",
+        (payment_id, reference)
+    )
+    db.execute(
+        """INSERT INTO payment_ledger
+           (id, payment_id, recipient_id, recipient_role, recipient_name, recipient_phone, amount_ugx)
+           VALUES (?, ?, 'usr_driver_01', 'DRIVER', 'David Okello', '0772000000', 9600)""",
+        (f"led_test_{uuid.uuid4().hex}", payment_id)
+    )
+
     # 1. Login as driver
     client.get("/auth/demo/driver", follow_redirects=True)
 

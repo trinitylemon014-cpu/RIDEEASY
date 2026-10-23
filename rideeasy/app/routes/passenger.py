@@ -75,14 +75,22 @@ REWARD_BENEFITS_CATALOG = [
         "discount_ugx": 65000,
         "description": "Complimentary 3-hour access pass to Karibuni VIP Lounge at Entebbe Airport with refreshments and Wi-Fi.",
         "badge": "EXCLUSIVE"
+    },
+    {
+        "id": "rew_25_percent_5000",
+        "title": "25% Off One Ride",
+        "category": "RIDE DISCOUNT",
+        "points_cost": 5000,
+        "required_km": 0,
+        "discount_ugx": 0,
+        "discount_percent": 25,
+        "description": "Apply 25% off one ride you select when booking.",
+        "badge": "5,000 POINT MILESTONE"
     }
 ]
 
 def get_passenger_rewards_summary(passenger_id, db):
-    """
-    Computes accumulated RideEasy Rewards points, tier status, distance milestone progress,
-    and active vouchers based on total trip distance from completed rides.
-    """
+    """Summarize paid-trip points, tiers, distance, and active vouchers."""
     stats = db.fetchone(
         """SELECT COALESCE(SUM(estimated_distance_km), 0) as total_distance_km,
                   COUNT(*) as completed_count
@@ -93,8 +101,12 @@ def get_passenger_rewards_summary(passenger_id, db):
     total_km = round(float(stats["total_distance_km"]), 1) if stats else 0.0
     completed_count = int(stats["completed_count"]) if stats else 0
 
-    POINTS_PER_KM = 10
-    total_earned_points = int(round(total_km * POINTS_PER_KM))
+    earned_row = db.fetchone(
+        "SELECT COALESCE(SUM(points), 0) AS total_points FROM reward_point_awards WHERE passenger_id = ?",
+        (passenger_id,)
+    )
+    POINTS_PER_TRIP = 100
+    total_earned_points = int(earned_row["total_points"]) if earned_row else 0
 
     spent_row = db.fetchone(
         "SELECT COALESCE(SUM(points_spent), 0) as total_spent FROM rewards_redemptions WHERE passenger_id = ?",
@@ -111,7 +123,6 @@ def get_passenger_rewards_summary(passenger_id, db):
         tier_max = 1500
         progress_pct = 100
         points_to_next = 0
-        km_to_next = 0.0
     elif total_earned_points >= 750:
         tier_name = "Platinum Traveler"
         tier_code = "PLATINUM"
@@ -120,7 +131,6 @@ def get_passenger_rewards_summary(passenger_id, db):
         tier_max = 1500
         progress_pct = min(100, int(((total_earned_points - 750) / (1500 - 750)) * 100))
         points_to_next = 1500 - total_earned_points
-        km_to_next = round(points_to_next / POINTS_PER_KM, 1)
     elif total_earned_points >= 250:
         tier_name = "Gold Commuter"
         tier_code = "GOLD"
@@ -129,7 +139,6 @@ def get_passenger_rewards_summary(passenger_id, db):
         tier_max = 750
         progress_pct = min(100, int(((total_earned_points - 250) / (750 - 250)) * 100))
         points_to_next = 750 - total_earned_points
-        km_to_next = round(points_to_next / POINTS_PER_KM, 1)
     else:
         tier_name = "Silver Cruiser"
         tier_code = "SILVER"
@@ -138,7 +147,7 @@ def get_passenger_rewards_summary(passenger_id, db):
         tier_max = 250
         progress_pct = min(100, int((total_earned_points / 250) * 100))
         points_to_next = 250 - total_earned_points
-        km_to_next = round(points_to_next / POINTS_PER_KM, 1)
+    trips_to_next = (points_to_next + POINTS_PER_TRIP - 1) // POINTS_PER_TRIP
 
     redemptions = db.fetchall(
         """SELECT * FROM rewards_redemptions
@@ -151,18 +160,19 @@ def get_passenger_rewards_summary(passenger_id, db):
     for item in REWARD_BENEFITS_CATALOG:
         unlocked = available_points >= item["points_cost"]
         needed_points = max(0, item["points_cost"] - available_points)
-        needed_km = round(needed_points / POINTS_PER_KM, 1)
+        needed_trips = (needed_points + POINTS_PER_TRIP - 1) // POINTS_PER_TRIP
         benefits.append({
             **item,
+            "discount_percent": item.get("discount_percent", 0),
             "can_redeem": unlocked,
             "needed_points": needed_points,
-            "needed_km": needed_km
+            "needed_trips": needed_trips
         })
 
     return {
         "total_km": total_km,
         "completed_count": completed_count,
-        "points_per_km": POINTS_PER_KM,
+        "points_per_trip": POINTS_PER_TRIP,
         "total_earned_points": total_earned_points,
         "total_spent_points": total_spent_points,
         "available_points": available_points,
@@ -173,7 +183,7 @@ def get_passenger_rewards_summary(passenger_id, db):
         "tier_max": tier_max,
         "progress_pct": progress_pct,
         "points_to_next": points_to_next,
-        "km_to_next": km_to_next,
+        "trips_to_next": trips_to_next,
         "benefits": benefits,
         "redemptions": redemptions
     }
@@ -243,12 +253,26 @@ def redeem_reward():
     voucher_code = f"RW-{prefix}-{random_hex}"
     redemption_id = f"red_{uuid.uuid4().hex[:10]}"
 
-    db.execute(
+    inserted = db.execute(
         """INSERT INTO rewards_redemptions
-        (id, passenger_id, reward_id, reward_title, points_spent, voucher_code, discount_ugx, status, created_at, expires_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, 'ACTIVE', CURRENT_TIMESTAMP, datetime('now', '+60 days'))""",
-        (redemption_id, user["id"], benefit["id"], benefit["title"], benefit["points_cost"], voucher_code, benefit["discount_ugx"])
+        (id, passenger_id, reward_id, reward_title, points_spent, voucher_code,
+         discount_ugx, discount_percent, status, created_at, expires_at)
+        SELECT ?, ?, ?, ?, ?, ?, ?, ?, 'ACTIVE', CURRENT_TIMESTAMP, datetime('now', '+60 days')
+        WHERE (
+            (SELECT COALESCE(SUM(points), 0) FROM reward_point_awards WHERE passenger_id = ?)
+            - (SELECT COALESCE(SUM(points_spent), 0) FROM rewards_redemptions WHERE passenger_id = ?)
+        ) >= ?""",
+        (redemption_id, user["id"], benefit["id"], benefit["title"], benefit["points_cost"],
+         voucher_code, benefit["discount_ugx"], benefit.get("discount_percent", 0),
+         user["id"], user["id"], benefit["points_cost"])
     )
+    if inserted == 0:
+        updated_summary = get_passenger_rewards_summary(user["id"], db)
+        err_msg = f"Insufficient points balance ({updated_summary['available_points']} pts available, need {benefit['points_cost']} pts)."
+        if request.is_json or request.headers.get("X-Requested-With") == "XMLHttpRequest":
+            return jsonify({"success": False, "error": err_msg}), 400
+        flash(err_msg, "error")
+        return redirect(url_for("passenger.dashboard"))
 
     # In-app notification
     NotificationService.create_notification(
@@ -268,6 +292,7 @@ def redeem_reward():
         "voucher_code": voucher_code,
         "points_spent": benefit["points_cost"],
         "discount_ugx": benefit["discount_ugx"],
+        "discount_percent": benefit.get("discount_percent", 0),
         "status": "ACTIVE",
         "created_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         "expires_at": (datetime.now() + timedelta(days=60)).strftime("%Y-%m-%d")
@@ -306,18 +331,36 @@ def book_ride():
     user = AuthService.get_current_user()
     db = get_db()
     landmarks = MapService.LANDMARKS
+    eligible_rewards = db.fetchall(
+        """SELECT id, reward_title, voucher_code, discount_percent, discount_ugx
+           FROM rewards_redemptions
+           WHERE passenger_id = ? AND status = 'ACTIVE'
+             AND (expires_at IS NULL OR expires_at > CURRENT_TIMESTAMP)
+             AND ride_id IS NULL
+           ORDER BY created_at DESC""",
+        (user["id"],)
+    )
 
     if request.method == "POST":
         pickup_address = request.form.get("pickup_address", "").strip()
         destination_address = request.form.get("destination_address", "").strip()
         category = request.form.get("category", "ECONOMY").upper()
-        payment_method = request.form.get("payment_method", "CASH").upper()
+        payment_method = request.form.get("payment_method", "MTN_MOMO").upper()
         is_airport = 1 if request.form.get("is_airport_ride") == "1" else 0
         related_journey_id = request.form.get("related_journey_id", "").strip() or None
 
         if not pickup_address or not destination_address:
             flash("Please provide both pickup and destination locations.", "error")
-            return render_template("passenger/book_ride.html", user=user, landmarks=landmarks)
+            return render_template(
+                "passenger/book_ride.html", user=user, landmarks=landmarks,
+                eligible_rewards=eligible_rewards
+            )
+        if payment_method not in {"MTN_MOMO", "AIRTEL_MONEY", "CARD"}:
+            flash("Please choose an online Paystack payment method.", "error")
+            return render_template(
+                "passenger/book_ride.html", user=user, landmarks=landmarks,
+                eligible_rewards=eligible_rewards
+            )
 
         # Coordinate lookup & distance calculation
         p_coords = MapService.find_coordinates(pickup_address)
@@ -331,6 +374,33 @@ def book_ride():
             distance_km = 3.5  # Sensible minimum for city transfers
 
         estimated_fare = PricingService.calculate_fare(category, distance_km)
+        voucher_code = request.form.get("reward_voucher_code", "").strip().upper()
+        selected_voucher = None
+        if voucher_code:
+            selected_voucher = db.fetchone(
+                """SELECT id, discount_percent, discount_ugx FROM rewards_redemptions
+                   WHERE passenger_id = ? AND voucher_code = ? AND status = 'ACTIVE'
+                     AND ride_id IS NULL
+                     AND (expires_at IS NULL OR expires_at > CURRENT_TIMESTAMP)""",
+                (user["id"], voucher_code)
+            )
+            if not selected_voucher:
+                flash("That reward voucher is invalid, expired, or already used.", "error")
+                return render_template(
+                    "passenger/book_ride.html", user=user, landmarks=landmarks,
+                    eligible_rewards=eligible_rewards
+                )
+            discount_percent = int(selected_voucher["discount_percent"] or 0)
+            if not 0 <= discount_percent <= 100:
+                abort(400, "Reward discount is invalid.")
+        else:
+            discount_percent = 0
+        discount_ugx = (
+            min(estimated_fare, estimated_fare * discount_percent // 100)
+        )
+        if selected_voucher and not discount_percent:
+            discount_ugx = min(estimated_fare, int(selected_voucher["discount_ugx"] or 0))
+        final_fare = estimated_fare - discount_ugx
 
         # Find available online verified driver
         available_driver = db.fetchone(
@@ -346,7 +416,7 @@ def book_ride():
         driver_id = available_driver["user_id"] if available_driver else None
         status = "DRIVER_ASSIGNED" if driver_id else "SEARCHING_FOR_DRIVER"
 
-        db.execute(
+        ride_insert = (
             """INSERT INTO rides 
             (id, passenger_id, driver_id, category, pickup_address, pickup_lat, pickup_lng, 
              destination_address, destination_lat, destination_lng, estimated_distance_km, 
@@ -354,8 +424,19 @@ def book_ride():
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'UNPAID', ?, ?, ?)""",
             (ride_id, user["id"], driver_id, category, pickup_address, p_coords["lat"], p_coords["lng"],
              destination_address, d_coords["lat"], d_coords["lng"], distance_km,
-             estimated_fare, estimated_fare, payment_method, status, is_airport, related_journey_id)
+             estimated_fare, final_fare, payment_method, status, is_airport, related_journey_id)
         )
+        if selected_voucher:
+            db.execute_transaction([
+                ride_insert,
+                (
+                    """UPDATE rewards_redemptions SET status = 'USED', ride_id = ?
+                       WHERE id = ? AND passenger_id = ? AND status = 'ACTIVE' AND ride_id IS NULL""",
+                    (ride_id, selected_voucher["id"], user["id"]), 1
+                )
+            ])
+        else:
+            db.execute(*ride_insert)
 
         if related_journey_id:
             db.execute("UPDATE confirmed_journeys SET airport_ride_booked = 1 WHERE id = ?", (related_journey_id,))
@@ -395,7 +476,8 @@ def book_ride():
         pre_destination=pre_destination,
         pre_category=pre_category,
         is_airport=is_airport,
-        journey_id=journey_id
+        journey_id=journey_id,
+        eligible_rewards=eligible_rewards
     )
 
 @passenger_bp.route("/saved-routes", methods=["GET", "POST"])
@@ -592,6 +674,10 @@ def cancel_ride(ride_id):
             WHERE id = ?""",
             (full_reason, ride_id)
         )
+        db.execute(
+            "UPDATE rewards_redemptions SET status = 'ACTIVE', ride_id = NULL WHERE ride_id = ? AND status = 'USED'",
+            (ride_id,)
+        )
 
         # Audit log entry
         db.execute(
@@ -668,6 +754,12 @@ def receipt(ride_id):
     ride = db.fetchone("SELECT * FROM rides WHERE id = ? AND passenger_id = ?", (ride_id, user["id"]))
     if not ride:
         abort(404)
+    verified_payment = db.fetchone(
+        "SELECT id FROM payment_transactions WHERE ride_id = ? AND status = 'PAID'",
+        (ride_id,)
+    )
+    if verified_payment:
+        ride["payment_method"] = "PAYSTACK"
 
     driver = None
     if ride["driver_id"]:

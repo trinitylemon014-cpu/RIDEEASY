@@ -77,6 +77,24 @@
       </div>
     </div>
 
+    {% if ride.status == 'COMPLETED' %}
+    <div class="card" style="margin-bottom: 1.5rem;">
+      <div class="card-title">Ride payment</div>
+      {% if ride.payment_status == 'PAID' %}
+        <p>Paystack has verified this payment. Your 100 reward points have been recorded.</p>
+      {% else %}
+        <p>Pay securely through Paystack. Points and driver/admin earnings are recorded only after server-side verification.</p>
+        {% if ride.payment_status == 'PENDING' %}
+          <p class="text-subtle">A payment attempt is awaiting confirmation. You may safely reopen checkout if needed.</p>
+        {% endif %}
+        <form method="POST" action="{{ url_for('payments.start_paystack_checkout', ride_id=ride.id) }}">
+          <input type="hidden" name="csrf_token" value="{{ payment_csrf_token }}">
+          <button type="submit" class="btn btn-primary">Pay {{ ride.final_fare_ugx or ride.estimated_fare_ugx | ugx }} with Paystack</button>
+        </form>
+      {% endif %}
+    </div>
+    {% endif %}
+
     <!-- Assigned Driver & Vehicle Card -->
     {% if ride.driver_name %}
     <div class="card" style="margin-bottom: 1.5rem;">

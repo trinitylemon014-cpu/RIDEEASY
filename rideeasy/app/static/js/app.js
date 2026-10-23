@@ -1478,7 +1478,7 @@ document.addEventListener("DOMContentLoaded", () => {
                       ${escapeHtml(v.title)} <span style="font-size: 0.625rem; font-weight: 700; background-color: var(--color-black); color: var(--color-white); padding: 0.1rem 0.35rem; border-radius: 2px; margin-left: 0.25rem;">NEW</span>
                     </div>
                     <div class="text-subtle" style="font-size: 0.75rem;">
-                      Redeemed for ${v.points_spent} pts · Valid for 60 days
+                      Redeemed for ${v.points_spent} pts · ${v.discount_percent ? `${v.discount_percent}% off one ride` : "Valid for 60 days"}
                     </div>
                   </div>
                 </div>
@@ -1510,9 +1510,9 @@ document.addEventListener("DOMContentLoaded", () => {
                   card.classList.add("is-locked");
                   if (actionContainer) {
                     actionContainer.innerHTML = `
-                      <span class="text-subtle" style="font-size: 0.75rem;">${b.required_km} km required</span>
+                      <span class="text-subtle" style="font-size: 0.75rem;">${b.points_cost} points · ${Math.ceil(b.points_cost / 100)} paid trips</span>
                       <button type="button" class="btn btn-secondary btn-sm" disabled style="opacity: 0.6; cursor: not-allowed; font-size: 0.75rem; padding: 0.25rem 0.5rem;" title="Complete more journeys to earn points">
-                        Need ${b.needed_points} pts (${b.needed_km} km)
+                        Need ${b.needed_points} pts (${b.needed_trips} paid trips)
                       </button>
                     `;
                   }
@@ -1552,5 +1552,4 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   };
 });
-
 

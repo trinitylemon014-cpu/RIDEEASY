@@ -10,8 +10,11 @@ from app.config import Config
 from app.repositories.database import get_db
 
 class TestConfig(Config):
+    SECRET_KEY = "test-only-rideeasy-secret"
     TESTING = True
     DEBUG = False
+    FLASK_ENV = "testing"
+    SESSION_COOKIE_SECURE = False
     WTF_CSRF_ENABLED = False
     # Use in-memory SQLite or test DB for tests
     LOCAL_DB_PATH = os.path.join(os.path.dirname(__file__), "test_rideeasy.db")

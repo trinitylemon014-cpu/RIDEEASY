@@ -258,6 +258,70 @@ CREATE TABLE IF NOT EXISTS rides (
     FOREIGN KEY (related_journey_id) REFERENCES confirmed_journeys(id)
 );
 
+-- Paystack charges are pending until a signed callback or return URL is verified server-side.
+CREATE TABLE IF NOT EXISTS payment_transactions (
+    id TEXT PRIMARY KEY,
+    ride_id TEXT NOT NULL,
+    passenger_id TEXT NOT NULL,
+    reference TEXT NOT NULL UNIQUE,
+    provider_reference TEXT,
+    authorization_url TEXT,
+    amount_ugx INTEGER NOT NULL CHECK(amount_ugx > 0),
+    currency TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'PENDING' CHECK(status IN ('PENDING', 'PAID', 'FAILED')),
+    payer_name TEXT,
+    paid_at TIMESTAMP,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (ride_id) REFERENCES rides(id),
+    FOREIGN KEY (passenger_id) REFERENCES users(id)
+);
+
+-- Immutable earned shares; payout_status tracks the later manual mobile-money payout.
+CREATE TABLE IF NOT EXISTS payment_ledger (
+    id TEXT PRIMARY KEY,
+    payment_id TEXT NOT NULL,
+    recipient_id TEXT NOT NULL,
+    recipient_role TEXT NOT NULL CHECK(recipient_role IN ('ADMIN', 'DRIVER')),
+    recipient_name TEXT NOT NULL,
+    recipient_phone TEXT NOT NULL,
+    amount_ugx INTEGER NOT NULL CHECK(amount_ugx >= 0),
+    payout_status TEXT NOT NULL DEFAULT 'PENDING' CHECK(payout_status IN ('PENDING', 'PAID')),
+    paid_at TIMESTAMP,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(payment_id, recipient_role),
+    FOREIGN KEY (payment_id) REFERENCES payment_transactions(id),
+    FOREIGN KEY (recipient_id) REFERENCES users(id)
+);
+
+CREATE TABLE IF NOT EXISTS payment_settings (
+    setting_key TEXT PRIMARY KEY,
+    setting_value TEXT NOT NULL,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Points are awarded once for each completed ride with a verified payment.
+CREATE TABLE IF NOT EXISTS reward_point_awards (
+    ride_id TEXT PRIMARY KEY,
+    passenger_id TEXT NOT NULL,
+    points INTEGER NOT NULL CHECK(points > 0),
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (ride_id) REFERENCES rides(id),
+    FOREIGN KEY (passenger_id) REFERENCES users(id)
+);
+
+CREATE TABLE IF NOT EXISTS sms_messages (
+    id TEXT PRIMARY KEY,
+    payment_id TEXT NOT NULL,
+    recipient_phone TEXT NOT NULL,
+    message TEXT NOT NULL,
+    status TEXT NOT NULL CHECK(status IN ('SENT', 'FAILED', 'NOT_CONFIGURED')),
+    provider_message_id TEXT,
+    error_message TEXT,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (payment_id) REFERENCES payment_transactions(id)
+);
+
 -- In-App Notifications
 CREATE TABLE IF NOT EXISTS notifications (
     id TEXT PRIMARY KEY,
@@ -328,6 +392,8 @@ CREATE TABLE IF NOT EXISTS rewards_redemptions (
     points_spent INTEGER NOT NULL,
     voucher_code TEXT UNIQUE NOT NULL,
     discount_ugx INTEGER DEFAULT 0,
+    discount_percent INTEGER NOT NULL DEFAULT 0 CHECK(discount_percent BETWEEN 0 AND 100),
+    ride_id TEXT,
     status TEXT NOT NULL DEFAULT 'ACTIVE' CHECK(status IN ('ACTIVE', 'USED', 'EXPIRED')),
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     expires_at TIMESTAMP,
@@ -346,4 +412,10 @@ CREATE INDEX IF NOT EXISTS idx_school_requests_school ON school_transport_reques
 CREATE INDEX IF NOT EXISTS idx_reminders_journey ON journey_reminders(journey_id);
 CREATE INDEX IF NOT EXISTS idx_saved_routes_passenger ON saved_routes(passenger_id);
 CREATE INDEX IF NOT EXISTS idx_rewards_redemptions_passenger ON rewards_redemptions(passenger_id);
-
+CREATE INDEX IF NOT EXISTS idx_payment_transactions_ride ON payment_transactions(ride_id);
+CREATE INDEX IF NOT EXISTS idx_payment_transactions_status ON payment_transactions(status);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_payment_one_active_per_ride
+    ON payment_transactions(ride_id) WHERE status IN ('PENDING', 'PAID');
+CREATE INDEX IF NOT EXISTS idx_payment_ledger_recipient ON payment_ledger(recipient_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_payment_ledger_status ON payment_ledger(payout_status, created_at);
+CREATE INDEX IF NOT EXISTS idx_reward_point_awards_passenger ON reward_point_awards(passenger_id);

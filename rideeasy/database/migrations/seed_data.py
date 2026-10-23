@@ -1,12 +1,29 @@
 import uuid
 from datetime import datetime, timedelta
 from werkzeug.security import generate_password_hash
+from flask import current_app, has_app_context
 from app.repositories.database import get_db
+from app.config import Config
 
 def seed_database():
     """Seeds the database with pricing configs, realistic Ugandan transportation data, and demo accounts."""
     db = get_db()
     db.init_db()
+    if has_app_context():
+        collection_phone = current_app.config["PAYSTACK_COLLECTION_PHONE"]
+        admin_payout_phone = current_app.config["PAYSTACK_ADMIN_PAYOUT_PHONE"]
+    else:
+        collection_phone = Config.PAYSTACK_COLLECTION_PHONE
+        admin_payout_phone = Config.PAYSTACK_ADMIN_PAYOUT_PHONE
+    for setting_key, setting_value in (
+        ("collection_phone", collection_phone),
+        ("admin_payout_phone", admin_payout_phone),
+        ("admin_payout_name", "RideEasy Admin")
+    ):
+        db.execute(
+            "INSERT OR IGNORE INTO payment_settings (setting_key, setting_value) VALUES (?, ?)",
+            (setting_key, setting_value)
+        )
 
     # Migration for new columns if existing database
     try:
@@ -194,6 +211,12 @@ def seed_database():
 
     # 7. Sample Recent Rides
     _seed_demo_rides(db)
+    db.execute(
+        """INSERT OR IGNORE INTO reward_point_awards (ride_id, passenger_id, points)
+           SELECT id, passenger_id, 100 FROM rides
+           WHERE (id GLOB 'ride_0[1-9]' OR id = 'ride_10')
+             AND status = 'COMPLETED' AND payment_status = 'PAID'"""
+    )
 
     # 8. Sample Saved Routes
     _seed_saved_routes(db)
@@ -222,7 +245,7 @@ def _seed_demo_rides(db):
     ]
     for r_id, p_id, d_id, cat, p_addr, p_lat, p_lng, d_addr, d_lat, d_lng, dist, efare, ffare, pmethod, pstat, stat, is_air, cr_at in rides:
         db.execute(
-            """INSERT OR REPLACE INTO rides 
+            """INSERT OR IGNORE INTO rides
             (id, passenger_id, driver_id, category, pickup_address, pickup_lat, pickup_lng, destination_address, destination_lat, destination_lng, estimated_distance_km, estimated_fare_ugx, final_fare_ugx, payment_method, payment_status, status, is_airport_ride, created_at) 
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (r_id, p_id, d_id, cat, p_addr, p_lat, p_lng, d_addr, d_lat, d_lng, dist, efare, ffare, pmethod, pstat, stat, is_air, cr_at)
@@ -249,5 +272,3 @@ def _seed_saved_routes(db):
             VALUES (?, ?, ?, ?, ?, ?)""",
             (r_id, p_id, r_name, p_addr, d_addr, cat)
         )
-
-

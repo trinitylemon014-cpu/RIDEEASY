@@ -52,9 +52,9 @@
     </div>
 
     <div class="stat-card">
-      <div class="stat-label">Total Earnings</div>
+      <div class="stat-label">Total Verified Driver Earnings</div>
       <div class="stat-value">{{ total_earnings | ugx }}</div>
-      <div class="stat-subtext">Completed trips in period</div>
+      <div class="stat-subtext">80% shares from verified paid trips</div>
     </div>
 
     <div class="stat-card">
@@ -110,7 +110,7 @@
     <!-- 4 KPI Metrics -->
     <div class="earnings-kpi-grid">
       <div class="earnings-kpi-card">
-        <div class="stat-label">Past Week Revenue</div>
+        <div class="stat-label">Past Week Driver Earnings</div>
         <div class="stat-value" id="kpi-week-earnings" style="font-size: 1.5rem;">
           {{ earnings_summary.total_week_earnings | ugx }}
         </div>
@@ -121,7 +121,7 @@
 
       <div class="earnings-kpi-card" style="border-left: 3px solid var(--color-black);">
         <div class="stat-label" style="display: flex; align-items: center; justify-content: space-between;">
-          <span>Today's Income</span>
+          <span>Today's Driver Share</span>
           <span style="font-size: 0.625rem; font-weight: 700; background-color: var(--color-black); color: var(--color-white); padding: 0.05rem 0.35rem; border-radius: 2px;">LIVE</span>
         </div>
         <div class="stat-value" id="kpi-today-earnings" style="font-size: 1.5rem;">

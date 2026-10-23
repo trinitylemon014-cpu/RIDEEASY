@@ -31,7 +31,7 @@ RideEasy is a unified African transportation platform serving urban ride-hailing
                                  ┌───────────────┴───────────────┐
                                  │       Repository Layer        │
                                  │  - Turso libSQL Sync Client   │
-                                 │  - SQLite Local Dev Fallback  │
+                                 │  - SQLite Local Development   │
                                  └───────────────────────────────┘
 ```
 

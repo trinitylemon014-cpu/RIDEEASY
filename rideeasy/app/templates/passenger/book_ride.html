@@ -100,6 +100,10 @@
         </div>
       </div>
 
+      <a class="btn btn-secondary btn-sm route-planner-link" href="/map?for=passenger" data-route-role="passenger" data-start-id="pickup_address" data-destination-id="destination_address" style="margin-bottom: 1.25rem;">
+        Plan route and verify distance on map
+      </a>
+
       <!-- Save Current Route for Quick Access (e.g. 'Home to Office') -->
       <div style="margin-bottom: 1.5rem; padding: 0.875rem 1rem; background-color: var(--color-off-white); border: 1px solid var(--color-light-grey); border-radius: var(--radius-sm);">
         <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem;">
@@ -164,12 +168,24 @@
       <div class="form-group">
         <label class="form-label" for="payment_method">Payment Option</label>
         <select id="payment_method" name="payment_method" class="form-select" required>
-          <option value="CASH">Cash directly to driver</option>
-          <option value="MTN_MOMO" selected>MTN Mobile Money (MoMo)</option>
-          <option value="AIRTEL_MONEY">Airtel Money</option>
-          <option value="CARD">Debit / Credit Card</option>
+          <option value="MTN_MOMO" selected>Paystack (mobile money or card)</option>
+        </select>
+        <small class="text-subtle">Choose an available payment channel on Paystack after your ride is completed.</small>
+      </div>
+
+      {% if eligible_rewards %}
+      <div class="form-group">
+        <label class="form-label" for="reward_voucher_code">Apply a reward to this ride</label>
+        <select id="reward_voucher_code" name="reward_voucher_code" class="form-select">
+          <option value="">No reward</option>
+          {% for reward in eligible_rewards %}
+          <option value="{{ reward.voucher_code }}">
+            {{ reward.reward_title }}{% if reward.discount_percent %} ({{ reward.discount_percent }}% off){% else %} ({{ reward.discount_ugx | ugx }} off){% endif %}
+          </option>
+          {% endfor %}
         </select>
       </div>
+      {% endif %}
 
       <!-- Real-Time Fare Estimate Calculation Card -->
       <div style="background-color: var(--color-off-white); border: 1px solid var(--color-light-grey); border-radius: var(--radius-sm); padding: 1.25rem; margin-bottom: 1.5rem; display: flex; align-items: center; justify-content: space-between;">

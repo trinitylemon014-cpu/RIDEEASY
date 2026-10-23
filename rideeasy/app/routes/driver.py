@@ -40,18 +40,22 @@ def get_driver_earnings_summary(driver_id, db):
     rides = db.fetchall(
         """SELECT r.id, r.pickup_address, r.destination_address, r.category,
                   r.estimated_fare_ugx, r.final_fare_ugx, r.payment_method,
-                  r.created_at, date(r.created_at) as trip_date,
-                  u.full_name as passenger_name
-        FROM rides r
-        JOIN users u ON r.passenger_id = u.id
-        WHERE r.driver_id = ? AND r.status = 'COMPLETED' AND r.created_at >= ?
-        ORDER BY r.created_at ASC""",
+                  COALESCE(p.paid_at, p.created_at) AS created_at,
+                  date(COALESCE(p.paid_at, p.created_at)) as trip_date,
+                  l.amount_ugx as driver_share_ugx, u.full_name as passenger_name
+        FROM payment_ledger l
+        JOIN payment_transactions p ON p.id = l.payment_id
+        JOIN rides r ON r.id = p.ride_id
+        JOIN users u ON u.id = r.passenger_id
+        WHERE l.recipient_id = ? AND l.recipient_role = 'DRIVER'
+          AND p.status = 'PAID' AND COALESCE(p.paid_at, p.created_at) >= ?
+        ORDER BY COALESCE(p.paid_at, p.created_at) ASC""",
         (driver_id, earliest_date)
     )
 
     for r in rides:
         trip_date = r["trip_date"]
-        fare = r["final_fare_ugx"] or r["estimated_fare_ugx"] or 0
+        fare = r["driver_share_ugx"]
         if trip_date in date_map:
             date_map[trip_date]["earnings_ugx"] += fare
             date_map[trip_date]["trip_count"] += 1
@@ -97,8 +101,8 @@ def dashboard():
     vehicle = db.fetchone("SELECT * FROM vehicles WHERE driver_id = ?", (user["id"],))
 
     total_earnings = db.fetchone(
-        """SELECT COALESCE(SUM(COALESCE(final_fare_ugx, estimated_fare_ugx)), 0) as total
-        FROM rides WHERE driver_id = ? AND status = 'COMPLETED'""",
+        """SELECT COALESCE(SUM(amount_ugx), 0) as total
+        FROM payment_ledger WHERE recipient_id = ? AND recipient_role = 'DRIVER'""",
         (user["id"],)
     )
 
@@ -229,20 +233,20 @@ def update_ride_status(ride_id):
         abort(404)
 
     expected = allowed_transitions.get(ride["status"])
-    if new_status != expected and new_status != "COMPLETED":
+    if new_status != expected:
         flash(f"Invalid status transition from {ride['status']} to {new_status}.", "error")
         return redirect(url_for("driver.active_ride"))
 
     if new_status == "COMPLETED":
         db.execute(
-            "UPDATE rides SET status = 'COMPLETED', payment_status = 'PAID', updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+            "UPDATE rides SET status = 'COMPLETED', updated_at = CURRENT_TIMESTAMP WHERE id = ?",
             (ride_id,)
         )
         db.execute(
             "UPDATE driver_profiles SET total_trips = total_trips + 1 WHERE user_id = ?",
             (user["id"],)
         )
-        flash("Trip completed successfully! Fare recorded.", "success")
+        flash("Trip completed. Passenger payment remains pending until verified by Paystack.", "success")
         return redirect(url_for("driver.trips"))
     else:
         db.execute(

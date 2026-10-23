@@ -1,0 +1,143 @@
+{% extends "base.html" %}
+
+{% block title %}Payments & Payout Ledger — RideEasy Admin{% endblock %}
+
+{% block content %}
+<div class="container section">
+  <div style="display:flex; justify-content:space-between; align-items:baseline; gap:1rem; flex-wrap:wrap; margin-bottom:2rem;">
+    <div>
+      <div class="metadata-row"><span>Financial operations</span><span class="metadata-separator">·</span><span>UGX</span></div>
+      <h2>Payments & Payout Ledger</h2>
+    </div>
+    <a href="{{ url_for('admin.dashboard') }}" class="btn btn-secondary">Back to Overview</a>
+  </div>
+
+  <div class="card" style="margin-bottom:1.5rem;">
+    <div class="card-title">Monthly verified earnings</div>
+    {% if monthly_totals %}
+    <div class="table-responsive">
+      <table class="table">
+        <thead><tr><th>Month</th><th>Recipient</th><th>Payments</th><th>Ledger amount</th></tr></thead>
+        <tbody>
+          {% for total in monthly_totals %}
+          <tr><td>{{ total.month }}</td><td>{{ total.recipient_role }}</td><td>{{ total.entry_count }}</td><td>{{ total.amount_ugx | ugx }}</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+      <p class="text-subtle">No monthly payment totals recorded yet.</p>
+    {% endif %}
+  </div>
+
+  <div class="card" style="margin-bottom:1.5rem;">
+    <div class="card-title">Payment account references</div>
+    <p class="card-subtitle">Paystack settles to the merchant account configured in your Paystack dashboard. These phone numbers are payout/contact references only; changing them does not change Paystack settlement settings.</p>
+    <form method="POST" action="{{ url_for('admin.payments') }}">
+      <input type="hidden" name="csrf_token" value="{{ payment_csrf_token }}">
+      <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:1rem;">
+        <div class="form-group">
+          <label class="form-label" for="collection_phone">Merchant contact / reference number</label>
+          <input class="form-control" id="collection_phone" name="collection_phone" value="{{ settings.get('collection_phone', '') }}" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="admin_payout_phone">Admin payout number</label>
+          <input class="form-control" id="admin_payout_phone" name="admin_payout_phone" value="{{ settings.get('admin_payout_phone', '') }}" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="admin_payout_name">Admin payout account name</label>
+          <input class="form-control" id="admin_payout_name" name="admin_payout_name" value="{{ settings.get('admin_payout_name', '') }}" maxlength="100" required>
+        </div>
+      </div>
+      <button type="submit" class="btn btn-primary">Save Payment References</button>
+    </form>
+  </div>
+
+  <div class="card" style="margin-bottom:1.5rem;">
+    <div class="card-title">Verified payment splits</div>
+    <p class="card-subtitle">Each verified completed Paystack ride creates a 20% admin and 80% driver ledger credit. Payouts are manual and should only be marked paid after the mobile-money transfer is confirmed.</p>
+    {% if totals %}
+    <div class="table-responsive">
+      <table class="table">
+        <thead><tr><th>Recipient</th><th>Ledger status</th><th>Entries</th><th>Total amount</th></tr></thead>
+        <tbody>
+          {% for total in totals %}
+          <tr>
+            <td>{{ total.recipient_role }}</td>
+            <td>{{ total.payout_status }}</td>
+            <td>{{ total.entry_count }}</td>
+            <td>{{ total.amount_ugx | ugx }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+      <p class="text-subtle">No verified payment splits recorded yet.</p>
+    {% endif %}
+  </div>
+
+  <div class="card" style="margin-bottom:1.5rem;">
+    <div class="card-title">Recent payment ledger</div>
+    {% if ledger %}
+    <div class="table-responsive">
+      <table class="table">
+        <thead><tr><th>Payment date</th><th>Payer</th><th>Ride / driver</th><th>Recipient</th><th>Share</th><th>Payout</th><th>Action</th></tr></thead>
+        <tbody>
+          {% for entry in ledger %}
+          <tr>
+            <td>{{ entry.payment_date }}</td>
+            <td>{{ entry.payer_name or entry.passenger_name }}</td>
+            <td>#{{ entry.ride_id[:8].upper() }}<br><span class="text-subtle">{{ entry.driver_name or 'No driver' }}</span></td>
+            <td>{{ entry.recipient_name }}<br><span class="text-subtle">{{ entry.recipient_phone }} · {{ entry.recipient_role }}</span></td>
+            <td>{{ entry.amount_ugx | ugx }}</td>
+            <td>{{ entry.payout_status }}</td>
+            <td>
+              {% if entry.payout_status == 'PENDING' %}
+              <form method="POST" action="{{ url_for('admin.mark_ledger_entry_paid', entry_id=entry.id) }}">
+                <input type="hidden" name="csrf_token" value="{{ payment_csrf_token }}">
+                <label class="text-subtle"><input type="checkbox" name="confirm_payout" value="yes" required> Transfer confirmed</label>
+                <button type="submit" class="btn btn-secondary btn-sm">Record paid</button>
+              </form>
+              {% else %}
+                <span class="text-subtle">{{ entry.paid_at }}</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+      <p class="text-subtle">No payment ledger entries yet.</p>
+    {% endif %}
+  </div>
+
+  <div class="card">
+    <div class="card-title">SMS delivery issues</div>
+    {% if sms_failures %}
+    <div class="table-responsive">
+      <table class="table">
+          <thead><tr><th>Created</th><th>Recipient</th><th>Status</th><th>Details</th><th>Action</th></tr></thead>
+        <tbody>
+          {% for sms in sms_failures %}
+            <tr>
+              <td>{{ sms.created_at }}</td><td>{{ sms.recipient_phone }}</td><td>{{ sms.status }}</td>
+              <td>{{ sms.error_message or 'Provider did not confirm delivery.' }}</td>
+              <td>
+                <form method="POST" action="{{ url_for('admin.retry_payment_sms', message_id=sms.id) }}">
+                  <input type="hidden" name="csrf_token" value="{{ payment_csrf_token }}">
+                  <button type="submit" class="btn btn-secondary btn-sm">Retry SMS</button>
+                </form>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+      <p class="text-subtle">No SMS delivery errors recorded.</p>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

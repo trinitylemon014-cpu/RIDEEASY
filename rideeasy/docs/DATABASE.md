@@ -45,8 +45,8 @@ turso db tokens create rideeasy-db
 turso db show rideeasy-db --url
 ```
 
-## 3. Local Development Fallback
-When `TURSO_DATABASE_URL` is omitted or empty, RideEasy automatically initializes and connects to a local SQLite database (`rideeasy.db`). Both local SQLite and Turso execute the identical schema (`database/schema/schema.sql`).
+## 3. Local Development Database
+When `TURSO_DATABASE_URL` is omitted or empty, RideEasy initializes local SQLite (`rideeasy.db`). A configured Turso connection failure raises an error; RideEasy does not silently switch production traffic or payment records to a local file. Payment settlement requires a transactional `libsql://`, `ws://`, or `wss://` connection; the HTTP-only `https://` transport cannot atomically commit ledger entries.
 
 ## 4. Key Relational Tables & Constraints
 - `users`: Core authentication identity with role enum check (`PASSENGER`, `DRIVER`, `SCHOOL`, `TRAVEL_COMPANY`, `ADMIN`).

@@ -12,7 +12,7 @@
         <span>{{ rewards_summary.tier_name }}</span>
       </div>
       <h2>RideEasy Rewards</h2>
-      <p class="text-subtle">Earn 10 points for every kilometer traveled on completed rides.</p>
+      <p class="text-subtle">Earn 100 points for each completed ride after Paystack verifies payment.</p>
     </div>
     <a href="/passenger/dashboard" class="btn btn-secondary">Back to overview</a>
   </div>
@@ -54,7 +54,7 @@
             <p>{{ benefit.description }}</p>
           </div>
           <div style="display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; border-top: 1px solid var(--color-light-grey); padding-top: 0.75rem;">
-            <span class="text-subtle">{{ benefit.required_km }} km required</span>
+            <span class="text-subtle">{{ (benefit.points_cost + 99) // 100 }} completed paid trips required</span>
             {% if benefit.can_redeem %}
               <form method="POST" action="/passenger/rewards/redeem" style="margin: 0;">
                 <input type="hidden" name="reward_id" value="{{ benefit.id }}">
@@ -78,7 +78,7 @@
           <tbody>
             {% for voucher in rewards_summary.redemptions %}
               <tr>
-                <td>{{ voucher.reward_title }}</td>
+                <td>{{ voucher.reward_title }}{% if voucher.discount_percent %} ({{ voucher.discount_percent }}% off one ride){% endif %}</td>
                 <td><strong>{{ voucher.voucher_code }}</strong></td>
                 <td>{{ voucher.points_spent }}</td>
                 <td>{{ voucher.status }}</td>

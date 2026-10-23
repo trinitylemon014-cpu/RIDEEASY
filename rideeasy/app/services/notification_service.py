@@ -21,11 +21,11 @@ class NotificationService:
         db = get_db()
         if unread_only:
             return db.fetchall(
-                "SELECT * FROM notifications WHERE user_id = ? AND is_read = 0 ORDER BY created_at DESC LIMIT ?",
+                "SELECT * FROM notifications WHERE user_id = ? AND is_read = 0 ORDER BY created_at DESC, rowid DESC LIMIT ?",
                 (user_id, limit)
             )
         return db.fetchall(
-            "SELECT * FROM notifications WHERE user_id = ? ORDER BY created_at DESC LIMIT ?",
+            "SELECT * FROM notifications WHERE user_id = ? ORDER BY created_at DESC, rowid DESC LIMIT ?",
             (user_id, limit)
         )
 

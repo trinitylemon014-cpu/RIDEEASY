@@ -1,9 +1,16 @@
 import uuid
+import re
+import secrets
 from flask import Blueprint, render_template, request, redirect, url_for, flash, session, abort
 from app.repositories.database import get_db
 from app.services.auth_service import login_required, role_required, AuthService
 
 admin_bp = Blueprint("admin", __name__, url_prefix="/admin")
+
+def _valid_payment_csrf():
+    token = request.form.get("csrf_token", "")
+    expected = session.get("payment_csrf_token", "")
+    return bool(token and expected and secrets.compare_digest(token, expected))
 
 @admin_bp.before_request
 @login_required
@@ -198,3 +205,138 @@ def audit_logs():
         ORDER BY a.created_at DESC LIMIT 50"""
     )
     return render_template("admin/audit_logs.html", user=user, logs=logs)
+
+@admin_bp.route("/payments", methods=["GET", "POST"])
+def payments():
+    user = AuthService.get_current_user()
+    db = get_db()
+    if request.method == "POST":
+        if not _valid_payment_csrf():
+            abort(400)
+
+        collection_phone = request.form.get("collection_phone", "").strip()
+        admin_phone = request.form.get("admin_payout_phone", "").strip()
+        admin_name = request.form.get("admin_payout_name", "").strip()
+        phone_pattern = r"\+?[0-9]{10,15}"
+        if not re.fullmatch(phone_pattern, collection_phone) or not re.fullmatch(phone_pattern, admin_phone):
+            flash("Enter valid phone numbers using 10–15 digits and an optional leading +.", "error")
+            return redirect(url_for("admin.payments"))
+        if not admin_name or len(admin_name) > 100:
+            flash("Enter a payout account name of 1–100 characters.", "error")
+            return redirect(url_for("admin.payments"))
+
+        for key, value in (
+            ("collection_phone", collection_phone),
+            ("admin_payout_phone", admin_phone),
+            ("admin_payout_name", admin_name)
+        ):
+            db.execute(
+                """INSERT INTO payment_settings (setting_key, setting_value, updated_at)
+                   VALUES (?, ?, CURRENT_TIMESTAMP)
+                   ON CONFLICT(setting_key) DO UPDATE SET
+                     setting_value = excluded.setting_value, updated_at = CURRENT_TIMESTAMP""",
+                (key, value)
+            )
+        db.execute(
+            """INSERT INTO audit_logs (id, user_id, action, resource_type, resource_id, details)
+               VALUES (?, ?, 'UPDATE_PAYMENT_SETTINGS', 'PAYMENT_SETTINGS', NULL, ?)""",
+            (f"aud_{uuid.uuid4().hex[:8]}", user["id"], "Updated payment contact and payout destination.")
+        )
+        flash("Payment contact and admin payout details updated.", "success")
+        return redirect(url_for("admin.payments"))
+
+    settings = {
+        row["setting_key"]: row["setting_value"]
+        for row in db.fetchall("SELECT setting_key, setting_value FROM payment_settings")
+    }
+    ledger = db.fetchall(
+        """SELECT l.*, p.reference, p.amount_ugx AS gross_amount_ugx, p.payer_name,
+                  COALESCE(p.paid_at, p.created_at) AS payment_date, r.id AS ride_id,
+                  passenger.full_name AS passenger_name, driver.full_name AS driver_name
+           FROM payment_ledger l
+           JOIN payment_transactions p ON p.id = l.payment_id
+           JOIN rides r ON r.id = p.ride_id
+           JOIN users passenger ON passenger.id = p.passenger_id
+           LEFT JOIN users driver ON driver.id = r.driver_id
+           ORDER BY l.created_at DESC LIMIT 100"""
+    )
+    totals = db.fetchall(
+        """SELECT recipient_role, payout_status, COALESCE(SUM(amount_ugx), 0) AS amount_ugx,
+                  COUNT(*) AS entry_count
+           FROM payment_ledger GROUP BY recipient_role, payout_status"""
+    )
+    monthly_totals = db.fetchall(
+        """SELECT substr(COALESCE(p.paid_at, p.created_at), 1, 7) AS month, l.recipient_role,
+                  COALESCE(SUM(l.amount_ugx), 0) AS amount_ugx, COUNT(*) AS entry_count
+           FROM payment_ledger l JOIN payment_transactions p ON p.id = l.payment_id
+           WHERE p.status = 'PAID'
+           GROUP BY substr(COALESCE(p.paid_at, p.created_at), 1, 7), l.recipient_role
+           ORDER BY month DESC LIMIT 24"""
+    )
+    sms_failures = db.fetchall(
+        """SELECT id, payment_id, recipient_phone, message, status, error_message, created_at
+           FROM sms_messages WHERE status != 'SENT'
+           ORDER BY created_at DESC LIMIT 20"""
+    )
+    return render_template(
+        "admin/payments.html", user=user, settings=settings, ledger=ledger,
+        totals=totals, monthly_totals=monthly_totals, sms_failures=sms_failures
+    )
+
+@admin_bp.route("/payments/sms/<message_id>/retry", methods=["POST"])
+def retry_payment_sms(message_id):
+    if not _valid_payment_csrf():
+        abort(400)
+    message = get_db().fetchone(
+        "SELECT * FROM sms_messages WHERE id = ? AND status != 'SENT'",
+        (message_id,)
+    )
+    if not message:
+        abort(404)
+    from app.services.sms_service import SmsService
+    status = SmsService.send_payment_sms(
+        message["payment_id"], message["recipient_phone"], message["message"]
+    )
+    flash(
+        "SMS was submitted to the configured provider." if status == "SENT"
+        else f"SMS retry was not delivered ({status.lower().replace('_', ' ')}).",
+        "success" if status == "SENT" else "error"
+    )
+    return redirect(url_for("admin.payments"))
+
+@admin_bp.route("/payments/ledger/<entry_id>/mark-paid", methods=["POST"])
+def mark_ledger_entry_paid(entry_id):
+    if not _valid_payment_csrf():
+        abort(400)
+    if request.form.get("confirm_payout") != "yes":
+        abort(400)
+    db = get_db()
+    entry = db.fetchone(
+        "SELECT * FROM payment_ledger WHERE id = ? AND payout_status = 'PENDING'",
+        (entry_id,)
+    )
+    if not entry:
+        abort(404)
+
+    changed = db.execute(
+        """UPDATE payment_ledger SET payout_status = 'PAID', paid_at = CURRENT_TIMESTAMP
+           WHERE id = ? AND payout_status = 'PENDING'""",
+        (entry_id,)
+    )
+    if changed:
+        user = AuthService.get_current_user()
+        db.execute(
+            """INSERT INTO audit_logs (id, user_id, action, resource_type, resource_id, details)
+               VALUES (?, ?, 'MARK_MANUAL_PAYOUT_PAID', 'PAYMENT_LEDGER', ?, ?)""",
+            (f"aud_{uuid.uuid4().hex[:8]}", user["id"], entry_id,
+             f"Marked UGX {entry['amount_ugx']} paid to {entry['recipient_phone']}.")
+        )
+        from app.services.notification_service import NotificationService
+        NotificationService.create_notification(
+            entry["recipient_id"],
+            "Payout recorded",
+            f"An admin recorded your manual payout of UGX {entry['amount_ugx']:,}.",
+            related_entity_id=entry_id
+        )
+        flash("Payout marked paid and recorded in the audit log.", "success")
+    return redirect(url_for("admin.payments"))

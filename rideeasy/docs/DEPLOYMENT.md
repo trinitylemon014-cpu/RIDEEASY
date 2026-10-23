@@ -29,6 +29,23 @@ Open your browser at `http://127.0.0.1:5000` to interact with the live applicati
 
 ## 2. Production Deployment (Linux / Ubuntu / Debian)
 
+Before enabling payments, set deployment secrets outside source control:
+
+```text
+SECRET_KEY=<strong-random-secret>
+FLASK_ENV=production
+TURSO_DATABASE_URL=libsql://<database>.turso.io
+TURSO_AUTH_TOKEN=<database-token>
+PAYSTACK_SECRET_KEY=<Paystack-secret-key>
+PAYSTACK_CALLBACK_URL=https://rideeasy.ug/payments/paystack/callback
+PAYSTACK_CURRENCY=UGX
+PAYSTACK_AMOUNT_MULTIPLIER=1
+EGOSMS_API_URL=<configured-EgoSMS-compatible-endpoint>
+EGOSMS_API_KEY=<SMS-provider-key>
+```
+
+Register `https://rideeasy.ug/payments/paystack/webhook` in the Paystack dashboard. Confirm Uganda, UGX, the merchant's supported payment channels, and the currency amount units with Paystack before live transactions. The application records manual payout credits; it does not transfer funds to mobile numbers automatically. EgoSMS is not considered active until its real API contract and credentials are configured.
+
 ### Using Gunicorn and Systemd
 1. Install Gunicorn and dependencies:
    ```bash

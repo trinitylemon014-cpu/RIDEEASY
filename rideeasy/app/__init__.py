@@ -1,5 +1,6 @@
 import os
-from flask import Flask, render_template
+import secrets
+from flask import Flask, render_template, session
 from app.config import Config
 from app.repositories.database import get_db
 from app.services.auth_service import AuthService
@@ -10,14 +11,13 @@ def create_app(config_class=Config):
                 static_folder="static", 
                 template_folder="templates")
     app.config.from_object(config_class)
+    if not app.config.get("SECRET_KEY") and not app.config.get("TESTING"):
+        raise RuntimeError("SECRET_KEY must be set to a strong deployment secret.")
 
     # Initialize database & seed demo data if needed
     with app.app_context():
         from database.migrations.seed_data import seed_database
-        try:
-            seed_database()
-        except Exception as e:
-            app.logger.warning(f"Database seed notice: {e}")
+        seed_database()
 
     # Register Jinja custom filters & context processors
     @app.template_filter("ugx")
@@ -34,7 +34,9 @@ def create_app(config_class=Config):
         user = AuthService.get_current_user()
         unread_count = 0
         recent_notifs = []
+        csrf_token = ""
         if user:
+            csrf_token = session.setdefault("payment_csrf_token", secrets.token_urlsafe(32))
             from app.services.notification_service import NotificationService
             unread_count = NotificationService.get_unread_count(user["id"])
             recent_notifs = NotificationService.get_user_notifications(user["id"], unread_only=True, limit=5)
@@ -46,6 +48,7 @@ def create_app(config_class=Config):
             "current_user": user,
             "unread_notifications_count": unread_count,
             "recent_notifications": recent_notifs,
+            "payment_csrf_token": csrf_token,
             "support_phone": Config.SUPPORT_PHONE,
             "support_email": Config.SUPPORT_EMAIL
         }
@@ -60,6 +63,8 @@ def create_app(config_class=Config):
     from app.routes.travel_partner import travel_bp
     from app.routes.admin import admin_bp
     from app.routes.api import api_bp
+    from app.routes.payments import payments_bp
+    from app.routes.maps import maps_bp
 
     app.register_blueprint(main_bp)
     app.register_blueprint(auth_bp, url_prefix="/auth")
@@ -70,6 +75,8 @@ def create_app(config_class=Config):
     app.register_blueprint(travel_bp)
     app.register_blueprint(admin_bp)
     app.register_blueprint(api_bp)
+    app.register_blueprint(payments_bp)
+    app.register_blueprint(maps_bp)
 
     # Error Handlers
     @app.errorhandler(403)

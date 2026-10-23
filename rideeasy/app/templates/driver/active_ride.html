@@ -28,6 +28,7 @@
         <div class="stat-card"><div class="stat-label">Distance</div><div class="stat-value">{{ ride.estimated_distance_km }} km</div></div>
         <div class="stat-card"><div class="stat-label">Estimated fare</div><div class="stat-value" style="font-size: 1rem;">{{ ride.final_fare_ugx or ride.estimated_fare_ugx | ugx }}</div></div>
       </div>
+      <a class="btn btn-secondary btn-sm" href="/map?pickup={{ ride.pickup_address | urlencode }}&destination={{ ride.destination_address | urlencode }}">View route on map</a>
       <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; border-top: 1px solid var(--color-light-grey); padding-top: 1rem;">
         {% if ride.status == 'DRIVER_ASSIGNED' %}
           <form method="POST" action="/driver/rides/{{ ride.id }}/status"><input type="hidden" name="status" value="DRIVER_ARRIVING"><button class="btn btn-primary" type="submit">En route to pickup</button></form>
@@ -35,8 +36,10 @@
           <form method="POST" action="/driver/rides/{{ ride.id }}/status"><input type="hidden" name="status" value="DRIVER_ARRIVED"><button class="btn btn-primary" type="submit">Arrived at pickup</button></form>
         {% elif ride.status == 'DRIVER_ARRIVED' %}
           <form method="POST" action="/driver/rides/{{ ride.id }}/status"><input type="hidden" name="status" value="TRIP_STARTED"><button class="btn btn-primary" type="submit">Start ride</button></form>
-        {% elif ride.status in ['TRIP_STARTED', 'TRIP_COMPLETED'] %}
-          <form method="POST" action="/driver/rides/{{ ride.id }}/status"><input type="hidden" name="status" value="COMPLETED"><button class="btn btn-primary" type="submit">Complete ride</button></form>
+        {% elif ride.status == 'TRIP_STARTED' %}
+          <form method="POST" action="/driver/rides/{{ ride.id }}/status"><input type="hidden" name="status" value="TRIP_COMPLETED"><button class="btn btn-primary" type="submit">Complete ride</button></form>
+        {% elif ride.status == 'TRIP_COMPLETED' %}
+          <form method="POST" action="/driver/rides/{{ ride.id }}/status"><input type="hidden" name="status" value="COMPLETED"><button class="btn btn-primary" type="submit">Confirm completed ride</button></form>
         {% endif %}
         <a href="tel:{{ ride.passenger_phone }}" class="btn btn-secondary">Call passenger</a>
       </div>

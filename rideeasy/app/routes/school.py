@@ -55,6 +55,8 @@ def new_request():
     db = get_db()
     school = db.fetchone("SELECT * FROM schools WHERE user_id = ?", (user["id"],))
     landmarks = MapService.LANDMARKS
+    pickup_location = request.args.get("pickup", "").strip() or (school["address"] if school else "")
+    destination = request.args.get("destination", "").strip()
 
     if request.method == "POST":
         vehicle_type = request.form.get("vehicle_type", "COASTER").upper()
@@ -69,7 +71,14 @@ def new_request():
 
         if not pickup_location or not destination or not travel_date or not departure_time:
             flash("Pickup, destination, travel date, and departure time are required.", "error")
-            return render_template("school/request.html", user=user, school=school, landmarks=landmarks)
+            return render_template(
+                "school/request.html",
+                user=user,
+                school=school,
+                landmarks=landmarks,
+                pickup_location=pickup_location,
+                destination=destination
+            )
 
         # Estimate benchmark price for school coaster/bus charter
         p_coords = MapService.find_coordinates(pickup_location)
@@ -94,7 +103,14 @@ def new_request():
         flash("Transport request submitted successfully! RideEasy operations team will review and assign a certified driver and inspected vehicle.", "success")
         return redirect(url_for("school.dashboard"))
 
-    return render_template("school/request.html", user=user, school=school, landmarks=landmarks)
+    return render_template(
+        "school/request.html",
+        user=user,
+        school=school,
+        landmarks=landmarks,
+        pickup_location=pickup_location,
+        destination=destination
+    )
 
 @school_bp.route("/requests/<request_id>")
 def request_detail(request_id):
