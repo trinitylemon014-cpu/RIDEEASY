@@ -9,6 +9,7 @@
   "rideeasy/tests/test_auth.py::test_logout",
   "rideeasy/tests/test_database.py::test_database_demo_users_exist",
   "rideeasy/tests/test_database.py::test_database_pricing_seeded",
+  "rideeasy/tests/test_database.py::test_seed_repairs_missing_travel_fixtures",
   "rideeasy/tests/test_flights.py::test_passenger_can_submit_flight_inquiry",
   "rideeasy/tests/test_flights.py::test_travel_company_can_quote_and_confirm_booking",
   "rideeasy/tests/test_profile_cancellation_notifications.py::test_in_app_notification_system",

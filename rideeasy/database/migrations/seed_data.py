@@ -65,14 +65,6 @@ def seed_database():
                 "INSERT INTO notifications (id, user_id, title, message, type, is_read, related_entity_id) VALUES (?, ?, ?, ?, ?, 0, ?)",
                 ("notif_demo_01", "usr_pass_01", "Driver Assigned", "David Okello (Toyota Premio UBD 204K) has been assigned to your trip #RIDE_01.", "DRIVER_ASSIGNED", "ride_01")
             )
-        # Seed / update completed demo rides for weekly trend
-        _seed_demo_rides(db)
-
-        # Check if demo saved routes exist
-        saved_route = db.fetchone("SELECT id FROM saved_routes WHERE passenger_id = 'usr_pass_01' LIMIT 1")
-        if not saved_route:
-            _seed_saved_routes(db)
-
         # Check if demo rewards redemption exists
         redemption = db.fetchone("SELECT id FROM rewards_redemptions WHERE passenger_id = 'usr_pass_01' LIMIT 1")
         if not redemption:
@@ -82,9 +74,8 @@ def seed_database():
                 VALUES (?, ?, ?, ?, ?, ?, ?, 'ACTIVE', datetime('now', '-2 days'), datetime('now', '+58 days'))""",
                 ("red_demo_01", "usr_pass_01", "rew_toll_pass", "Entebbe Expressway Toll Pass", 200, "REWARD-TOLL-9421", 5000)
             )
-        return
-
-    print("Seeding RideEasy platform data...")
+    else:
+        print("Seeding RideEasy platform data...")
 
     # 1. Pricing Configurations (Ugandan Shillings - UGX)
     pricing = [
@@ -97,7 +88,7 @@ def seed_database():
     ]
     for cat, base, per_km, per_min, min_f in pricing:
         db.execute(
-            "INSERT OR REPLACE INTO pricing_configs (category, base_fare_ugx, per_km_ugx, per_min_ugx, min_fare_ugx) VALUES (?, ?, ?, ?, ?)",
+            "INSERT OR IGNORE INTO pricing_configs (category, base_fare_ugx, per_km_ugx, per_min_ugx, min_fare_ugx) VALUES (?, ?, ?, ?, ?)",
             (cat, base, per_km, per_min, min_f)
         )
 
@@ -154,7 +145,7 @@ def seed_database():
     # 6. Travel Company Profile
     db.execute(
         "INSERT OR IGNORE INTO travel_companies (user_id, company_name, license_number, contact_person, phone, email, physical_address, verification_status) VALUES (?, ?, ?, ?, ?, ?, ?, 'APPROVED')",
-        ("usr_travel_01", "Nile Equatorial Travel Agency Ltd", "TUG-LIC-77821-2026", "Brenda Nalubega", "+256 312 880 770", "travel@rideeasy.ug", "Workers House, 3rd Floor, Pilkington Road, Kampala", "APPROVED")
+        ("usr_travel_01", "Nile Equatorial Travel Agency Ltd", "TUG-LIC-77821-2026", "Brenda Nalubega", "+256 312 880 770", "travel@rideeasy.ug", "Workers House, 3rd Floor, Pilkington Road, Kampala")
     )
 
     # Sample Flight Request, Quotation & Booking
