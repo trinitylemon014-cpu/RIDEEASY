@@ -173,6 +173,7 @@
           <a href="/admin/pricing" class="btn btn-secondary btn-sm">Pricing</a>
           <a href="/admin/audit-logs" class="btn btn-secondary btn-sm">Audit Logs</a>
         {% elif current_user.role == 'TRAVEL_COMPANY' %}
+          <a href="/map" class="btn btn-secondary btn-sm">Route Map</a>
           <a href="/travel/dashboard" class="btn btn-secondary btn-sm">Travel Partner Dashboard</a>
         {% endif %}
       </div>
@@ -204,6 +205,7 @@
         <a href="/map" class="btn btn-secondary btn-block">Route Map</a>
       {% elif current_user.role == 'TRAVEL_COMPANY' %}
         <a href="/travel/dashboard" class="btn btn-primary btn-block">Travel Partner Dashboard</a>
+        <a href="/map" class="btn btn-secondary btn-block">Route Map</a>
       {% elif current_user.role == 'ADMIN' %}
         <a href="/admin/dashboard" class="btn btn-primary btn-block">Administrator Console</a>
         <a href="/map" class="btn btn-secondary btn-block">Route Map</a>
@@ -293,8 +295,7 @@
     </div>
   </footer>
 
-  {% if current_user %}
-    <div class="ai-support-widget no-print" id="ai-support-widget">
+  <div class="ai-support-widget no-print" id="ai-support-widget">
       <section class="ai-support-panel" id="ai-support-panel" aria-labelledby="ai-support-title" hidden>
         <header class="ai-support-header">
           <div class="ai-support-identity">
@@ -321,7 +322,7 @@
         <div class="ai-chat-thread" id="ai-chat-thread" role="log" aria-live="polite" aria-relevant="additions">
           <div class="ai-chat-message bot">
             <div class="ai-message-meta"><strong>RideEasy Concierge <span class="ai-message-tag">AI</span></strong><span class="text-subtle">Now</span></div>
-            <div class="ai-msg-content">Hello <strong>{{ current_user.full_name.split()[0] }}</strong>. How can I help with your RideEasy journey today?</div>
+            <div class="ai-msg-content">Hello{% if current_user %} <strong>{{ current_user.full_name.split()[0] }}</strong>{% endif %}. How can I help with your RideEasy journey today?</div>
           </div>
         </div>
 
@@ -341,8 +342,7 @@
         <span>Support</span>
         <span class="ai-support-toggle-status" aria-hidden="true"></span>
       </button>
-    </div>
-  {% endif %}
+  </div>
 
   <script src="/static/js/map-links.js" defer></script>
   <script src="/static/js/app.js"></script>

@@ -6,7 +6,7 @@ maps_bp = Blueprint("maps", __name__)
 
 @maps_bp.before_request
 @login_required
-@role_required("PASSENGER", "DRIVER", "SCHOOL", "ADMIN")
+@role_required("PASSENGER", "DRIVER", "SCHOOL", "TRAVEL_COMPANY", "ADMIN")
 def before_request():
     pass
 
@@ -19,6 +19,7 @@ def route_planner():
         "SCHOOL": "school",
         "DRIVER": "driver",
         "PASSENGER": "passenger",
+        "TRAVEL_COMPANY": "travel",
         "ADMIN": "admin",
     }[user["role"]]
 

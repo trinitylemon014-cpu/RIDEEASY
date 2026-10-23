@@ -84,7 +84,9 @@ def test_route_map_is_available_to_passenger_driver_and_school(client):
     assert b'value="Jinja Source of the Nile"' in school_booking.data
 
     client.get("/auth/demo/travel", follow_redirects=True)
-    assert client.get("/map").status_code == 403
+    travel_map = client.get("/map")
+    assert travel_map.status_code == 200
+    assert b"Back to travel partner dashboard" in travel_map.data
 
 def test_route_api_reports_missing_configuration(client, app, monkeypatch):
     client.get("/auth/demo/passenger", follow_redirects=True)

@@ -101,6 +101,232 @@
   color: var(--sky-700);
 }
 
+/* Floating customer support chat */
+.ai-support-widget {
+  position: fixed;
+  right: max(1.25rem, env(safe-area-inset-right));
+  bottom: max(1.25rem, env(safe-area-inset-bottom));
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.75rem;
+  font-family: var(--font-sans);
+}
+
+.ai-support-panel {
+  display: flex;
+  flex-direction: column;
+  width: min(24rem, calc(100vw - 2rem));
+  max-height: min(36rem, calc(100vh - 7rem));
+  overflow: hidden;
+  color: var(--sky-900);
+  background: var(--color-white);
+  border: 1px solid var(--sky-200);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+}
+
+.ai-support-panel[hidden] {
+  display: none;
+}
+
+.ai-support-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.9rem 1rem;
+  color: var(--color-white);
+  background: var(--sky-800);
+}
+
+.ai-support-identity {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+}
+
+.ai-support-identity > span:last-child {
+  display: grid;
+  gap: 0.15rem;
+}
+
+.ai-support-mark {
+  display: grid;
+  width: 2.25rem;
+  height: 2.25rem;
+  place-items: center;
+  border-radius: 50%;
+  color: var(--sky-900);
+  background: var(--yellow-300);
+}
+
+.ai-support-presence {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  color: var(--sky-100);
+  font-size: 0.72rem;
+}
+
+.status-dot,
+.ai-support-toggle-status {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  background: #4ade80;
+}
+
+.ai-support-close {
+  display: grid;
+  width: 2rem;
+  height: 2rem;
+  place-items: center;
+  color: var(--color-white);
+  background: transparent;
+  border: 0;
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.ai-support-close:hover {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.ai-support-context {
+  padding: 0.75rem 1rem 0.25rem;
+  color: var(--color-medium-grey);
+  font-size: 0.78rem;
+}
+
+.ai-support-prompts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  padding: 0.5rem 1rem;
+}
+
+.ai-prompt-btn {
+  padding: 0.35rem 0.55rem;
+  color: var(--sky-800);
+  background: var(--sky-50);
+  border: 1px solid var(--sky-200);
+  border-radius: 999px;
+  font: inherit;
+  font-size: 0.7rem;
+  cursor: pointer;
+}
+
+.ai-prompt-btn:hover {
+  background: var(--sky-100);
+}
+
+.ai-chat-thread {
+  display: flex;
+  flex: 1;
+  min-height: 10rem;
+  max-height: 18rem;
+  flex-direction: column;
+  gap: 0.75rem;
+  overflow-y: auto;
+  padding: 0.75rem 1rem;
+  background: var(--color-off-white);
+}
+
+.ai-chat-message {
+  max-width: 88%;
+  padding: 0.65rem 0.75rem;
+  background: var(--color-white);
+  border: 1px solid var(--color-light-grey);
+  border-radius: var(--radius-md);
+  font-size: 0.82rem;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.ai-chat-message.bot {
+  align-self: flex-start;
+}
+
+.ai-message-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.25rem;
+  font-size: 0.72rem;
+}
+
+.ai-message-tag {
+  padding: 0.08rem 0.3rem;
+  color: var(--sky-900);
+  background: var(--yellow-200);
+  border-radius: 3px;
+  font-size: 0.6rem;
+}
+
+.ai-chat-form {
+  display: flex;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  border-top: 1px solid var(--color-light-grey);
+}
+
+.ai-chat-form .form-control {
+  min-width: 0;
+  flex: 1;
+}
+
+.ai-chat-form .btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.ai-support-footnote {
+  padding: 0 1rem 0.75rem;
+  color: var(--color-medium-grey);
+  font-size: 0.68rem;
+}
+
+.ai-support-toggle {
+  display: inline-flex;
+  min-height: 3.25rem;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.7rem 1rem;
+  color: var(--color-white);
+  background: var(--sky-800);
+  border: 2px solid var(--color-white);
+  border-radius: 999px;
+  box-shadow: var(--shadow-lg);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.ai-support-toggle:hover {
+  background: var(--sky-900);
+  transform: translateY(-1px);
+}
+
+.ai-support-toggle .icon {
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
+@media (max-width: 480px) {
+  .ai-support-widget {
+    right: max(0.75rem, env(safe-area-inset-right));
+    bottom: max(0.75rem, env(safe-area-inset-bottom));
+  }
+
+  .ai-support-panel {
+    width: calc(100vw - 1.5rem);
+    max-height: calc(100vh - 5.75rem);
+  }
+}
+
 /* In-App Notifications Components */
 .notification-badge {
   position: absolute;

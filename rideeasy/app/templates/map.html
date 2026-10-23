@@ -24,6 +24,8 @@
       <a href="/passenger/book-ride" class="btn btn-secondary">Back to ride booking</a>
     {% elif role == 'admin' %}
       <a href="/admin/dashboard" class="btn btn-secondary">Back to admin overview</a>
+    {% elif role == 'travel' %}
+      <a href="/travel/dashboard" class="btn btn-secondary">Back to travel partner dashboard</a>
     {% else %}
       <a href="/driver/dashboard" class="btn btn-secondary">Back to driver overview</a>
     {% endif %}
