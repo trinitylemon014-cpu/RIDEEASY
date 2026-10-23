@@ -1,0 +1,135 @@
+{% extends "base.html" %}
+
+{% block title %}Administrator Control Console — RideEasy{% endblock %}
+
+{% block content %}
+<div class="container section">
+  <div style="display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 1rem; margin-bottom: 2rem;">
+    <div>
+      <div class="metadata-row" style="margin-bottom: 0.25rem;">
+        <span style="font-weight: 700; color: var(--color-black); text-transform: uppercase;">Platform Oversight</span>
+        <span class="metadata-separator">·</span>
+        <span>Uganda National Registry</span>
+      </div>
+      <h2>Operations Desk: {{ user.full_name }}</h2>
+    </div>
+
+    <!-- Admin Quick Navigation Tabs -->
+    <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+      <a href="/admin/drivers" class="btn btn-secondary btn-sm">Verify Drivers</a>
+      <a href="/admin/schools" class="btn btn-secondary btn-sm">School Charters</a>
+      <a href="/admin/flights" class="btn btn-secondary btn-sm">Flight Assignments</a>
+      <a href="/admin/pricing" class="btn btn-secondary btn-sm">Pricing Config</a>
+      <a href="/admin/audit-logs" class="btn btn-secondary btn-sm">Audit Trail</a>
+    </div>
+  </div>
+
+  <!-- Operational Statistics Grid -->
+  <div class="stats-grid">
+    <div class="stat-card">
+      <div class="stat-label">Total Registered Users</div>
+      <div class="stat-value">{{ stats.total_users }}</div>
+      <div class="stat-subtext">Across all 5 system roles</div>
+    </div>
+
+    <div class="stat-card">
+      <div class="stat-label">Active Drivers Online</div>
+      <div class="stat-value">{{ stats.active_drivers }}</div>
+      <div class="stat-subtext">Currently available for dispatch</div>
+    </div>
+
+    <div class="stat-card">
+      <div class="stat-label">Total Rides Recorded</div>
+      <div class="stat-value">{{ stats.total_rides }}</div>
+      <div class="stat-subtext">City & airport journeys</div>
+    </div>
+
+    <div class="stat-card">
+      <div class="stat-label">Pending School Charters</div>
+      <div class="stat-value">{{ stats.pending_schools }}</div>
+      <div class="stat-subtext">Awaiting driver assignment</div>
+    </div>
+  </div>
+
+  <!-- Live Rides Surveillance -->
+  <div class="card" style="margin-bottom: 2rem;">
+    <div class="card-header">
+      <div>
+        <div class="card-title">Recent Trips Surveillance</div>
+        <div class="card-subtitle">Real-time ride dispatches and statuses across Kampala</div>
+      </div>
+    </div>
+
+    {% if recent_rides %}
+      <div class="table-responsive">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Trip ID</th>
+              <th>Passenger</th>
+              <th>Assigned Driver</th>
+              <th>Route</th>
+              <th>Fare</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for r in recent_rides %}
+              <tr>
+                <td>#{{ r.id[:8].upper() }}</td>
+                <td>{{ r.passenger_name }}</td>
+                <td>{{ r.driver_name or 'Unassigned' }}</td>
+                <td>{{ r.pickup_address }} → {{ r.destination_address }}</td>
+                <td style="font-weight: 700;">{{ r.final_fare_ugx or r.estimated_fare_ugx | ugx }}</td>
+                <td>
+                  <span class="status-indicator">
+                    <span class="status-dot"></span> {{ r.status.replace('_', ' ') }}
+                  </span>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% endif %}
+  </div>
+
+  <!-- Security Audit Logs -->
+  <div class="card">
+    <div class="card-header">
+      <div>
+        <div class="card-title">System Audit Log Stream</div>
+        <div class="card-subtitle">Security actions, status transitions, and administrative overrides</div>
+      </div>
+      <a href="/admin/audit-logs" class="btn btn-secondary btn-sm">Full Audit Trail</a>
+    </div>
+
+    {% if recent_audit_logs %}
+      <div class="table-responsive">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Timestamp</th>
+              <th>Operator</th>
+              <th>Action Event</th>
+              <th>Target Resource</th>
+              <th>Details</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for a in recent_audit_logs %}
+              <tr>
+                <td class="text-subtle">{{ a.created_at }}</td>
+                <td><strong>{{ a.user_name or 'System' }}</strong> ({{ a.role or 'CORE' }})</td>
+                <td><code>{{ a.action }}</code></td>
+                <td>{{ a.resource_type }}</td>
+                <td style="font-size: 0.8125rem;">{{ a.details }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

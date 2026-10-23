@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+
+{% block title %}Access Denied (403) — RideEasy{% endblock %}
+
+{% block content %}
+<div class="container section">
+  <div style="max-width: 500px; margin: 3rem auto; text-align: center;">
+    <div style="font-size: 3rem; font-weight: 800; color: var(--color-black); margin-bottom: 0.5rem;">403</div>
+    <h2>Access Restricted</h2>
+    <p style="margin-bottom: 2rem;">You do not possess the required security credentials or role authorization to access this portal.</p>
+    <a href="/" class="btn btn-primary">Return to Homepage</a>
+  </div>
+</div>
+{% endblock %}

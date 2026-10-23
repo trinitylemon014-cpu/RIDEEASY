@@ -1,0 +1,180 @@
+{% extends "base.html" %}
+
+{% block title %}User Profile — RideEasy{% endblock %}
+
+{% block content %}
+<div class="container section">
+  <div style="max-width: 800px; margin: 0 auto;">
+    <div style="margin-bottom: 2rem; display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 0.5rem;">
+      <div>
+        <div class="metadata-row" style="margin-bottom: 0.25rem;">
+          <span style="font-weight: 700; color: var(--color-black); text-transform: uppercase;">Account Security</span>
+          <span class="metadata-separator">·</span>
+          <span>User ID: <code>#{{ user.id[:8].upper() }}</code></span>
+        </div>
+        <h2>User Profile & Settings</h2>
+      </div>
+
+      <div style="display: flex; gap: 0.5rem; align-items: center;">
+        <span class="status-indicator">
+          <span class="status-dot"></span> {{ user.role }}
+        </span>
+        {% if user.is_verified %}
+          <span class="status-indicator">
+            <span class="status-dot"></span> VERIFIED ACCOUNT
+          </span>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Profile Overview & Edit Form -->
+    <div class="card" style="margin-bottom: 2rem;">
+      <form method="POST" action="/profile" enctype="multipart/form-data">
+        
+        <!-- Top Section: Avatar & Primary Metadata -->
+        <div style="display: flex; gap: 2rem; align-items: center; flex-wrap: wrap; padding-bottom: 2rem; border-bottom: 1px solid var(--color-light-grey); margin-bottom: 2rem;">
+          <div style="position: relative;">
+            <img id="avatar-preview" 
+                 src="{{ user.avatar_url or '/static/images/default-avatar.svg' }}" 
+                 alt="{{ user.full_name }}" 
+                 style="width: 100px; height: 100px; border-radius: var(--radius-sm); border: 2px solid var(--color-black); object-fit: cover; background-color: var(--color-near-black);">
+          </div>
+
+          <div style="flex: 1; min-width: 240px;">
+            <h3 style="margin-bottom: 0.25rem;">{{ user.full_name }}</h3>
+            <div class="metadata-row" style="margin-bottom: 1rem;">
+              <span>{{ user.email }}</span>
+              <span class="metadata-separator">·</span>
+              <span>{{ user.phone }}</span>
+            </div>
+
+            <div>
+              <label for="avatar" class="btn btn-secondary btn-sm" style="cursor: pointer; display: inline-flex; align-items: center; gap: 0.5rem;">
+                <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                Change Profile Photo
+              </label>
+              <input type="file" id="avatar" name="avatar" accept="image/png, image/jpeg, image/webp" style="display: none;" onchange="previewAvatar(this);">
+              <div class="text-subtle" style="margin-top: 0.35rem; font-size: 0.75rem;">JPG, PNG, or WebP. Max 4MB.</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Editable Account Information Form Fields -->
+        <div class="card-title" style="margin-bottom: 1.25rem;">Personal Information</div>
+
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1.25rem; margin-bottom: 1.5rem;">
+          <div class="form-group" style="margin-bottom: 0;">
+            <label class="form-label" for="full_name">Full Name</label>
+            <input type="text" id="full_name" name="full_name" class="form-control" value="{{ user.full_name }}" required>
+          </div>
+
+          <div class="form-group" style="margin-bottom: 0;">
+            <label class="form-label" for="email">Email Address</label>
+            <input type="email" id="email" name="email" class="form-control" value="{{ user.email }}" required>
+          </div>
+
+          <div class="form-group" style="margin-bottom: 0;">
+            <label class="form-label" for="phone">Phone Number (MoMo / Airtel)</label>
+            <input type="tel" id="phone" name="phone" class="form-control" value="{{ user.phone }}" required>
+          </div>
+        </div>
+
+        <!-- Role-Specific Profile Preferences -->
+        {% if user.role == 'PASSENGER' %}
+          <div style="border-top: 1px solid var(--color-light-grey); padding-top: 1.5rem; margin-top: 1.5rem; margin-bottom: 1.5rem;">
+            <div class="card-title" style="margin-bottom: 0.35rem;">Passenger Preferences & Emergency Contact</div>
+            <p class="card-subtitle" style="margin-bottom: 1.25rem;">Used for ride safety protocols and quick destination autofill</p>
+
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1.25rem; margin-bottom: 1.25rem;">
+              <div class="form-group" style="margin-bottom: 0;">
+                <label class="form-label" for="emergency_contact_name">Emergency Contact Name</label>
+                <input type="text" id="emergency_contact_name" name="emergency_contact_name" class="form-control" placeholder="e.g. Next of Kin" value="{{ passenger_profile.emergency_contact_name or '' }}">
+              </div>
+
+              <div class="form-group" style="margin-bottom: 0;">
+                <label class="form-label" for="emergency_contact_phone">Emergency Contact Phone</label>
+                <input type="tel" id="emergency_contact_phone" name="emergency_contact_phone" class="form-control" placeholder="+256 700 000 000" value="{{ passenger_profile.emergency_contact_phone or '' }}">
+              </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1.25rem; margin-bottom: 1.25rem;">
+              <div class="form-group" style="margin-bottom: 0;">
+                <label class="form-label" for="home_address">Home Address</label>
+                <input type="text" id="home_address" name="home_address" class="form-control" placeholder="e.g. Plot 14 Acacia Avenue, Kololo" value="{{ passenger_profile.home_address or '' }}">
+              </div>
+
+              <div class="form-group" style="margin-bottom: 0;">
+                <label class="form-label" for="work_address">Workplace / Office Address</label>
+                <input type="text" id="work_address" name="work_address" class="form-control" placeholder="e.g. Victoria Towers, Nakasero Road" value="{{ passenger_profile.work_address or '' }}">
+              </div>
+            </div>
+
+            <div class="form-group" style="margin-bottom: 0;">
+              <label class="form-label" for="preferred_payment_method">Default Payment Method</label>
+              <select id="preferred_payment_method" name="preferred_payment_method" class="form-select">
+                <option value="MTN_MOMO" {% if passenger_profile and passenger_profile.preferred_payment_method == 'MTN_MOMO' %}selected{% endif %}>MTN Mobile Money (MoMo)</option>
+                <option value="AIRTEL_MONEY" {% if passenger_profile and passenger_profile.preferred_payment_method == 'AIRTEL_MONEY' %}selected{% endif %}>Airtel Money</option>
+                <option value="CASH" {% if passenger_profile and passenger_profile.preferred_payment_method == 'CASH' %}selected{% endif %}>Cash to Driver</option>
+                <option value="CARD" {% if passenger_profile and passenger_profile.preferred_payment_method == 'CARD' %}selected{% endif %}>Debit / Credit Card</option>
+              </select>
+            </div>
+          </div>
+        {% elif user.role == 'DRIVER' and driver_profile %}
+          <div style="border-top: 1px solid var(--color-light-grey); padding-top: 1.5rem; margin-top: 1.5rem; margin-bottom: 1.5rem;">
+            <div class="card-title" style="margin-bottom: 0.35rem;">Driver & Vehicle Credentials</div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1rem;">
+              <div>
+                <div class="text-subtle">Permit Number</div>
+                <div style="font-weight: 700;">{{ driver_profile.license_number }}</div>
+              </div>
+              <div>
+                <div class="text-subtle">National ID (NIN)</div>
+                <div style="font-weight: 700;">{{ driver_profile.national_id_nin }}</div>
+              </div>
+              <div>
+                <div class="text-subtle">Assigned Vehicle</div>
+                <div style="font-weight: 700;">{{ driver_profile.plate_number }} ({{ driver_profile.make }} {{ driver_profile.model }})</div>
+              </div>
+              <div>
+                <div class="text-subtle">Driver Rating</div>
+                <div style="font-weight: 700;">{{ driver_profile.rating_avg or '5.0' }} / 5.0 ({{ driver_profile.total_trips or 0 }} Trips)</div>
+              </div>
+            </div>
+          </div>
+        {% elif user.role == 'SCHOOL' and school_profile %}
+          <div style="border-top: 1px solid var(--color-light-grey); padding-top: 1.5rem; margin-top: 1.5rem; margin-bottom: 1.5rem;">
+            <div class="card-title" style="margin-bottom: 0.35rem;">School Institutional Record</div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1rem;">
+              <div>
+                <div class="text-subtle">Registration Ministry ID</div>
+                <div style="font-weight: 700;">{{ school_profile.registration_number }}</div>
+              </div>
+              <div>
+                <div class="text-subtle">Campus Location</div>
+                <div style="font-weight: 700;">{{ school_profile.address }}, {{ school_profile.district }}</div>
+              </div>
+            </div>
+          </div>
+        {% endif %}
+
+        <div style="display: flex; gap: 0.75rem; justify-content: flex-end; border-top: 1px solid var(--color-light-grey); padding-top: 1.5rem; margin-top: 1.5rem;">
+          <a href="/" class="btn btn-secondary">Cancel</a>
+          <button type="submit" class="btn btn-primary">Save Profile Changes</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script>
+  function previewAvatar(input) {
+    if (input.files && input.files[0]) {
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        document.getElementById('avatar-preview').src = e.target.result;
+      }
+      reader.readAsDataURL(input.files[0]);
+    }
+  }
+</script>
+{% endblock %}

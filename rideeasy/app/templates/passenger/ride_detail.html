@@ -1,0 +1,166 @@
+{% extends "base.html" %}
+
+{% block title %}Trip Tracker #{{ ride.id[:8].upper() }} — RideEasy{% endblock %}
+
+{% block content %}
+<div class="container section">
+  <div style="max-width: 680px; margin: 0 auto;">
+    <div style="margin-bottom: 1.5rem; display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 0.5rem;">
+      <div>
+        <a href="/passenger/rides" class="text-subtle" style="display: inline-flex; align-items: center; gap: 0.25rem; margin-bottom: 0.5rem;">
+          ← Back to Rides
+        </a>
+        <h2>Trip #{{ ride.id[:8].upper() }}</h2>
+      </div>
+
+      <div>
+        <span class="status-indicator">
+          <span class="status-dot"></span> {{ ride.status.replace('_', ' ') }}
+        </span>
+      </div>
+    </div>
+
+    <!-- Live Status Tracker Hook for JS Polling -->
+    <div id="live-ride-tracker" data-ride-id="{{ ride.id }}" class="card" style="margin-bottom: 1.5rem;">
+      <!-- Lifecycle Status Timeline -->
+      <div class="status-timeline">
+        {% set steps = [
+          ('REQUESTED', 'Requested'),
+          ('DRIVER_ASSIGNED', 'Assigned'),
+          ('DRIVER_ARRIVING', 'Arriving'),
+          ('DRIVER_ARRIVED', 'Arrived'),
+          ('TRIP_STARTED', 'In Transit'),
+          ('COMPLETED', 'Arrived')
+        ] %}
+
+        {% set current_index = 0 %}
+        {% if ride.status == 'REQUESTED' %}{% set current_index = 0 %}
+        {% elif ride.status == 'SEARCHING_FOR_DRIVER' %}{% set current_index = 0 %}
+        {% elif ride.status == 'DRIVER_ASSIGNED' %}{% set current_index = 1 %}
+        {% elif ride.status == 'DRIVER_ARRIVING' %}{% set current_index = 2 %}
+        {% elif ride.status == 'DRIVER_ARRIVED' %}{% set current_index = 3 %}
+        {% elif ride.status == 'TRIP_STARTED' %}{% set current_index = 4 %}
+        {% elif ride.status == 'TRIP_COMPLETED' or ride.status == 'COMPLETED' %}{% set current_index = 5 %}
+        {% endif %}
+
+        {% for code, label in steps %}
+          <div class="timeline-step {% if loop.index0 <= current_index %}passed{% endif %} {% if loop.index0 == current_index %}active{% endif %}">
+            <div class="timeline-dot">{{ loop.index }}</div>
+            <div class="timeline-label">{{ label }}</div>
+          </div>
+        {% endfor %}
+      </div>
+
+      <div style="border-top: 1px solid var(--color-light-grey); padding-top: 1.25rem; margin-top: 1rem;">
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+          <div>
+            <div style="font-size: 0.75rem; text-transform: uppercase; font-weight: 700; color: var(--color-medium-grey);">Current Stage</div>
+            <div id="live-status-text" style="font-size: 1.25rem; font-weight: 800; color: var(--color-black);">
+              {{ ride.status.replace('_', ' ') }}
+            </div>
+          </div>
+
+          <div>
+            {% if ride.status in ('REQUESTED', 'SEARCHING_FOR_DRIVER') and not ride.driver_id %}
+              <a href="/passenger/rides/{{ ride.id }}/cancel" class="btn btn-secondary btn-sm" style="color: #990000; border-color: #E5E5E5;">Cancel Request</a>
+            {% elif ride.driver_name and ride.status not in ('COMPLETED', 'CANCELLED') %}
+              <a href="/passenger/rides/{{ ride.id }}/cancel" class="btn btn-secondary btn-sm" style="font-size: 0.75rem;">Cancellation Rules</a>
+            {% elif ride.status == 'COMPLETED' %}
+              <a href="/passenger/rides/{{ ride.id }}/receipt" class="btn btn-primary btn-sm">View Official Receipt</a>
+            {% elif ride.status == 'CANCELLED' %}
+              <span class="status-indicator">
+                <span class="status-dot"></span> Cancelled
+              </span>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Assigned Driver & Vehicle Card -->
+    {% if ride.driver_name %}
+    <div class="card" style="margin-bottom: 1.5rem;">
+      <div class="card-title" style="margin-bottom: 1rem;">Assigned Driver & Vehicle</div>
+      <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+        <div style="display: flex; gap: 1rem; align-items: center;">
+          <div style="width: 48px; height: 48px; border-radius: var(--radius-sm); border: 1px solid var(--color-light-grey); display: flex; align-items: center; justify-content: center; background-color: var(--color-off-white);">
+            <svg class="icon icon-lg" viewBox="0 0 24 24"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+          </div>
+          <div>
+            <div style="font-size: 1.125rem; font-weight: 700; color: var(--color-black);">{{ ride.driver_name }}</div>
+            <div class="metadata-row">
+              <span>Rating: {{ ride.driver_rating or '5.0' }} / 5.0</span>
+              <span class="metadata-separator">·</span>
+              <span>Verified Operator</span>
+            </div>
+          </div>
+        </div>
+
+        <div style="text-align: right;">
+          <div style="font-size: 1.125rem; font-weight: 800; letter-spacing: 0.05em; color: var(--color-black); background-color: var(--color-off-white); border: 1px solid var(--color-light-grey); padding: 0.25rem 0.5rem; border-radius: var(--radius-sm); display: inline-block;">
+            {{ ride.plate_number }}
+          </div>
+          <div style="font-size: 0.75rem; color: var(--color-medium-grey); margin-top: 0.25rem;">
+            {{ ride.color }} {{ ride.make }} {{ ride.model }}
+          </div>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- Trip Route & Fare Details -->
+    <div class="card" style="margin-bottom: 1.5rem;">
+      <div class="card-title" style="margin-bottom: 1rem;">Journey Specifications</div>
+      <div style="display: flex; flex-direction: column; gap: 0.875rem;">
+        <div>
+          <div class="text-subtle">Pickup Location</div>
+          <div style="font-weight: 600; font-size: 0.9375rem;">{{ ride.pickup_address }}</div>
+        </div>
+        <div>
+          <div class="text-subtle">Destination</div>
+          <div style="font-weight: 600; font-size: 0.9375rem;">{{ ride.destination_address }}</div>
+        </div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem; border-top: 1px solid var(--color-light-grey); padding-top: 0.875rem;">
+          <div>
+            <div class="text-subtle">Distance</div>
+            <div style="font-weight: 700;">{{ ride.estimated_distance_km }} km</div>
+          </div>
+          <div>
+            <div class="text-subtle">Category</div>
+            <div style="font-weight: 700;">{{ ride.category }}</div>
+          </div>
+          <div>
+            <div class="text-subtle">Fare (UGX)</div>
+            <div style="font-weight: 800; font-size: 1.125rem;">{{ ride.final_fare_ugx or ride.estimated_fare_ugx | ugx }}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Rating Section if Trip is Completed -->
+    {% if ride.status == 'COMPLETED' %}
+    <div class="card">
+      <div class="card-title">Rate Your Experience</div>
+      <p class="card-subtitle" style="margin-bottom: 1rem;">Help us maintain exceptional transport safety in Uganda</p>
+      <form method="POST" action="/passenger/rides/{{ ride.id }}/rate">
+        <div class="form-group">
+          <label class="form-label" for="rating">Driver Rating (1 to 5 Stars)</label>
+          <select id="rating" name="rating" class="form-select" required>
+            <option value="5" selected>5 - Excellent, Safe & Courteous</option>
+            <option value="4">4 - Very Good Trip</option>
+            <option value="3">3 - Satisfactory</option>
+            <option value="2">2 - Needs Improvement</option>
+            <option value="1">1 - Poor Safety / Conduct</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="review">Comments (Optional)</label>
+          <textarea id="review" name="review" class="form-control" rows="2" placeholder="Tell us about the vehicle condition, punctuality, or driver professionalism..."></textarea>
+        </div>
+        <button type="submit" class="btn btn-primary btn-sm">Submit Driver Rating</button>
+      </form>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+
+{% block title %}School Transport Allocations — RideEasy Admin{% endblock %}
+
+{% block content %}
+<div class="container section">
+  <div style="display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 1rem; margin-bottom: 2rem;">
+    <div>
+      <div class="metadata-row" style="margin-bottom: 0.25rem;">
+        <span style="font-weight: 700; color: var(--color-black); text-transform: uppercase;">Fleet Allocation</span>
+        <span class="metadata-separator">·</span>
+        <span>Institutional Bookings</span>
+      </div>
+      <h2>School Charters & Allocations</h2>
+    </div>
+
+    <a href="/admin/dashboard" class="btn btn-secondary">← Back to Overview</a>
+  </div>
+
+  <div class="card">
+    {% if requests %}
+      <div class="table-responsive">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>School & Contact</th>
+              <th>Vehicle & Seats</th>
+              <th>Trip Route</th>
+              <th>Dates & Times</th>
+              <th>Status</th>
+              <th>Assigned Operator</th>
+              <th>Dispatch Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for r in requests %}
+              <tr>
+                <td>
+                  <strong>{{ r.school_name }}</strong>
+                  <div class="text-subtle">{{ r.contact_person }} · {{ r.school_phone }}</div>
+                </td>
+                <td>
+                  <strong>{{ r.vehicle_type }}</strong>
+                  <div class="text-subtle">{{ r.passenger_count }} Seats</div>
+                </td>
+                <td>
+                  <div style="font-weight: 600;">{{ r.destination }}</div>
+                  <div class="text-subtle">Pickup: {{ r.pickup_location }}</div>
+                </td>
+                <td>
+                  <div>{{ r.travel_date }} ({{ r.departure_time }})</div>
+                  {% if r.return_date %}<div class="text-subtle">Ret: {{ r.return_date }} ({{ r.return_time }})</div>{% endif %}
+                </td>
+                <td>
+                  <span class="status-indicator">
+                    <span class="status-dot"></span> {{ r.status.replace('_', ' ') }}
+                  </span>
+                </td>
+                <td>
+                  {% if r.assigned_driver_name %}
+                    <strong>{{ r.assigned_driver_name }}</strong>
+                    <div class="text-subtle">Plate: {{ r.assigned_vehicle_plate }}</div>
+                  {% else %}
+                    <span class="text-subtle">None Assigned</span>
+                  {% endif %}
+                </td>
+                <td>
+                  <!-- Assignment Form Modal/Inline -->
+                  <form method="POST" action="/admin/schools/requests/{{ r.id }}/assign" style="display: flex; flex-direction: column; gap: 0.25rem;">
+                    <select name="driver_id" class="form-select" style="min-height: 32px; padding: 0.2rem 0.4rem; font-size: 0.75rem;" required>
+                      <option value="">-- Assign Driver --</option>
+                      {% for d in drivers %}
+                        <option value="{{ d.id }}" {% if d.id == r.assigned_driver_id %}selected{% endif %}>
+                          {{ d.full_name }} ({{ d.plate_number }} {{ d.category }})
+                        </option>
+                      {% endfor %}
+                    </select>
+                    <input type="number" name="agreed_price_ugx" value="{{ r.agreed_price_ugx or 380000 }}" class="form-control" style="min-height: 32px; padding: 0.2rem 0.4rem; font-size: 0.75rem;" placeholder="Agreed Tariff (UGX)">
+                    <button type="submit" class="btn btn-primary btn-sm" style="min-height: 30px; font-size: 0.75rem;">Assign & Invoice</button>
+                  </form>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <div style="text-align: center; padding: 3rem 0; color: var(--color-medium-grey);">
+        No school transport requests in queue.
+      </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+
+{% block title %}Contact & Support Desk — RideEasy{% endblock %}
+
+{% block content %}
+<div class="container section">
+  <div style="max-width: 680px; margin: 0 auto;">
+    <div class="metadata-row" style="margin-bottom: 0.5rem;">
+      <span style="font-weight: 700; color: var(--color-black); text-transform: uppercase;">24/7 Operations Desk</span>
+      <span class="metadata-separator">·</span>
+      <span>Kampala, Uganda</span>
+    </div>
+    <h1 style="margin-bottom: 1rem;">Customer & Fleet Support</h1>
+    <p style="font-size: 1.125rem; line-height: 1.6; margin-bottom: 2rem;">
+      Get in touch with the RideEasy customer protection and driver dispatch desk in Kampala.
+    </p>
+
+    <div class="card" style="margin-bottom: 2rem;">
+      <div class="card-title">Direct Support Channels</div>
+      <div style="display: flex; flex-direction: column; gap: 1rem; margin-top: 1rem;">
+        <div style="border: 1px solid var(--color-light-grey); padding: 1rem; border-radius: var(--radius-sm); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem;">
+          <div>
+            <div style="font-weight: 700;">Emergency & Ride Support Hotline</div>
+            <div class="text-subtle">Available 24 hours for passenger assistance & road safety</div>
+          </div>
+          <a href="tel:{{ support_phone }}" class="btn btn-primary btn-sm">{{ support_phone }}</a>
+        </div>
+
+        <div style="border: 1px solid var(--color-light-grey); padding: 1rem; border-radius: var(--radius-sm); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem;">
+          <div>
+            <div style="font-weight: 700;">Institutional School Transport Desk</div>
+            <div class="text-subtle">Dedicated liaison for school administrators and excursion coordinators</div>
+          </div>
+          <a href="mailto:{{ support_email }}" class="btn btn-secondary btn-sm">{{ support_email }}</a>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Physical Operations Inspection Center</div>
+      <div style="margin-top: 0.75rem; font-size: 0.875rem; line-height: 1.6;">
+        <div><strong>Emtrixz Technology Company Ltd</strong></div>
+        <div>Victoria Towers, 4th Floor, Nakasero Road</div>
+        <div>Kampala Central Division, Uganda</div>
+        <div style="margin-top: 0.5rem; color: var(--color-medium-grey);">Driver onboarding & mechanical inspection: Monday to Saturday, 08:00 - 17:00 EAT</div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

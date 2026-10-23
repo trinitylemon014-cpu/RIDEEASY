@@ -1,0 +1,491 @@
+/* RideEasy Dashboard & Workflow Styles
+   Monochrome, Clean Spatial Mathematics */
+
+/* Metric Grid */
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1.25rem;
+  margin-bottom: 2rem;
+}
+
+.stat-card {
+  background-color: var(--color-white);
+  border: 1px solid var(--color-light-grey);
+  border-radius: var(--radius-md);
+  padding: 1.25rem;
+}
+
+.stat-label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-medium-grey);
+  margin-bottom: 0.35rem;
+}
+
+.stat-value {
+  font-size: 1.75rem;
+  font-weight: 800;
+  color: var(--color-black);
+  letter-spacing: -0.03em;
+}
+
+.stat-subtext {
+  font-size: 0.75rem;
+  color: var(--color-dark-grey);
+  margin-top: 0.25rem;
+}
+
+/* Vehicle Category Selection Cards (Booking Flow) */
+.category-selector-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+}
+
+.category-card {
+  border: 1px solid var(--color-light-grey);
+  border-radius: var(--radius-sm);
+  padding: 1rem;
+  background-color: var(--color-white);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  position: relative;
+}
+
+.category-card:hover {
+  border-color: var(--color-black);
+}
+
+.category-card.selected, input[type="radio"]:checked + .category-card {
+  border: 2px solid var(--color-black);
+  background-color: var(--color-off-white);
+}
+
+.category-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.5rem;
+}
+
+.category-name {
+  font-size: 0.9375rem;
+  font-weight: 700;
+  color: var(--color-black);
+}
+
+.category-fare {
+  font-size: 1.125rem;
+  font-weight: 800;
+  color: var(--color-black);
+  margin-top: 0.25rem;
+}
+
+.category-details {
+  font-size: 0.75rem;
+  color: var(--color-medium-grey);
+  margin-top: 0.25rem;
+}
+
+/* Trip Lifecycle Timeline */
+.status-timeline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: relative;
+  margin: 2rem 0;
+  padding: 0 1rem;
+}
+
+.status-timeline::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 10%;
+  right: 10%;
+  height: 2px;
+  background-color: var(--color-light-grey);
+  z-index: 1;
+}
+
+.timeline-step {
+  position: relative;
+  z-index: 2;
+  background-color: var(--color-white);
+  padding: 0.5rem;
+  text-align: center;
+}
+
+.timeline-dot {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 2px solid var(--color-light-grey);
+  background-color: var(--color-white);
+  margin: 0 auto 0.5rem auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  color: var(--color-medium-grey);
+}
+
+.timeline-step.active .timeline-dot {
+  border-color: var(--color-black);
+  background-color: var(--color-black);
+  color: var(--color-white);
+}
+
+.timeline-step.passed .timeline-dot {
+  border-color: var(--color-black);
+  background-color: var(--color-black);
+  color: var(--color-white);
+}
+
+.timeline-label {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-medium-grey);
+}
+
+.timeline-step.active .timeline-label {
+  color: var(--color-black);
+}
+
+/* Reminder Timeline Cards */
+.reminder-card {
+  border: 1px solid var(--color-light-grey);
+  border-left: 3px solid var(--color-black);
+  border-radius: var(--radius-sm);
+  padding: 1rem;
+  background-color: var(--color-white);
+  margin-bottom: 0.75rem;
+}
+
+.reminder-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.35rem;
+}
+
+.reminder-title {
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: var(--color-black);
+}
+
+.reminder-time {
+  font-size: 0.75rem;
+  color: var(--color-medium-grey);
+}
+
+.reminder-body {
+  font-size: 0.8125rem;
+  color: var(--color-dark-grey);
+  line-height: 1.4;
+}
+
+/* Printable Official Receipt */
+@media print {
+  body {
+    background-color: #FFFFFF !important;
+  }
+  .navbar, .footer, .btn, .demo-role-bar, .no-print {
+    display: none !important;
+  }
+  .receipt-box {
+    border: 1px solid #000000 !important;
+    box-shadow: none !important;
+    padding: 2rem !important;
+    margin: 0 !important;
+  }
+}
+
+.receipt-box {
+  background-color: var(--color-white);
+  border: 1px solid var(--color-light-grey);
+  border-radius: var(--radius-md);
+  padding: 2rem;
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+.receipt-header {
+  text-align: center;
+  padding-bottom: 1.5rem;
+  border-bottom: 1px dashed var(--color-light-grey);
+  margin-bottom: 1.5rem;
+}
+
+.receipt-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 0.5rem 0;
+  font-size: 0.875rem;
+  color: var(--color-dark-grey);
+}
+
+.receipt-row.total {
+  border-top: 1px solid var(--color-black);
+  padding-top: 0.75rem;
+  margin-top: 0.75rem;
+  font-size: 1.125rem;
+  font-weight: 800;
+  color: var(--color-black);
+}
+
+/* Real-Time Driver Earnings Summary & Chart Component */
+.earnings-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.earnings-kpi-card {
+  background-color: var(--color-off-white);
+  border: 1px solid var(--color-light-grey);
+  border-radius: var(--radius-sm);
+  padding: 1rem;
+  transition: border-color 0.15s ease;
+}
+
+.earnings-kpi-card:hover {
+  border-color: var(--color-dark-grey);
+}
+
+.earnings-chart-container {
+  position: relative;
+  background-color: var(--color-white);
+  border: 1px solid var(--color-light-grey);
+  border-radius: var(--radius-sm);
+  padding: 1.25rem 1rem 0.75rem;
+  margin-bottom: 1.25rem;
+  overflow-x: auto;
+}
+
+.chart-bar {
+  fill: var(--color-black);
+  transition: fill 0.15s ease, opacity 0.15s ease;
+  cursor: pointer;
+}
+
+.chart-bar:hover {
+  fill: #444444;
+}
+
+.chart-bar.bar-today {
+  fill: var(--color-black);
+  stroke: var(--color-black);
+  stroke-width: 1px;
+}
+
+.chart-bar.is-selected {
+  fill: #000000;
+  stroke: #000000;
+  stroke-width: 2.5px;
+  filter: drop-shadow(0px 2px 4px rgba(0,0,0,0.3));
+}
+
+.chart-dot {
+  fill: var(--color-black);
+  stroke: var(--color-white);
+  stroke-width: 2.5px;
+  cursor: pointer;
+  transition: transform 0.15s ease, r 0.15s ease;
+}
+
+.chart-dot:hover, .chart-dot.is-selected {
+  r: 7px;
+  fill: #000000;
+}
+
+.chart-tooltip {
+  position: absolute;
+  background-color: #000000;
+  color: #FFFFFF;
+  border-radius: var(--radius-sm);
+  padding: 0.5rem 0.75rem;
+  font-size: 0.75rem;
+  line-height: 1.35;
+  pointer-events: none;
+  z-index: 100;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+  white-space: nowrap;
+  transform: translate(-50%, -100%);
+  margin-top: -8px;
+  transition: opacity 0.15s ease;
+}
+
+.chart-tooltip::after {
+  content: "";
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border-width: 5px;
+  border-style: solid;
+  border-color: #000000 transparent transparent transparent;
+}
+
+.day-breakdown-pills {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+@media (max-width: 768px) {
+  .day-breakdown-pills {
+    grid-template-columns: repeat(auto-fit, minmax(90px, 1fr));
+  }
+}
+
+.day-pill-btn {
+  background-color: var(--color-off-white);
+  border: 1px solid var(--color-light-grey);
+  border-radius: var(--radius-sm);
+  padding: 0.5rem 0.35rem;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  font-size: 0.75rem;
+}
+
+.day-pill-btn:hover {
+  border-color: var(--color-black);
+  background-color: var(--color-white);
+}
+
+.day-pill-btn.active {
+  background-color: var(--color-black);
+  color: var(--color-white);
+  border-color: var(--color-black);
+}
+
+.day-pill-btn.active .text-subtle {
+  color: #CCCCCC !important;
+}
+
+.day-trips-list {
+  background-color: var(--color-off-white);
+  border: 1px solid var(--color-light-grey);
+  border-radius: var(--radius-sm);
+  padding: 0.875rem 1rem;
+  margin-top: 0.75rem;
+}
+
+/* RideEasy Rewards Points Tracker & Benefits Catalog */
+.rewards-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+}
+
+.rewards-kpi-card {
+  background-color: var(--color-off-white);
+  border: 1px solid var(--color-light-grey);
+  border-radius: var(--radius-sm);
+  padding: 1.125rem;
+  transition: border-color 0.15s ease;
+}
+
+.rewards-kpi-card:hover {
+  border-color: var(--color-dark-grey);
+}
+
+.rewards-progress-wrapper {
+  background-color: var(--color-off-white);
+  border: 1px solid var(--color-light-grey);
+  border-radius: var(--radius-sm);
+  padding: 1.125rem;
+  margin-bottom: 1.5rem;
+}
+
+.rewards-progress-track {
+  width: 100%;
+  height: 10px;
+  background-color: #E5E5E5;
+  border-radius: 5px;
+  overflow: hidden;
+  margin: 0.6rem 0 0.4rem;
+}
+
+.rewards-progress-fill {
+  height: 100%;
+  background-color: var(--color-black);
+  border-radius: 5px;
+  transition: width 0.4s ease;
+}
+
+.rewards-tier-milestones {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  font-size: 0.6875rem;
+  color: var(--color-medium-grey);
+  flex-wrap: wrap;
+}
+
+.rewards-tier-milestone.active {
+  color: var(--color-black);
+  font-weight: 700;
+}
+
+.rewards-catalog-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.reward-benefit-card {
+  background-color: var(--color-white);
+  border: 1px solid var(--color-light-grey);
+  border-radius: var(--radius-sm);
+  padding: 1.125rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 0.875rem;
+  transition: all 0.15s ease;
+}
+
+.reward-benefit-card:hover {
+  border-color: var(--color-black);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.reward-benefit-card.is-unlocked {
+  border-top: 3px solid var(--color-black);
+}
+
+.reward-benefit-card.is-locked {
+  background-color: #FAFAFA;
+  opacity: 0.88;
+}
+
+.voucher-code-badge {
+  font-family: var(--font-mono, monospace);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  background-color: var(--color-black);
+  color: var(--color-white);
+  padding: 0.2rem 0.5rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.8125rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+

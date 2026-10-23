@@ -1,0 +1,190 @@
+{% extends "base.html" %}
+
+{% block title %}Book a Ride — RideEasy{% endblock %}
+
+{% block content %}
+<div class="container section">
+  <div style="max-width: 640px; margin: 0 auto;">
+    <div style="margin-bottom: 1.5rem;">
+      <a href="/passenger/dashboard" class="text-subtle" style="display: inline-flex; align-items: center; gap: 0.25rem; margin-bottom: 0.5rem;">
+        ← Back to Dashboard
+      </a>
+      <h2>Request a Ride</h2>
+      <p style="font-size: 0.875rem;">Fast dispatch with verified Ugandan drivers and transparent tariffs</p>
+    </div>
+
+    {% if is_airport == '1' %}
+      <div class="alert alert-info" style="margin-bottom: 1.5rem;">
+        <div>
+          <strong>Airport Journey Linked:</strong> This ride is connected to your upcoming flight journey. Direct transfer to Entebbe International Airport (EBB).
+        </div>
+      </div>
+    {% endif %}
+
+    <!-- Frequent Saved Routes Section for 1-Click Quick Access -->
+    <div class="card" style="margin-bottom: 1.5rem; border-left: 4px solid var(--color-black);">
+      <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem; flex-wrap: wrap; gap: 0.5rem;">
+        <div style="display: flex; align-items: center; gap: 0.5rem;">
+          <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z"/></svg>
+          <strong style="font-size: 0.875rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--color-black);">Saved Frequent Routes</strong>
+        </div>
+        <span class="text-subtle" style="font-size: 0.75rem;">1-Click Quick Fill</span>
+      </div>
+
+      <div id="saved-routes-list" style="display: flex; flex-direction: column; gap: 0.625rem;">
+        {% if saved_routes %}
+          {% for rt in saved_routes %}
+            <div class="saved-route-item" id="saved-route-{{ rt.id }}" style="border: 1px solid var(--color-light-grey); border-radius: var(--radius-sm); padding: 0.75rem 1rem; background-color: var(--color-white); display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; flex-wrap: wrap;">
+              <div style="flex: 1; min-width: 200px;">
+                <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.25rem;">
+                  <strong style="font-size: 0.875rem; color: var(--color-black);">{{ rt.name }}</strong>
+                  <span style="font-size: 0.6875rem; font-weight: 700; background-color: var(--color-black); color: var(--color-white); padding: 0.1rem 0.4rem; border-radius: 2px;">
+                    {{ rt.category }}
+                  </span>
+                </div>
+                <div style="font-size: 0.75rem; color: var(--color-dark-grey); line-height: 1.3;">
+                  <span>{{ rt.pickup_address }}</span>
+                  <span style="color: var(--color-medium-grey); font-weight: 700; margin: 0 0.25rem;">→</span>
+                  <span style="font-weight: 600;">{{ rt.destination_address }}</span>
+                </div>
+              </div>
+
+              <div style="display: flex; align-items: center; gap: 0.5rem;">
+                <button type="button" class="btn btn-primary btn-sm btn-apply-route" 
+                        data-pickup="{{ rt.pickup_address }}" 
+                        data-destination="{{ rt.destination_address }}" 
+                        data-category="{{ rt.category }}" 
+                        data-name="{{ rt.name }}"
+                        title="Quick-fill booking form with this route">
+                  Use Route
+                </button>
+                <form method="POST" action="/passenger/saved-routes/{{ rt.id }}/delete" style="margin: 0;" class="form-delete-saved-route" data-route-id="{{ rt.id }}">
+                  <button type="submit" class="btn btn-secondary btn-sm" title="Remove route" style="padding: 0.25rem 0.5rem; font-size: 0.75rem; color: var(--color-dark-grey);">
+                    ✕
+                  </button>
+                </form>
+              </div>
+            </div>
+          {% endfor %}
+        {% else %}
+          <div id="no-saved-routes-msg" style="text-align: center; padding: 1rem; font-size: 0.8125rem; color: var(--color-medium-grey); background-color: var(--color-off-white); border-radius: var(--radius-sm);">
+            No saved routes yet. Enter your pickup and destination below and click <strong>"Save Route"</strong> to store routes like 'Home to Office'.
+          </div>
+        {% endif %}
+      </div>
+    </div>
+
+    <form id="ride-booking-form" method="POST" action="/passenger/book-ride" class="card">
+      <input type="hidden" name="is_airport_ride" value="{{ is_airport }}">
+      <input type="hidden" name="related_journey_id" value="{{ journey_id }}">
+
+      <div class="form-group">
+        <label class="form-label" for="pickup_address">Pickup Location</label>
+        <input type="text" id="pickup_address" name="pickup_address" class="form-control" placeholder="e.g. Plot 14 Acacia Avenue, Kololo" value="{{ pre_pickup or 'Acacia Mall, Kisementi, Kololo' }}" required>
+        <div style="margin-top: 0.5rem; display: flex; gap: 0.35rem; flex-wrap: wrap;">
+          <span style="font-size: 0.75rem; color: var(--color-medium-grey); align-self: center;">Quick pick:</span>
+          <button type="button" class="btn btn-secondary btn-sm" data-set-pickup data-place="Acacia Mall, Kisementi, Kololo">Acacia Mall</button>
+          <button type="button" class="btn btn-secondary btn-sm" data-set-pickup data-place="Victoria Towers, Nakasero Road">Victoria Towers</button>
+          <button type="button" class="btn btn-secondary btn-sm" data-set-pickup data-place="Makerere University Main Gate">Makerere Gate</button>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="destination_address">Destination</label>
+        <input type="text" id="destination_address" name="destination_address" class="form-control" placeholder="e.g. Entebbe International Airport (EBB)" value="{{ pre_destination or 'Entebbe International Airport (EBB)' }}" required>
+        <div style="margin-top: 0.5rem; display: flex; gap: 0.35rem; flex-wrap: wrap;">
+          <span style="font-size: 0.75rem; color: var(--color-medium-grey); align-self: center;">Quick pick:</span>
+          <button type="button" class="btn btn-secondary btn-sm" data-set-pickup data-target="destination" data-place="Entebbe International Airport (EBB)">Entebbe Airport (EBB)</button>
+          <button type="button" class="btn btn-secondary btn-sm" data-set-pickup data-target="destination" data-place="Garden City Mall, Yusuf Lule Road">Garden City</button>
+          <button type="button" class="btn btn-secondary btn-sm" data-set-pickup data-target="destination" data-place="Kampala City Centre (Posta Uganda)">Posta Uganda</button>
+        </div>
+      </div>
+
+      <!-- Save Current Route for Quick Access (e.g. 'Home to Office') -->
+      <div style="margin-bottom: 1.5rem; padding: 0.875rem 1rem; background-color: var(--color-off-white); border: 1px solid var(--color-light-grey); border-radius: var(--radius-sm);">
+        <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem;">
+          <div style="display: flex; align-items: center; gap: 0.4rem;">
+            <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z"/></svg>
+            <span style="font-size: 0.8125rem; font-weight: 700; color: var(--color-black);">Save This Route as Frequent</span>
+          </div>
+          <button type="button" id="toggle-save-route-row-btn" class="btn btn-secondary btn-sm" style="font-size: 0.75rem;">
+            + Save Route
+          </button>
+        </div>
+
+        <div id="save-route-input-group" style="display: none; margin-top: 0.75rem; border-top: 1px solid var(--color-light-grey); padding-top: 0.75rem;">
+          <label class="form-label" for="save_route_name" style="font-size: 0.75rem;">Route Name</label>
+          <div style="display: flex; gap: 0.5rem;">
+            <input type="text" id="save_route_name" class="form-control" placeholder="e.g. Home to Office, Gym to Work" style="font-size: 0.875rem;">
+            <button type="button" id="btn-save-current-route" class="btn btn-primary btn-sm" style="white-space: nowrap;">
+              Save Route
+            </button>
+          </div>
+          <div id="save-route-status" style="font-size: 0.75rem; margin-top: 0.35rem; display: none;"></div>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Ride Category</label>
+        <div class="category-selector-grid">
+          <label>
+            <input type="radio" name="category" value="BODA" {% if pre_category == 'BODA' %}checked{% endif %} style="display: none;">
+            <div class="category-card {% if pre_category == 'BODA' %}selected{% endif %}">
+              <div class="category-name">Boda</div>
+              <div class="category-details">Quick city transit</div>
+            </div>
+          </label>
+
+          <label>
+            <input type="radio" name="category" value="ECONOMY" {% if pre_category == 'ECONOMY' or not pre_category %}checked{% endif %} style="display: none;">
+            <div class="category-card {% if pre_category == 'ECONOMY' or not pre_category %}selected{% endif %}">
+              <div class="category-name">Economy</div>
+              <div class="category-details">Standard Saloon (Premio / Spacio)</div>
+            </div>
+          </label>
+
+          <label>
+            <input type="radio" name="category" value="COMFORT" {% if pre_category == 'COMFORT' %}checked{% endif %} style="display: none;">
+            <div class="category-card {% if pre_category == 'COMFORT' %}selected{% endif %}">
+              <div class="category-name">Comfort</div>
+              <div class="category-details">Spacious AC Sedan (Fielder / Axio)</div>
+            </div>
+          </label>
+
+          <label>
+            <input type="radio" name="category" value="PREMIUM" {% if pre_category == 'PREMIUM' %}checked{% endif %} style="display: none;">
+            <div class="category-card {% if pre_category == 'PREMIUM' %}selected{% endif %}">
+              <div class="category-name">Premium</div>
+              <div class="category-details">Executive SUV (Prado / Harrier)</div>
+            </div>
+          </label>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="payment_method">Payment Option</label>
+        <select id="payment_method" name="payment_method" class="form-select" required>
+          <option value="CASH">Cash directly to driver</option>
+          <option value="MTN_MOMO" selected>MTN Mobile Money (MoMo)</option>
+          <option value="AIRTEL_MONEY">Airtel Money</option>
+          <option value="CARD">Debit / Credit Card</option>
+        </select>
+      </div>
+
+      <!-- Real-Time Fare Estimate Calculation Card -->
+      <div style="background-color: var(--color-off-white); border: 1px solid var(--color-light-grey); border-radius: var(--radius-sm); padding: 1.25rem; margin-bottom: 1.5rem; display: flex; align-items: center; justify-content: space-between;">
+        <div>
+          <div style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: var(--color-medium-grey);">Estimated Trip Fare</div>
+          <div id="estimated-fare-display" style="font-size: 1.75rem; font-weight: 800; color: var(--color-black);">UGX 85,000</div>
+          <div id="estimated-distance-display" style="font-size: 0.8125rem; color: var(--color-dark-grey);">42.5 km (estimated)</div>
+        </div>
+        <div class="status-indicator">
+          <span class="status-dot"></span> Regulated Tariffs
+        </div>
+      </div>
+
+      <button type="submit" class="btn btn-primary btn-block">Confirm & Request Driver</button>
+    </form>
+  </div>
+</div>
+{% endblock %}

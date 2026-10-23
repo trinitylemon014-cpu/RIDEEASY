@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+
+{% block title %}Register Account — RideEasy{% endblock %}
+
+{% block content %}
+<div class="container section">
+  <div style="max-width: 520px; margin: 0 auto;">
+    <div class="card">
+      <div style="text-align: center; margin-bottom: 2rem;">
+        <div class="metadata-row" style="justify-content: center; margin-bottom: 0.35rem;">
+          <span style="font-weight: 700; color: var(--color-black); text-transform: uppercase;">New Registration</span>
+        </div>
+        <h2>Create RideEasy Account</h2>
+        <p style="font-size: 0.875rem;">Register as a passenger, verified driver, or educational institution</p>
+      </div>
+
+      <form method="POST" action="/auth/register">
+        <div class="form-group">
+          <label class="form-label" for="role">Select Account Type</label>
+          <select id="role" name="role" class="form-select" required>
+            <option value="PASSENGER">Individual Passenger (City rides & Flights)</option>
+            <option value="DRIVER">Driver Partner (Earn with your inspected vehicle)</option>
+            <option value="SCHOOL">School / Educational Institution (Coaster & Bus Charters)</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="full_name">Full Name / School Name</label>
+          <input type="text" id="full_name" name="full_name" class="form-control" placeholder="e.g. Grace Namubiru or Greenhill Academy" required>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="email">Email Address</label>
+          <input type="email" id="email" name="email" class="form-control" placeholder="name@domain.ug" required>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="phone">Ugandan Phone Number (MoMo / Airtel)</label>
+          <input type="tel" id="phone" name="phone" class="form-control" placeholder="+256 700 000 000" required>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="password">Create Password</label>
+          <input type="password" id="password" name="password" class="form-control" placeholder="Minimum 8 characters" required>
+        </div>
+
+        <div style="font-size: 0.75rem; color: var(--color-medium-grey); margin-bottom: 1.25rem;">
+          By creating an account, you agree to RideEasy's Carriage Regulations and safety guidelines in Uganda.
+        </div>
+
+        <button type="submit" class="btn btn-primary btn-block">Complete Registration</button>
+      </form>
+
+      <div style="text-align: center; margin-top: 1.5rem; font-size: 0.8125rem;">
+        Already registered? <a href="/auth/login" style="font-weight: 700; text-decoration: underline;">Sign In</a>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

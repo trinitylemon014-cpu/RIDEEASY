@@ -1,0 +1,290 @@
+{% extends "base.html" %}
+
+{% block title %}RideEasy — MOVE. TRAVEL. ARRIVE. | Transportation Platform Uganda{% endblock %}
+
+{% block content %}
+<!-- Hero Section -->
+<section style="background-color: var(--color-white); border-bottom: 1px solid var(--color-light-grey); padding: 4rem 0;">
+  <div class="container">
+    <div style="max-width: 760px;">
+      <div class="metadata-row" style="margin-bottom: 0.75rem;">
+        <span style="font-weight: 700; color: var(--color-black); text-transform: uppercase; letter-spacing: 0.08em;">Official Mobility Platform</span>
+        <span class="metadata-separator">·</span>
+        <span>Kampala, Uganda</span>
+        <span class="metadata-separator">·</span>
+        <span>Emtrixz Technology Company</span>
+      </div>
+      <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 1.5rem;">
+        <img src="/static/images/logo.png" alt="RideEasy Motion Logo" style="height: 56px; width: auto; object-fit: contain;" onerror="this.style.display='none'">
+        <div>
+          <div style="font-size: 1.375rem; font-weight: 800; letter-spacing: -0.04em; color: var(--color-black);">RideEasy</div>
+          <div style="font-size: 0.6875rem; letter-spacing: 0.15em; font-weight: 700; color: var(--color-medium-grey);">MOVE. TRAVEL. ARRIVE.</div>
+        </div>
+      </div>
+      <h1 style="font-size: 3rem; line-height: 1.1; margin-bottom: 1rem;">
+        MOVE. TRAVEL. ARRIVE.
+      </h1>
+      <p style="font-size: 1.125rem; color: var(--color-dark-grey); margin-bottom: 2rem; line-height: 1.6;">
+        RideEasy is Uganda's premier unified transport infrastructure. We deliver reliable city ride-hailing, institutional school bus charters, verified flight booking assistance, and scheduled airport journeys.
+      </p>
+
+      <div style="display: flex; gap: 0.75rem; flex-wrap: wrap;">
+        <a href="/passenger/book-ride" class="btn btn-primary">
+          <svg class="icon" viewBox="0 0 24 24"><path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2"/><circle cx="7" cy="17" r="2"/><circle cx="17" cy="17" r="2"/></svg>
+          Book City Ride
+        </a>
+        <a href="/school/request" class="btn btn-secondary">
+          <svg class="icon" viewBox="0 0 24 24"><path d="M4 16c0 .88.39 1.67 1 2.22V20a1 1 0 0 0 1 1h1a1 1 0 0 0 1-1v-1h8v1a1 1 0 0 0 1 1h1a1 1 0 0 0 1-1v-1.78c.61-.55 1-1.34 1-2.22V6c0-3.5-3.58-4-8-4s-8 .5-8 4v10z"/><circle cx="7.5" cy="14.5" r="1.5"/><circle cx="16.5" cy="14.5" r="1.5"/><line x1="4" y1="10" x2="20" y2="10"/></svg>
+          School Bus & Coaster
+        </a>
+        <a href="/passenger/flight-request" class="btn btn-secondary">
+          <svg class="icon" viewBox="0 0 24 24"><path d="M17.8 19.2 16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.2z"/></svg>
+          Flight Assistance
+        </a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Interactive Live Fare Estimator Widget -->
+<section class="section">
+  <div class="container">
+    <div style="display: grid; grid-template-columns: 1.2fr 1fr; gap: 2.5rem; align-items: start;">
+      <div>
+        <div class="metadata-row" style="margin-bottom: 0.5rem;">
+          <span style="font-weight: 700; color: var(--color-black); text-transform: uppercase;">Instant Quote</span>
+          <span class="metadata-separator">·</span>
+          <span>Transparent Pricing Formula</span>
+        </div>
+        <h2>Estimate Your Travel Fare</h2>
+        <p style="margin-bottom: 1.5rem;">
+          Real calculation based on road distance, vehicle category, and official tariffs. No hidden charges or unexpected surge multipliers.
+        </p>
+
+        <form id="ride-booking-form" class="card" onsubmit="event.preventDefault(); window.location.href='/passenger/book-ride?pickup=' + encodeURIComponent(document.getElementById('pickup_address').value) + '&destination=' + encodeURIComponent(document.getElementById('destination_address').value);">
+          <div class="form-group">
+            <label class="form-label" for="pickup_address">Pickup Point</label>
+            <input type="text" id="pickup_address" class="form-control" placeholder="e.g. Acacia Mall, Kololo, Kampala" value="Acacia Mall, Kisementi, Kololo" required>
+            <div style="margin-top: 0.5rem; display: flex; gap: 0.35rem; flex-wrap: wrap;">
+              <span style="font-size: 0.75rem; color: var(--color-medium-grey); align-self: center;">Quick fill:</span>
+              <button type="button" class="btn btn-secondary btn-sm" data-set-pickup data-place="Acacia Mall, Kisementi, Kololo">Acacia Mall</button>
+              <button type="button" class="btn btn-secondary btn-sm" data-set-pickup data-place="Victoria Towers, Nakasero Road">Victoria Towers</button>
+              <button type="button" class="btn btn-secondary btn-sm" data-set-pickup data-place="Kampala City Centre (Posta Uganda)">Posta Kampala</button>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="destination_address">Destination</label>
+            <input type="text" id="destination_address" class="form-control" placeholder="e.g. Entebbe International Airport (EBB)" value="Entebbe International Airport (EBB)" required>
+            <div style="margin-top: 0.5rem; display: flex; gap: 0.35rem; flex-wrap: wrap;">
+              <span style="font-size: 0.75rem; color: var(--color-medium-grey); align-self: center;">Quick fill:</span>
+              <button type="button" class="btn btn-secondary btn-sm" data-set-pickup data-target="destination" data-place="Entebbe International Airport (EBB)">Entebbe Airport (EBB)</button>
+              <button type="button" class="btn btn-secondary btn-sm" data-set-pickup data-target="destination" data-place="Garden City Mall, Yusuf Lule Road">Garden City</button>
+              <button type="button" class="btn btn-secondary btn-sm" data-set-pickup data-target="destination" data-place="Makerere University Main Gate">Makerere Gate</button>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Select Vehicle Category</label>
+            <div class="category-selector-grid">
+              <label>
+                <input type="radio" name="category" value="BODA" style="display: none;">
+                <div class="category-card">
+                  <div class="category-name">Boda</div>
+                  <div class="category-details">Quick city transit · 1 passenger</div>
+                </div>
+              </label>
+
+              <label>
+                <input type="radio" name="category" value="ECONOMY" checked style="display: none;">
+                <div class="category-card selected">
+                  <div class="category-name">Economy</div>
+                  <div class="category-details">Standard Saloon · 4 passengers</div>
+                </div>
+              </label>
+
+              <label>
+                <input type="radio" name="category" value="COMFORT" style="display: none;">
+                <div class="category-card">
+                  <div class="category-name">Comfort</div>
+                  <div class="category-details">Spacious Sedan · AC equipped</div>
+                </div>
+              </label>
+
+              <label>
+                <input type="radio" name="category" value="PREMIUM" style="display: none;">
+                <div class="category-card">
+                  <div class="category-name">Premium</div>
+                  <div class="category-details">Executive SUV · VIP service</div>
+                </div>
+              </label>
+            </div>
+          </div>
+
+          <div style="background-color: var(--color-off-white); border: 1px solid var(--color-light-grey); border-radius: var(--radius-sm); padding: 1.25rem; margin-bottom: 1.25rem; display: flex; align-items: center; justify-content: space-between;">
+            <div>
+              <div style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: var(--color-medium-grey);">Estimated Fare</div>
+              <div id="estimated-fare-display" style="font-size: 1.75rem; font-weight: 800; color: var(--color-black);">UGX 85,000</div>
+              <div id="estimated-distance-display" style="font-size: 0.8125rem; color: var(--color-dark-grey);">42.5 km (estimated)</div>
+            </div>
+            <button type="submit" class="btn btn-primary">Proceed to Book</button>
+          </div>
+        </form>
+      </div>
+
+      <!-- Trust Pillars & Regulatory Overview -->
+      <div>
+        <div class="card" style="margin-bottom: 1.5rem;">
+          <h3 style="margin-bottom: 0.75rem;">Strict Safety Standards</h3>
+          <p style="font-size: 0.875rem; margin-bottom: 1rem;">
+            Every ride, driver, and vehicle operating on the RideEasy network undergoes stringent verification in compliance with Ugandan transport regulations:
+          </p>
+          <ul style="list-style: none; display: flex; flex-direction: column; gap: 0.75rem; font-size: 0.875rem;">
+            <li style="display: flex; gap: 0.5rem; align-items: flex-start;">
+              <svg class="icon icon-sm" viewBox="0 0 24 24" style="margin-top: 2px;"><polyline points="20 6 9 17 4 12"/></svg>
+              <span><strong>National ID (NIN) & Background Vetting:</strong> Verified against official government identification databases.</span>
+            </li>
+            <li style="display: flex; gap: 0.5rem; align-items: flex-start;">
+              <svg class="icon icon-sm" viewBox="0 0 24 24" style="margin-top: 2px;"><polyline points="20 6 9 17 4 12"/></svg>
+              <span><strong>Vehicle Roadworthiness:</strong> Mechanical inspections, comprehensive insurance, and valid speed governors.</span>
+            </li>
+            <li style="display: flex; gap: 0.5rem; align-items: flex-start;">
+              <svg class="icon icon-sm" viewBox="0 0 24 24" style="margin-top: 2px;"><polyline points="20 6 9 17 4 12"/></svg>
+              <span><strong>Institutional School Protocols:</strong> Schools maintain dedicated dashboards with authorized drivers only.</span>
+            </li>
+            <li style="display: flex; gap: 0.5rem; align-items: flex-start;">
+              <svg class="icon icon-sm" viewBox="0 0 24 24" style="margin-top: 2px;"><polyline points="20 6 9 17 4 12"/></svg>
+              <span><strong>Authorized IATA Travel Agencies:</strong> Flight bookings handled exclusively by licensed partner agencies.</span>
+            </li>
+          </ul>
+        </div>
+
+        <div class="card">
+          <div class="card-title">Accepted Payment Channels</div>
+          <p class="card-subtitle" style="margin-bottom: 1rem;">Seamless reconciliation for individuals and organizations</p>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; font-size: 0.8125rem;">
+            <div style="border: 1px solid var(--color-light-grey); padding: 0.75rem; border-radius: var(--radius-sm);">
+              <strong>MTN MoMo</strong>
+              <div class="text-subtle">Direct USSD prompt</div>
+            </div>
+            <div style="border: 1px solid var(--color-light-grey); padding: 0.75rem; border-radius: var(--radius-sm);">
+              <strong>Airtel Money</strong>
+              <div class="text-subtle">Instant mobile debit</div>
+            </div>
+            <div style="border: 1px solid var(--color-light-grey); padding: 0.75rem; border-radius: var(--radius-sm);">
+              <strong>Cash to Driver</strong>
+              <div class="text-subtle">Exact cash on delivery</div>
+            </div>
+            <div style="border: 1px solid var(--color-light-grey); padding: 0.75rem; border-radius: var(--radius-sm);">
+              <strong>Bank Card / Invoicing</strong>
+              <div class="text-subtle">Schools & Corporate</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- The 4 Core Mobility Services -->
+<section style="background-color: var(--color-white); border-top: 1px solid var(--color-light-grey); border-bottom: 1px solid var(--color-light-grey); padding: 4rem 0;">
+  <div class="container">
+    <div style="text-align: center; max-width: 600px; margin: 0 auto 3rem auto;">
+      <div class="metadata-row" style="justify-content: center; margin-bottom: 0.5rem;">
+        <span style="font-weight: 700; color: var(--color-black); text-transform: uppercase;">Complete Service Portfolio</span>
+      </div>
+      <h2>Four Pillars of African Travel</h2>
+      <p>Built purposefully for commuters, educational institutions, international travelers, and verified operators.</p>
+    </div>
+
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 1.5rem;">
+      <!-- Service 1 -->
+      <div class="card">
+        <svg class="icon icon-lg" viewBox="0 0 24 24" style="margin-bottom: 1rem;"><rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
+        <h3>01. Ride-Hailing</h3>
+        <p style="font-size: 0.875rem; margin-bottom: 1.25rem;">
+          Fast, safe point-to-point urban transport across Kampala and Wakiso. Choose between Boda, Economy, Comfort, or Premium.
+        </p>
+        <a href="/passenger/book-ride" class="btn btn-secondary btn-sm btn-block">Book Ride</a>
+      </div>
+
+      <!-- Service 2 -->
+      <div class="card">
+        <svg class="icon icon-lg" viewBox="0 0 24 24" style="margin-bottom: 1rem;"><path d="M4 16c0 .88.39 1.67 1 2.22V20a1 1 0 0 0 1 1h1a1 1 0 0 0 1-1v-1h8v1a1 1 0 0 0 1 1h1a1 1 0 0 0 1-1v-1.78c.61-.55 1-1.34 1-2.22V6c0-3.5-3.58-4-8-4s-8 .5-8 4v10z"/><circle cx="7.5" cy="14.5" r="1.5"/><circle cx="16.5" cy="14.5" r="1.5"/></svg>
+        <h3>02. School Transport</h3>
+        <p style="font-size: 0.875rem; margin-bottom: 1.25rem;">
+          Charter certified 30-passenger Coasters and 60-passenger Buses for educational excursions, sporting events, and daily shuttles.
+        </p>
+        <a href="/school/request" class="btn btn-secondary btn-sm btn-block">School Portal</a>
+      </div>
+
+      <!-- Service 3 -->
+      <div class="card">
+        <svg class="icon icon-lg" viewBox="0 0 24 24" style="margin-bottom: 1rem;"><path d="M17.8 19.2 16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.2z"/></svg>
+        <h3>03. Flight Assistance</h3>
+        <p style="font-size: 0.875rem; margin-bottom: 1.25rem;">
+          Submit international flight inquiries and receive verified proposals from certified IATA agencies with authentic PNR ticketing.
+        </p>
+        <a href="/passenger/flight-request" class="btn btn-secondary btn-sm btn-block">Request Flight Quote</a>
+      </div>
+
+      <!-- Service 4 -->
+      <div class="card">
+        <svg class="icon icon-lg" viewBox="0 0 24 24" style="margin-bottom: 1rem;"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+        <h3>04. Travel Reminders</h3>
+        <p style="font-size: 0.875rem; margin-bottom: 1.25rem;">
+          Automated 5-tier reminders (7-day passport check, 3-day airport ride, 2-day packing, 1-day check-in, and travel day flight status).
+        </p>
+        <a href="/auth/demo/passenger" class="btn btn-secondary btn-sm btn-block">View Journey Tracker</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Role Exploration Hub -->
+<section class="section">
+  <div class="container">
+    <div style="background-color: var(--color-white); border: 1px solid var(--color-light-grey); border-radius: var(--radius-md); padding: 2.5rem;">
+      <div style="max-width: 600px; margin-bottom: 2rem;">
+        <div class="metadata-row" style="margin-bottom: 0.35rem;">
+          <span style="font-weight: 700; color: var(--color-black); text-transform: uppercase;">Role-Based Dashboards</span>
+        </div>
+        <h2>Test Every Persona in the Platform</h2>
+        <p>Switch freely between roles to experience the complete end-to-end transport workflow.</p>
+      </div>
+
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
+        <div style="border: 1px solid var(--color-light-grey); padding: 1.25rem; border-radius: var(--radius-sm);">
+          <div style="font-weight: 700; margin-bottom: 0.25rem;">Passenger</div>
+          <p style="font-size: 0.75rem; margin-bottom: 1rem;">Grace Namubiru · Book rides, track trips, schedule airport transfers.</p>
+          <a href="/auth/demo/passenger" class="btn btn-primary btn-sm btn-block">Explore as Passenger</a>
+        </div>
+
+        <div style="border: 1px solid var(--color-light-grey); padding: 1.25rem; border-radius: var(--radius-sm);">
+          <div style="font-weight: 700; margin-bottom: 0.25rem;">Driver</div>
+          <p style="font-size: 0.75rem; margin-bottom: 1rem;">David Okello · Toyota Premio UBD 204K · Accept rides & update statuses.</p>
+          <a href="/auth/demo/driver" class="btn btn-primary btn-sm btn-block">Explore as Driver</a>
+        </div>
+
+        <div style="border: 1px solid var(--color-light-grey); padding: 1.25rem; border-radius: var(--radius-sm);">
+          <div style="font-weight: 700; margin-bottom: 0.25rem;">School</div>
+          <p style="font-size: 0.75rem; margin-bottom: 1rem;">Greenhill Academy · Request coasters and buses for school excursions.</p>
+          <a href="/auth/demo/school" class="btn btn-primary btn-sm btn-block">Explore as School</a>
+        </div>
+
+        <div style="border: 1px solid var(--color-light-grey); padding: 1.25rem; border-radius: var(--radius-sm);">
+          <div style="font-weight: 700; margin-bottom: 0.25rem;">Travel Partner</div>
+          <p style="font-size: 0.75rem; margin-bottom: 1rem;">Nile Equatorial Travel · Quote flights & confirm genuine PNR bookings.</p>
+          <a href="/auth/demo/travel" class="btn btn-primary btn-sm btn-block">Explore as Partner</a>
+        </div>
+
+        <div style="border: 1px solid var(--color-light-grey); padding: 1.25rem; border-radius: var(--radius-sm);">
+          <div style="font-weight: 700; margin-bottom: 0.25rem;">Administrator</div>
+          <p style="font-size: 0.75rem; margin-bottom: 1rem;">Arthur Katende · Fleet audit, driver approvals, pricing & dispatch.</p>
+          <a href="/auth/demo/admin" class="btn btn-primary btn-sm btn-block">Explore as Admin</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+{% endblock %}

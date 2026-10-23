@@ -1,0 +1,181 @@
+{% extends "base.html" %}
+
+{% block title %}Process Flight Request #{{ req.id[:8].upper() }} — RideEasy{% endblock %}
+
+{% block content %}
+<div class="container section">
+  <div style="max-width: 760px; margin: 0 auto;">
+    <div style="margin-bottom: 1.5rem; display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 0.5rem;">
+      <div>
+        <a href="/travel/dashboard" class="text-subtle" style="display: inline-flex; align-items: center; gap: 0.25rem; margin-bottom: 0.5rem;">
+          ← Back to Agency Hub
+        </a>
+        <h2>Flight Request #{{ req.id[:8].upper() }}</h2>
+      </div>
+
+      <span class="status-indicator">
+        <span class="status-dot"></span> {{ req.status.replace('_', ' ') }}
+      </span>
+    </div>
+
+    <!-- Passenger Inquiry Specifications -->
+    <div class="card" style="margin-bottom: 1.5rem;">
+      <div class="card-title">Customer Requirements & Contact</div>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1rem;">
+        <div>
+          <div class="text-subtle">Passenger Name</div>
+          <div style="font-weight: 700;">{{ req.passenger_name }}</div>
+          <div class="text-subtle">{{ req.passenger_phone }} · {{ req.passenger_email }}</div>
+        </div>
+        <div>
+          <div class="text-subtle">Requested Route</div>
+          <div style="font-weight: 700; font-size: 1.125rem;">{{ req.departure_city }} → {{ req.destination_city }}</div>
+        </div>
+        <div>
+          <div class="text-subtle">Travel Dates</div>
+          <div style="font-weight: 600;">Dep: {{ req.departure_date }}{% if req.return_date %} · Ret: {{ req.return_date }}{% endif %}</div>
+        </div>
+        <div>
+          <div class="text-subtle">Passengers & Class</div>
+          <div>{{ req.passenger_count }} Passenger(s) · {{ req.cabin_class }}</div>
+        </div>
+      </div>
+
+      {% if req.travel_preferences or req.notes %}
+      <div style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--color-light-grey); font-size: 0.8125rem;">
+        {% if req.travel_preferences %}<div><strong>Preferences:</strong> {{ req.travel_preferences }}</div>{% endif %}
+        {% if req.notes %}<div style="margin-top: 0.25rem;"><strong>Notes:</strong> {{ req.notes }}</div>{% endif %}
+      </div>
+      {% endif %}
+
+      <div style="margin-top: 1rem; display: flex; gap: 0.5rem;">
+        <a href="tel:{{ req.passenger_phone }}" class="btn btn-secondary btn-sm">Call Customer</a>
+        <a href="mailto:{{ req.passenger_email }}" class="btn btn-secondary btn-sm">Email Customer</a>
+      </div>
+    </div>
+
+    <!-- If Booking Already Confirmed -->
+    {% if booking %}
+    <div class="card" style="margin-bottom: 1.5rem; border: 2px solid var(--color-black);">
+      <div class="card-title">Confirmed Airline Ticket Record</div>
+      <div class="metadata-row" style="margin: 0.5rem 0 1rem 0;">
+        <span>PNR: <strong style="font-size: 1.125rem;">{{ booking.booking_reference_pnr }}</strong></span>
+        <span class="metadata-separator">·</span>
+        <span>Ticket: {{ booking.airline_ticket_number or 'Electronic Ticket' }}</span>
+      </div>
+      <p style="font-size: 0.875rem;">
+        Booking is confirmed for {{ booking.airline_name }} (Flight {{ booking.flight_number }}). Automated 5-tier reminders and airport transfers have been synchronized for the passenger.
+      </p>
+    </div>
+    {% endif %}
+
+    <!-- 1. Submit Quotation Form -->
+    {% if not booking %}
+    <div class="card" style="margin-bottom: 1.5rem;">
+      <div class="card-title">Step 1: Provide Official Airline Quotation</div>
+      <p class="card-subtitle" style="margin-bottom: 1rem;">
+        Quote verified seat availability, airline tariff, and itinerary to passenger
+      </p>
+
+      <form method="POST" action="/travel/requests/{{ req.id }}/quote">
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+          <div class="form-group">
+            <label class="form-label" for="proposed_airline">Proposed Airline</label>
+            <input type="text" id="proposed_airline" name="proposed_airline" class="form-control" placeholder="e.g. Uganda Airlines / Emirates" value="Uganda Airlines" required>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="flight_number">Flight Number</label>
+            <input type="text" id="flight_number" name="flight_number" class="form-control" placeholder="e.g. UR 446" value="UR 446" required>
+          </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+          <div class="form-group">
+            <label class="form-label" for="departure_time">Departure Time</label>
+            <input type="text" id="departure_time" name="departure_time" class="form-control" placeholder="e.g. 17:30 EAT" value="17:30 EAT" required>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="arrival_time">Arrival Time</label>
+            <input type="text" id="arrival_time" name="arrival_time" class="form-control" placeholder="e.g. 23:45 GST" value="23:45 GST" required>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="itinerary_summary">Itinerary & Baggage Details</label>
+          <input type="text" id="itinerary_summary" name="itinerary_summary" class="form-control" placeholder="e.g. Direct flight Entebbe to Dubai. 2x 23kg check-in baggage included." value="Direct flight Entebbe to Dubai. 2x 23kg check-in baggage included." required>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+          <div class="form-group">
+            <label class="form-label" for="price_ugx">Total Tariff (UGX)</label>
+            <input type="number" id="price_ugx" name="price_ugx" class="form-control" placeholder="e.g. 2450000" value="2450000" required>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="valid_until">Quotation Expiry Date</label>
+            <input type="date" id="valid_until" name="valid_until" class="form-control" value="2026-11-05" required>
+          </div>
+        </div>
+
+        <button type="submit" class="btn btn-primary btn-block">Submit Quotation to Passenger</button>
+      </form>
+    </div>
+
+    <!-- 2. Confirm Genuine PNR Booking -->
+    <div class="card">
+      <div class="card-title">Step 2: Confirm Genuine PNR & Issue Ticket</div>
+      <p class="card-subtitle" style="margin-bottom: 1rem;">
+        Once the passenger approves the itinerary, register the authentic airline PNR reference to schedule automated travel reminders and airport transfers.
+      </p>
+
+      <form method="POST" action="/travel/requests/{{ req.id }}/confirm-booking">
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+          <div class="form-group">
+            <label class="form-label" for="booking_reference_pnr">Airline PNR Reference (6 Characters)</label>
+            <input type="text" id="booking_reference_pnr" name="booking_reference_pnr" class="form-control" placeholder="e.g. 6R9KQ2" maxlength="8" required>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="airline_ticket_number">E-Ticket Number (Optional)</label>
+            <input type="text" id="airline_ticket_number" name="airline_ticket_number" class="form-control" placeholder="e.g. 673-2491028472">
+          </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+          <div class="form-group">
+            <label class="form-label" for="airline_name">Airline Name</label>
+            <input type="text" id="airline_name" name="airline_name" class="form-control" value="Uganda Airlines" required>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="flight_number_confirm">Flight Number</label>
+            <input type="text" id="flight_number_confirm" name="flight_number" class="form-control" value="UR 446" required>
+          </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+          <div class="form-group">
+            <label class="form-label" for="departure_airport">Departure Airport</label>
+            <input type="text" id="departure_airport" name="departure_airport" class="form-control" value="Entebbe International Airport (EBB)" required>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="arrival_airport">Arrival Airport</label>
+            <input type="text" id="arrival_airport" name="arrival_airport" class="form-control" value="Dubai International Airport (DXB)" required>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="departure_datetime">Confirmed Departure Datetime</label>
+          <input type="text" id="departure_datetime" name="departure_datetime" class="form-control" placeholder="YYYY-MM-DD HH:MM:SS" value="2026-11-15 17:30:00" required>
+        </div>
+
+        <button type="submit" class="btn btn-primary btn-block">Confirm Booking & Initiate Passenger Reminders</button>
+      </form>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

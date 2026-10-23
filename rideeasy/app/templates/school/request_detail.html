@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+
+{% block title %}School Charter #{{ req.id[:8].upper() }} — RideEasy{% endblock %}
+
+{% block content %}
+<div class="container section">
+  <div style="max-width: 680px; margin: 0 auto;">
+    <div style="margin-bottom: 1.5rem; display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 0.5rem;">
+      <div>
+        <a href="/school/dashboard" class="text-subtle" style="display: inline-flex; align-items: center; gap: 0.25rem; margin-bottom: 0.5rem;">
+          ← Back to School Portal
+        </a>
+        <h2>Charter #{{ req.id[:8].upper() }}</h2>
+      </div>
+
+      <span class="status-indicator">
+        <span class="status-dot"></span> {{ req.status.replace('_', ' ') }}
+      </span>
+    </div>
+
+    <!-- Request Details -->
+    <div class="card" style="margin-bottom: 1.5rem;">
+      <div class="card-title">Excursion Particulars</div>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1rem;">
+        <div>
+          <div class="text-subtle">School Institution</div>
+          <div style="font-weight: 700;">{{ req.school_name }}</div>
+          <div class="text-subtle">Authorized: {{ req.contact_person }}</div>
+        </div>
+        <div>
+          <div class="text-subtle">Vehicle Fleet Selected</div>
+          <div style="font-weight: 700;">{{ req.vehicle_type }} ({{ req.passenger_count }} Seats Reserved)</div>
+        </div>
+        <div>
+          <div class="text-subtle">Campus Pickup</div>
+          <div style="font-weight: 600;">{{ req.pickup_location }}</div>
+        </div>
+        <div>
+          <div class="text-subtle">Excursion Destination</div>
+          <div style="font-weight: 600;">{{ req.destination }}</div>
+        </div>
+        <div>
+          <div class="text-subtle">Schedule</div>
+          <div>{{ req.travel_date }} at {{ req.departure_time }}</div>
+          {% if req.return_date %}<div class="text-subtle">Return: {{ req.return_date }} at {{ req.return_time }}</div>{% endif %}
+        </div>
+        <div>
+          <div class="text-subtle">Charter Tariff</div>
+          <div style="font-size: 1.25rem; font-weight: 800; color: var(--color-black);">{{ req.agreed_price_ugx | ugx }}</div>
+          <div class="metadata-row">
+            <span>Invoice: <strong>{{ req.invoice_status }}</strong></span>
+          </div>
+        </div>
+      </div>
+
+      {% if req.special_requirements %}
+      <div style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--color-light-grey); font-size: 0.8125rem;">
+        <strong>Safety Requirements:</strong> {{ req.special_requirements }}
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- Assigned Operator -->
+    <div class="card">
+      <div class="card-title">Assigned Certified Driver & Vehicle</div>
+      <p class="card-subtitle" style="margin-bottom: 1rem;">Verified against Ministry of Works background checks</p>
+
+      {% if req.driver_name %}
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+          <div>
+            <div style="font-size: 1.125rem; font-weight: 700;">{{ req.driver_name }}</div>
+            <div class="text-subtle">Driver Tel: {{ req.driver_phone }}</div>
+          </div>
+          <div style="text-align: right;">
+            <div style="font-size: 1.125rem; font-weight: 800; background-color: var(--color-off-white); border: 1px solid var(--color-light-grey); padding: 0.25rem 0.5rem; border-radius: var(--radius-sm); display: inline-block;">
+              {{ req.plate_number }}
+            </div>
+            <div class="text-subtle">{{ req.make }} {{ req.model }}</div>
+          </div>
+        </div>
+      {% else %}
+        <div style="padding: 1.5rem 0; text-align: center; color: var(--color-medium-grey); font-size: 0.875rem;">
+          RideEasy Fleet Operations is currently confirming vehicle mechanical inspection for your travel date. Driver and plate number will appear here once assigned.
+        </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}

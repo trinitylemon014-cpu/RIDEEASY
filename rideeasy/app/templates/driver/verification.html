@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+
+{% block title %}Driver Verification Status — RideEasy{% endblock %}
+
+{% block content %}
+<div class="container section">
+  <div style="max-width: 680px; margin: 0 auto;">
+    <div style="margin-bottom: 1.5rem;">
+      <a href="/driver/dashboard" class="text-subtle" style="display: inline-flex; align-items: center; gap: 0.25rem; margin-bottom: 0.5rem;">
+        ← Back to Console
+      </a>
+      <h2>Driver Compliance & Document Verification</h2>
+      <p style="font-size: 0.875rem;">Official regulatory screening records required under Ugandan transport laws</p>
+    </div>
+
+    <div class="card" style="margin-bottom: 1.5rem;">
+      <div class="card-header">
+        <div>
+          <div class="card-title">Driver Identification Credentials</div>
+          <div class="card-subtitle">Verified against Uganda Ministry of Works & Transport databases</div>
+        </div>
+        <span class="status-indicator">
+          <span class="status-dot"></span> {{ profile.verification_status }}
+        </span>
+      </div>
+
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+        <div>
+          <div class="text-subtle">Driving Permit Number</div>
+          <div style="font-weight: 700;">{{ profile.license_number }}</div>
+        </div>
+        <div>
+          <div class="text-subtle">National Identification (NIN)</div>
+          <div style="font-weight: 700;">{{ profile.national_id_nin }}</div>
+        </div>
+        <div>
+          <div class="text-subtle">Commercial Experience</div>
+          <div>{{ profile.years_experience }} Years Verified Driving</div>
+        </div>
+        <div>
+          <div class="text-subtle">Background Check</div>
+          <div>Interpol / Police Clearance On File</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Vehicle Inspection Record -->
+    <div class="card">
+      <div class="card-title">Registered Vehicle Record</div>
+      <p class="card-subtitle" style="margin-bottom: 1rem;">Mechanically certified and inspected for passenger transport</p>
+
+      {% if vehicle %}
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+          <div>
+            <div class="text-subtle">Registration Number</div>
+            <div style="font-size: 1.25rem; font-weight: 800; color: var(--color-black);">{{ vehicle.plate_number }}</div>
+          </div>
+          <div>
+            <div class="text-subtle">Vehicle Make & Model</div>
+            <div style="font-weight: 700;">{{ vehicle.color }} {{ vehicle.make }} {{ vehicle.model }} ({{ vehicle.year }})</div>
+          </div>
+          <div>
+            <div class="text-subtle">Category & Capacity</div>
+            <div>{{ vehicle.category }} · {{ vehicle.capacity }} Passengers</div>
+          </div>
+          <div>
+            <div class="text-subtle">Inspection Status</div>
+            <div>Certified Roadworthy (COV Active)</div>
+          </div>
+        </div>
+      {% else %}
+        <p style="color: var(--color-medium-grey);">No vehicle currently assigned.</p>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}

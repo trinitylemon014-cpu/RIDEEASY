@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+
+{% block title %}Trust & Safety Standards — RideEasy{% endblock %}
+
+{% block content %}
+<div class="container section">
+  <div style="max-width: 760px; margin: 0 auto;">
+    <div class="metadata-row" style="margin-bottom: 0.5rem;">
+      <span style="font-weight: 700; color: var(--color-black); text-transform: uppercase;">Zero Compromise</span>
+      <span class="metadata-separator">·</span>
+      <span>Regulatory Compliance</span>
+    </div>
+    <h1 style="margin-bottom: 1rem;">Trust & Safety Architecture</h1>
+    <p style="font-size: 1.125rem; line-height: 1.6; margin-bottom: 2rem;">
+      Safety is the foundational contract between RideEasy and our passengers, schools, and driver partners across Uganda.
+    </p>
+
+    <div style="display: flex; flex-direction: column; gap: 1.5rem;">
+      <div class="card">
+        <h3>1. Mandatory Driver Background & Identity Vetting</h3>
+        <p style="font-size: 0.875rem; margin-top: 0.5rem; line-height: 1.6;">
+          Every driver on RideEasy must undergo physical verification at our Kampala inspection center. We cross-verify the driver's National Identification Number (NIN) with the National Identification and Registration Authority (NIRA), validate valid Driving Permits with the Ministry of Works & Transport, and require an official Certificate of Good Conduct from the Uganda Police Interpol Division.
+        </p>
+      </div>
+
+      <div class="card">
+        <h3>2. Vehicle Roadworthiness & Speed Limiting</h3>
+        <p style="font-size: 0.875rem; margin-top: 0.5rem; line-height: 1.6;">
+          Vehicles operating under RideEasy—from city sedans to 60-passenger school coaches—must hold a valid Certificate of Fitness, active third-party or comprehensive motor insurance, and functioning seatbelts for all passengers. All school buses are equipped with certified speed governors restricted to 80 km/h on expressways and 50 km/h in urban school zones.
+        </p>
+      </div>
+
+      <div class="card">
+        <h3>3. Real Location Integrity</h3>
+        <p style="font-size: 0.875rem; margin-top: 0.5rem; line-height: 1.6;">
+          RideEasy never fabricates fictitious GPS routes or driver locations. When genuine mapping coordinates are captured, trip distances are calculated transparently using road network geometry.
+        </p>
+      </div>
+
+      <div class="card">
+        <h3>4. Transparent Payment Verification</h3>
+        <p style="font-size: 0.875rem; margin-top: 0.5rem; line-height: 1.6;">
+          All mobile money transactions (MTN MoMo and Airtel Money) and card debits are verified server-side with unique audit reference keys. Receipts with itemized tariff breakdowns are generated automatically for every completed trip.
+        </p>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

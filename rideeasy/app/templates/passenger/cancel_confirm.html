@@ -1,0 +1,119 @@
+{% extends "base.html" %}
+
+{% block title %}Cancel Ride Request #{{ ride.id[:8].upper() }} — RideEasy{% endblock %}
+
+{% block content %}
+<div class="container section">
+  <div style="max-width: 620px; margin: 0 auto;">
+    <div style="margin-bottom: 1.5rem;">
+      <a href="/passenger/rides/{{ ride.id }}" class="text-subtle" style="display: inline-flex; align-items: center; gap: 0.25rem; margin-bottom: 0.5rem;">
+        ← Back to Trip Tracker
+      </a>
+      <h2>Cancel Ride Request</h2>
+      <p style="font-size: 0.875rem;">Review cancellation terms before confirming termination of your trip request</p>
+    </div>
+
+    <!-- Official RideEasy Cancellation Rules Card -->
+    <div class="card" style="margin-bottom: 1.5rem; border-left: 3px solid var(--color-black);">
+      <div class="card-title" style="margin-bottom: 0.75rem;">Official RideEasy Cancellation Rules</div>
+      <ul style="list-style: none; display: flex; flex-direction: column; gap: 0.75rem; font-size: 0.8125rem; color: var(--color-dark-grey); line-height: 1.5;">
+        <li style="display: flex; gap: 0.5rem; align-items: flex-start;">
+          <svg class="icon icon-sm" viewBox="0 0 24 24" style="margin-top: 2px;"><polyline points="20 6 9 17 4 12"/></svg>
+          <span><strong>Rule 1 (Free Cancellation):</strong> You may cancel without any penalty or fee while the ride status is <em>REQUESTED</em> or <em>SEARCHING FOR DRIVER</em>.</span>
+        </li>
+        <li style="display: flex; gap: 0.5rem; align-items: flex-start;">
+          <svg class="icon icon-sm" viewBox="0 0 24 24" style="margin-top: 2px;"><polyline points="20 6 9 17 4 12"/></svg>
+          <span><strong>Rule 2 (Assigned Driver Protection):</strong> Once a verified driver accepts dispatch and initiates travel to your pickup point, online cancellation is locked to safeguard driver operating and fuel costs.</span>
+        </li>
+        <li style="display: flex; gap: 0.5rem; align-items: flex-start;">
+          <svg class="icon icon-sm" viewBox="0 0 24 24" style="margin-top: 2px;"><polyline points="20 6 9 17 4 12"/></svg>
+          <span><strong>Rule 3 (History & Audit Log):</strong> All cancellations are recorded permanently in your trip history with the submitted reason for service quality monitoring.</span>
+        </li>
+      </ul>
+    </div>
+
+    {% if is_driver_assigned %}
+      <!-- Cancellation Locked Notice if Driver is already assigned -->
+      <div class="card" style="border: 2px solid var(--color-black); margin-bottom: 1.5rem;">
+        <div style="display: flex; gap: 1rem; align-items: flex-start;">
+          <div style="background-color: var(--color-off-white); border: 1px solid var(--color-light-grey); padding: 0.75rem; border-radius: var(--radius-sm);">
+            <svg class="icon icon-lg" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          </div>
+          <div>
+            <h3 style="margin-bottom: 0.35rem;">Direct Cancellation Locked</h3>
+            <p style="font-size: 0.875rem; margin-bottom: 1rem; line-height: 1.5;">
+              Driver <strong>{{ ride.driver_name or 'Assigned Operator' }}</strong> ({{ ride.plate_number or 'Inspected Vehicle' }}) has already been dispatched and is currently en route to your pickup location. Under Rule 2 of the RideEasy Carriage Policy, online cancellation is locked to protect drivers against uncompensated transit expenses.
+            </p>
+            <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+              <a href="/passenger/rides/{{ ride.id }}" class="btn btn-primary btn-sm">Return to Trip Tracker</a>
+              {% if ride.driver_phone %}
+                <a href="tel:{{ ride.driver_phone }}" class="btn btn-secondary btn-sm">Call Assigned Driver</a>
+              {% endif %}
+              <a href="/contact" class="btn btn-secondary btn-sm">Contact Support</a>
+            </div>
+          </div>
+        </div>
+      </div>
+    {% else %}
+      <!-- Trip Particulars Summary -->
+      <div class="card" style="margin-bottom: 1.5rem;">
+        <div class="card-title" style="margin-bottom: 0.75rem;">Trip To Be Cancelled</div>
+        <div style="display: flex; flex-direction: column; gap: 0.5rem; font-size: 0.875rem;">
+          <div style="display: flex; justify-content: space-between;">
+            <span class="text-subtle">Trip Reference:</span>
+            <strong>#{{ ride.id[:8].upper() }}</strong>
+          </div>
+          <div style="display: flex; justify-content: space-between;">
+            <span class="text-subtle">Pickup:</span>
+            <span>{{ ride.pickup_address }}</span>
+          </div>
+          <div style="display: flex; justify-content: space-between;">
+            <span class="text-subtle">Destination:</span>
+            <span>{{ ride.destination_address }}</span>
+          </div>
+          <div style="display: flex; justify-content: space-between; border-top: 1px solid var(--color-light-grey); padding-top: 0.5rem; margin-top: 0.25rem;">
+            <span class="text-subtle">Category & Fare:</span>
+            <strong>{{ ride.category }} · {{ ride.estimated_fare_ugx | ugx }}</strong>
+          </div>
+        </div>
+      </div>
+
+      <!-- Confirmation Step & Reason Form -->
+      <form method="POST" action="/passenger/rides/{{ ride.id }}/cancel" class="card">
+        <div class="card-title" style="margin-bottom: 0.5rem;">Confirmation Step</div>
+        <p class="card-subtitle" style="margin-bottom: 1.25rem;">
+          Please indicate your reason for cancelling. This feedback is logged in your ride history.
+        </p>
+
+        <div class="form-group">
+          <label class="form-label" for="reason">Primary Reason</label>
+          <select id="reason" name="reason" class="form-select" required>
+            <option value="Wait time is longer than expected" selected>Wait time is longer than expected</option>
+            <option value="Booked alternative transport">Booked alternative transport</option>
+            <option value="Travel plans changed / trip no longer needed">Travel plans changed / trip no longer needed</option>
+            <option value="Incorrect pickup or destination entered">Incorrect pickup or destination entered</option>
+            <option value="Driver too far away">Driver too far away</option>
+            <option value="Other reason">Other reason</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="custom_notes">Additional Details (Optional)</label>
+          <textarea id="custom_notes" name="custom_notes" class="form-control" rows="2" placeholder="Brief explanation to log with this cancellation..."></textarea>
+        </div>
+
+        <div style="background-color: var(--color-off-white); border: 1px solid var(--color-light-grey); border-radius: var(--radius-sm); padding: 1rem; margin-bottom: 1.5rem; font-size: 0.8125rem;">
+          <strong>Confirmation:</strong> By clicking below, your ride request will be permanently terminated. No charges will be levied.
+        </div>
+
+        <div style="display: flex; gap: 0.75rem; justify-content: flex-end;">
+          <a href="/passenger/rides/{{ ride.id }}" class="btn btn-secondary">No, Keep My Ride</a>
+          <button type="submit" class="btn btn-primary" style="background-color: #990000; border-color: #990000;">
+            Yes, Confirm Cancellation
+          </button>
+        </div>
+      </form>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

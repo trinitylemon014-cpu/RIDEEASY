@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+
+{% block title %}Official Receipt {{ receipt.receipt_number }} — RideEasy{% endblock %}
+
+{% block content %}
+<div class="container section">
+  <div style="max-width: 600px; margin: 0 auto;">
+    <div class="no-print" style="margin-bottom: 1.5rem; display: flex; justify-content: space-between; align-items: center;">
+      <a href="/passenger/rides/{{ ride.id }}" class="text-subtle">
+        ← Back to Trip Details
+      </a>
+      <button onclick="window.print()" class="btn btn-secondary btn-sm">
+        <svg class="icon icon-sm" viewBox="0 0 24 24"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+        Print Official Receipt
+      </button>
+    </div>
+
+    <!-- Official Printable Monochrome Receipt Box -->
+    <div class="receipt-box">
+      <div class="receipt-header">
+        <div style="font-size: 1.5rem; font-weight: 800; letter-spacing: -0.03em;">{{ app_name }}</div>
+        <div style="font-size: 0.75rem; letter-spacing: 0.12em; color: var(--color-medium-grey); text-transform: uppercase; margin-bottom: 0.5rem;">{{ app_tagline }}</div>
+        <div style="font-size: 0.8125rem; color: var(--color-dark-grey);">{{ company_name }} · Kampala, Uganda</div>
+        <div class="metadata-row" style="justify-content: center; margin-top: 0.5rem;">
+          <span>Receipt: <strong>{{ receipt.receipt_number }}</strong></span>
+          <span class="metadata-separator">·</span>
+          <span>Date: {{ receipt.date[:16] }}</span>
+        </div>
+      </div>
+
+      <div style="margin-bottom: 1.5rem;">
+        <div style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: var(--color-medium-grey); margin-bottom: 0.5rem;">Trip Particulars</div>
+        <div class="receipt-row">
+          <span>Passenger</span>
+          <span style="font-weight: 600;">{{ receipt.passenger_name }}</span>
+        </div>
+        <div class="receipt-row">
+          <span>Verified Driver</span>
+          <span style="font-weight: 600;">{{ receipt.driver_name }}</span>
+        </div>
+        <div class="receipt-row">
+          <span>Vehicle Registration</span>
+          <span style="font-weight: 600;">{{ receipt.vehicle_plate }}</span>
+        </div>
+        <div class="receipt-row">
+          <span>Category & Distance</span>
+          <span>{{ receipt.category }} · {{ receipt.distance_km }} km</span>
+        </div>
+        <div class="receipt-row">
+          <span>Pickup</span>
+          <span style="max-width: 60%; text-align: right;">{{ receipt.pickup }}</span>
+        </div>
+        <div class="receipt-row">
+          <span>Destination</span>
+          <span style="max-width: 60%; text-align: right;">{{ receipt.destination }}</span>
+        </div>
+      </div>
+
+      <div style="border-top: 1px solid var(--color-light-grey); padding-top: 1rem; margin-bottom: 1.5rem;">
+        <div style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: var(--color-medium-grey); margin-bottom: 0.5rem;">Fare Breakdown</div>
+        <div class="receipt-row">
+          <span>Base Tariff</span>
+          <span>UGX {{ receipt.fare_breakdown.base_fare | ugx }}</span>
+        </div>
+        <div class="receipt-row">
+          <span>Distance & Time Tariff</span>
+          <span>UGX {{ receipt.fare_breakdown.distance_fare | ugx }}</span>
+        </div>
+        <div class="receipt-row">
+          <span>Service Fee & Road Safety Levy</span>
+          <span>UGX {{ receipt.fare_breakdown.service_fee | ugx }}</span>
+        </div>
+        <div class="receipt-row total">
+          <span>Total Fare Paid</span>
+          <span>UGX {{ receipt.fare_breakdown.total_ugx | ugx }}</span>
+        </div>
+        <div class="receipt-row" style="font-size: 0.8125rem; color: var(--color-medium-grey);">
+          <span>Payment Channel</span>
+          <span>{{ receipt.payment_method }} ({{ receipt.status }})</span>
+        </div>
+      </div>
+
+      <div style="text-align: center; border-top: 1px dashed var(--color-light-grey); padding-top: 1rem; font-size: 0.75rem; color: var(--color-medium-grey); line-height: 1.5;">
+        Thank you for choosing RideEasy. For corporate invoicing inquiries or tax declarations, contact support@rideeasy.ug or +256 700 123 456.
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,730 @@
+{% extends "base.html" %}
+
+{% block title %}Passenger Dashboard — RideEasy{% endblock %}
+
+{% block content %}
+<div class="container section">
+  <div style="display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 1rem; margin-bottom: 2rem;">
+    <div>
+      <div class="metadata-row" style="margin-bottom: 0.25rem;">
+        <span style="font-weight: 700; color: var(--color-black); text-transform: uppercase;">Passenger Portal</span>
+        <span class="metadata-separator">·</span>
+        <span>Account #{{ user.id[:8].upper() }}</span>
+      </div>
+      <h2>Welcome, {{ user.full_name }}</h2>
+    </div>
+
+    <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+      <a href="/passenger/book-ride" class="btn btn-primary">
+        <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2"/><circle cx="7" cy="17" r="2"/><circle cx="17" cy="17" r="2"/></svg>
+        Book City Ride
+      </a>
+      <a href="/passenger/flight-request" class="btn btn-secondary">
+        <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M17.8 19.2 16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.2z"/></svg>
+        Request Flight Quote
+      </a>
+      <a href="/passenger/journeys" class="btn btn-secondary">
+        <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/></svg>
+        Journeys & Reminders
+      </a>
+    </div>
+  </div>
+
+  <!-- Search & Filter Bar at Top of Passenger Dashboard -->
+  <div class="card" style="margin-bottom: 2rem; border-left: 4px solid var(--color-black);">
+    <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+      <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem;">
+        <label for="dashboard-ride-search" style="font-weight: 700; font-size: 0.8125rem; text-transform: uppercase; letter-spacing: 0.05em; display: flex; align-items: center; gap: 0.4rem; color: var(--color-black);">
+          <svg class="icon icon-sm" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <span>Search & Filter Recent Rides</span>
+        </label>
+        <span id="search-filter-status" class="text-subtle" style="font-size: 0.75rem;"></span>
+      </div>
+
+      <div style="position: relative; width: 100%;">
+        <input 
+          type="text" 
+          id="dashboard-ride-search" 
+          class="form-control" 
+          placeholder="Filter recent rides by route (e.g. Acacia, Airport), date (e.g. 2026-10), or driver name (e.g. David)..." 
+          value="{{ search_query or '' }}"
+          autocomplete="off"
+          style="padding-right: 2.5rem;"
+        >
+        <button 
+          type="button" 
+          id="clear-ride-search-btn" 
+          style="display: {% if search_query %}block{% else %}none{% endif %}; position: absolute; right: 0.75rem; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; color: var(--color-dark-grey); font-size: 1rem; font-weight: 700; padding: 0.2rem;" 
+          title="Clear search">
+          ✕
+        </button>
+      </div>
+
+      <div style="display: flex; align-items: center; gap: 0.35rem; flex-wrap: wrap;">
+        <span style="font-size: 0.6875rem; color: var(--color-medium-grey); font-weight: 700; text-transform: uppercase;">Quick filters:</span>
+        <button type="button" class="btn btn-secondary btn-sm quick-search-pill" data-query="Entebbe" style="font-size: 0.6875rem; padding: 0.15rem 0.5rem;">✈️ Entebbe Airport</button>
+        <button type="button" class="btn btn-secondary btn-sm quick-search-pill" data-query="Acacia" style="font-size: 0.6875rem; padding: 0.15rem 0.5rem;">🏬 Acacia Mall</button>
+        <button type="button" class="btn btn-secondary btn-sm quick-search-pill" data-query="Kololo" style="font-size: 0.6875rem; padding: 0.15rem 0.5rem;">📍 Kololo</button>
+        <button type="button" class="btn btn-secondary btn-sm quick-search-pill" data-query="David" style="font-size: 0.6875rem; padding: 0.15rem 0.5rem;">👤 Driver: David</button>
+        <button type="button" class="btn btn-secondary btn-sm quick-search-pill" data-query="2026" style="font-size: 0.6875rem; padding: 0.15rem 0.5rem;">📅 Year 2026</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- RideEasy Rewards Points Tracker & Benefits Component -->
+  <div class="card" id="rideeasy-rewards-card" style="margin-bottom: 2rem; border-left: 4px solid var(--color-black);">
+    <div class="card-header" style="margin-bottom: 1.25rem;">
+      <div style="display: flex; align-items: flex-start; gap: 0.75rem;">
+        <div style="width: 40px; height: 40px; background-color: var(--color-black); color: var(--color-white); border-radius: var(--radius-sm); display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 1.25rem;">
+          ★
+        </div>
+        <div>
+          <div class="metadata-row" style="margin-bottom: 0.2rem;">
+            <span style="font-weight: 700; color: var(--color-black); text-transform: uppercase;">Loyalty & Distance Program</span>
+            <span class="metadata-separator">·</span>
+            <span>Earn 10 Points Per 1 km Traveled</span>
+          </div>
+          <div class="card-title" style="margin: 0; display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+            <span>RideEasy Rewards</span>
+            <span class="status-indicator" style="font-size: 0.75rem; font-weight: 700; background-color: var(--color-black); color: var(--color-white); border-radius: var(--radius-sm); padding: 0.15rem 0.5rem;">
+              {{ rewards_summary.tier_name }}
+            </span>
+          </div>
+          <div class="card-subtitle">Accumulate points on every completed city ride and airport transfer to unlock travel perks</div>
+        </div>
+      </div>
+
+      <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
+        <a href="#redeemable-benefits-section" class="btn btn-secondary btn-sm" style="display: inline-flex; align-items: center; gap: 0.35rem;">
+          <span>Explore Catalog</span>
+          <svg class="icon icon-sm" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/></svg>
+        </a>
+      </div>
+    </div>
+
+    <!-- Points & Distance Metrics Strip -->
+    <div class="rewards-kpi-grid">
+      <div class="rewards-kpi-card" style="border-left: 3px solid var(--color-black);">
+        <div class="stat-label">Available Points Balance</div>
+        <div class="stat-value" id="rewards-available-pts" style="font-size: 1.625rem;">
+          {{ rewards_summary.available_points | ugx | replace('UGX ', '') }} <span style="font-size: 0.875rem; font-weight: 600; color: var(--color-medium-grey);">PTS</span>
+        </div>
+        <div class="stat-subtext">
+          <span id="rewards-lifetime-pts">{{ rewards_summary.total_earned_points }}</span> lifetime earned · <span id="rewards-spent-pts">{{ rewards_summary.total_spent_points }}</span> spent
+        </div>
+      </div>
+
+      <div class="rewards-kpi-card">
+        <div class="stat-label">Total Trip Distance</div>
+        <div class="stat-value" style="font-size: 1.625rem;">
+          {{ rewards_summary.total_km }} <span style="font-size: 0.875rem; font-weight: 600; color: var(--color-medium-grey);">KM</span>
+        </div>
+        <div class="stat-subtext">
+          Logged across {{ rewards_summary.completed_count }} completed trip{% if rewards_summary.completed_count != 1 %}s{% endif %}
+        </div>
+      </div>
+
+      <div class="rewards-kpi-card">
+        <div class="stat-label">Next Status Milestone</div>
+        <div class="stat-value" style="font-size: 1.625rem;">
+          {{ rewards_summary.progress_pct }}%
+        </div>
+        <div class="stat-subtext">
+          {% if rewards_summary.points_to_next > 0 %}
+            <strong id="rewards-pts-needed">{{ rewards_summary.points_to_next }} pts</strong> ({{ rewards_summary.km_to_next }} km) to {{ rewards_summary.next_tier_name }}
+          {% else %}
+            Highest status tier attained!
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <!-- Distance Tier Progress Bar -->
+    <div class="rewards-progress-wrapper">
+      <div style="display: flex; justify-content: space-between; align-items: baseline; font-size: 0.8125rem;">
+        <span style="font-weight: 700; color: var(--color-black);">
+          Tier Progress: {{ rewards_summary.tier_name }} → {{ rewards_summary.next_tier_name }}
+        </span>
+        <span class="text-subtle" style="font-size: 0.75rem;">
+          {{ rewards_summary.total_km }} km / {{ (rewards_summary.tier_max / rewards_summary.points_per_km) | int }} km
+        </span>
+      </div>
+
+      <div class="rewards-progress-track">
+        <div class="rewards-progress-fill" style="width: {{ rewards_summary.progress_pct }}%;"></div>
+      </div>
+
+      <div class="rewards-tier-milestones">
+        <span class="rewards-tier-milestone {% if rewards_summary.tier_code in ['SILVER', 'GOLD', 'PLATINUM', 'DIAMOND'] %}active{% endif %}">
+          ● Silver (0 km)
+        </span>
+        <span class="rewards-tier-milestone {% if rewards_summary.tier_code in ['GOLD', 'PLATINUM', 'DIAMOND'] %}active{% endif %}">
+          ● Gold (25 km / 250 pts)
+        </span>
+        <span class="rewards-tier-milestone {% if rewards_summary.tier_code in ['PLATINUM', 'DIAMOND'] %}active{% endif %}">
+          ● Platinum (75 km / 750 pts)
+        </span>
+        <span class="rewards-tier-milestone {% if rewards_summary.tier_code == 'DIAMOND' %}active{% endif %}">
+          ● Diamond (150+ km / 1,500 pts)
+        </span>
+      </div>
+    </div>
+
+    <!-- Active Redeemed Vouchers & Perks Strip -->
+    {% if rewards_summary.redemptions %}
+      <div style="margin-bottom: 1.5rem;">
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem;">
+          <span style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--color-black);">
+            Your Active Vouchers & Travel Perks:
+          </span>
+          <span class="text-subtle" style="font-size: 0.75rem;">
+            {{ rewards_summary.redemptions | length }} Active Perk{% if rewards_summary.redemptions | length != 1 %}s{% endif %}
+          </span>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 0.5rem;" id="active-vouchers-container">
+          {% for r in rewards_summary.redemptions %}
+            <div class="voucher-item-box" style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.75rem; background-color: var(--color-off-white); border: 1px solid var(--color-light-grey); padding: 0.75rem 1rem; border-radius: var(--radius-sm);">
+              <div style="display: flex; align-items: center; gap: 0.75rem;">
+                <div style="font-size: 1.25rem;">🎟️</div>
+                <div>
+                  <div style="font-weight: 700; color: var(--color-black); font-size: 0.9375rem;">
+                    {{ r.reward_title }}
+                  </div>
+                  <div class="text-subtle" style="font-size: 0.75rem;">
+                    Redeemed for {{ r.points_spent }} pts · Valid until {{ r.expires_at[:10] if r.expires_at else '60 days' }}
+                  </div>
+                </div>
+              </div>
+
+              <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+                <span class="voucher-code-badge" title="Click to copy voucher code" onclick="copyVoucherCode('{{ r.voucher_code }}', this)">
+                  <span>{{ r.voucher_code }}</span>
+                  <svg class="icon icon-sm" viewBox="0 0 24 24" style="cursor: pointer; stroke: #FFFFFF;"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                </span>
+                <span style="font-size: 0.6875rem; font-weight: 700; background-color: var(--color-black); color: var(--color-white); padding: 0.15rem 0.4rem; border-radius: var(--radius-sm);">
+                  {{ r.status }}
+                </span>
+              </div>
+            </div>
+          {% endfor %}
+        </div>
+      </div>
+    {% endif %}
+
+    <!-- Redeemable Benefits Catalog Section -->
+    <div id="redeemable-benefits-section" style="border-top: 1px dashed var(--color-light-grey); padding-top: 1.25rem;">
+      <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.5rem;">
+        <div>
+          <h4 style="margin: 0; font-size: 1rem; font-weight: 700; color: var(--color-black);">Redeemable Travel Benefits</h4>
+          <div class="card-subtitle">Unlock immediate ride discounts, expressway passes, and partner baggage allowances</div>
+        </div>
+        <span class="text-subtle" style="font-size: 0.75rem;">
+          Rate: 10 pts per 1 km
+        </span>
+      </div>
+
+      <div class="rewards-catalog-grid" id="rewards-catalog-list">
+        {% for b in rewards_summary.benefits %}
+          <div class="reward-benefit-card {% if b.can_redeem %}is-unlocked{% else %}is-locked{% endif %}" id="benefit-card-{{ b.id }}">
+            <div>
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                <span style="font-size: 0.625rem; font-weight: 700; background-color: {% if b.can_redeem %}var(--color-black){% else %}var(--color-medium-grey){% endif %}; color: var(--color-white); padding: 0.1rem 0.4rem; border-radius: 2px;">
+                  {{ b.badge }}
+                </span>
+                <span style="font-size: 0.75rem; font-weight: 800; color: var(--color-black);">
+                  {{ b.points_cost }} PTS
+                </span>
+              </div>
+
+              <h5 style="margin: 0 0 0.35rem 0; font-size: 0.9375rem; color: var(--color-black);">{{ b.title }}</h5>
+              <p style="margin: 0 0 0.75rem 0; font-size: 0.8125rem; color: var(--color-dark-grey); line-height: 1.4;">
+                {{ b.description }}
+              </p>
+            </div>
+
+            <div style="border-top: 1px solid var(--color-light-grey); padding-top: 0.75rem; display: flex; justify-content: space-between; align-items: center; gap: 0.5rem;">
+              <span class="text-subtle" style="font-size: 0.75rem;">
+                {{ b.required_km }} km required
+              </span>
+
+              {% if b.can_redeem %}
+                <form method="POST" action="/passenger/rewards/redeem" class="form-redeem-perk" style="margin: 0;" data-reward-id="{{ b.id }}" data-reward-title="{{ b.title }}" data-cost="{{ b.points_cost }}">
+                  <input type="hidden" name="reward_id" value="{{ b.id }}">
+                  <button type="submit" class="btn btn-primary btn-sm btn-redeem-action" style="font-size: 0.75rem; padding: 0.25rem 0.65rem;">
+                    Redeem Perk
+                  </button>
+                </form>
+              {% else %}
+                <button type="button" class="btn btn-secondary btn-sm" disabled style="opacity: 0.6; cursor: not-allowed; font-size: 0.75rem; padding: 0.25rem 0.5rem;" title="Complete more journeys to earn points">
+                  Need {{ b.needed_points }} pts ({{ b.needed_km }} km)
+                </button>
+              {% endif %}
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+
+  <!-- In-App Notifications Section -->
+  {% if notifications %}
+  <div class="card" style="margin-bottom: 2rem; border-left: 4px solid var(--color-black);">
+    <div class="card-header" style="margin-bottom: 1rem;">
+      <div style="display: flex; align-items: center; gap: 0.5rem;">
+        <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+        <div>
+          <div class="card-title" style="margin: 0; display: flex; align-items: center; gap: 0.5rem;">
+            <span>Notifications & Dispatches</span>
+            {% if unread_notifications_count > 0 %}
+              <span class="status-indicator" style="font-size: 0.75rem;">
+                <span class="status-dot"></span> {{ unread_notifications_count }} NEW
+              </span>
+            {% endif %}
+          </div>
+          <div class="card-subtitle">Real-time driver assignments, ride status alerts, and travel updates</div>
+        </div>
+      </div>
+      {% if unread_notifications_count > 0 %}
+        <form method="POST" action="/notifications/dismiss-all" style="margin: 0;">
+          <button type="submit" class="btn btn-secondary btn-sm">Mark All Dismissed</button>
+        </form>
+      {% endif %}
+    </div>
+
+    <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+      {% for notif in notifications %}
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; padding: 0.875rem 1rem; border-radius: var(--radius-sm); border: 1px solid {% if not notif.is_read %}var(--color-black){% else %}var(--color-light-grey){% endif %}; background-color: {% if not notif.is_read %}var(--color-off-white){% else %}var(--color-white){% endif %};">
+          <div style="display: flex; gap: 0.75rem; align-items: flex-start;">
+            <div style="margin-top: 2px;">
+              {% if notif.type == 'DRIVER_ASSIGNED' %}
+                <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2"/><circle cx="7" cy="17" r="2"/><circle cx="17" cy="17" r="2"/></svg>
+              {% elif notif.type == 'CANCELLATION' %}
+                <svg class="icon icon-sm" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+              {% else %}
+                <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+              {% endif %}
+            </div>
+            <div>
+              <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+                <strong style="color: var(--color-black); font-size: 0.9375rem;">{{ notif.title }}</strong>
+                {% if not notif.is_read %}
+                  <span style="font-size: 0.6875rem; font-weight: 700; background-color: var(--color-black); color: var(--color-white); padding: 0.1rem 0.4rem; border-radius: var(--radius-sm);">NEW</span>
+                {% endif %}
+                <span class="text-subtle" style="font-size: 0.75rem;">{{ notif.created_at[:16] }}</span>
+              </div>
+              <p style="margin: 0.25rem 0 0 0; font-size: 0.875rem; color: var(--color-dark-grey); line-height: 1.4;">
+                {{ notif.message }}
+              </p>
+              {% if notif.related_entity_id and notif.related_entity_id.startswith('ride_') %}
+                <div style="margin-top: 0.5rem;">
+                  <a href="/passenger/rides/{{ notif.related_entity_id }}" class="btn btn-secondary btn-sm" style="font-size: 0.75rem; padding: 0.2rem 0.5rem;">View Trip Tracker →</a>
+                </div>
+              {% endif %}
+            </div>
+          </div>
+
+          <form method="POST" action="/notifications/{{ notif.id }}/dismiss" style="margin: 0;">
+            <button type="submit" class="btn btn-secondary btn-sm" title="Dismiss notification" style="padding: 0.25rem 0.5rem; font-size: 0.75rem;">
+              ✕ Dismiss
+            </button>
+          </form>
+        </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Upcoming Flights & Active Reminders Alert -->
+  {% if reminders %}
+  <div class="card" style="margin-bottom: 2rem; border-left: 4px solid var(--color-black);">
+    <div class="card-header">
+      <div>
+        <div class="card-title">Scheduled Travel Reminders</div>
+        <div class="card-subtitle">Automated readiness checkpoints for your upcoming international flights</div>
+      </div>
+      <a href="/passenger/journeys" class="btn btn-secondary btn-sm">All Journeys</a>
+    </div>
+
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem;">
+      {% for rem in reminders[:3] %}
+        <div class="reminder-card" style="margin-bottom: 0;">
+          <div class="reminder-header">
+            <span class="reminder-title">{{ rem.title }}</span>
+            <span class="reminder-time">{{ rem.scheduled_for[:10] }}</span>
+          </div>
+          <div class="reminder-body">{{ rem.message }}</div>
+          <div class="metadata-row" style="margin-top: 0.5rem;">
+            <span>Route: {{ rem.destination }}</span>
+            <span class="metadata-separator">·</span>
+            <span>{{ 'Delivered' if rem.is_delivered else 'Scheduled' }}</span>
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Confirmed Journeys Preview -->
+  {% if journeys %}
+  <div class="card" style="margin-bottom: 2rem;">
+    <div class="card-header">
+      <div>
+        <div class="card-title">Confirmed Flight Journeys</div>
+        <div class="card-subtitle">Genuine airline PNR bookings issued by authorized partner travel agencies</div>
+      </div>
+      <a href="/passenger/flight-request" class="btn btn-secondary btn-sm">+ New Request</a>
+    </div>
+
+    <div style="display: flex; flex-direction: column; gap: 1rem;">
+      {% for j in journeys %}
+      <div style="border: 1px solid var(--color-light-grey); padding: 1.25rem; border-radius: var(--radius-sm); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+        <div>
+          <div class="metadata-row" style="margin-bottom: 0.25rem;">
+            <span>PNR: <strong>{{ j.booking_reference_pnr }}</strong></span>
+            <span class="metadata-separator">·</span>
+            <span>{{ j.airline_name }} ({{ j.flight_number }})</span>
+          </div>
+          <div style="font-size: 1.125rem; font-weight: 700; color: var(--color-black);">
+            {{ j.origin }} → {{ j.destination }}
+          </div>
+          <div style="font-size: 0.8125rem; color: var(--color-dark-grey); margin-top: 0.25rem;">
+            Departure: {{ j.departure_datetime }}
+          </div>
+        </div>
+
+        <div>
+          {% if j.airport_ride_booked %}
+            <span class="status-indicator">
+              <span class="status-dot"></span> Airport Ride Reserved
+            </span>
+          {% else %}
+            <a href="/passenger/book-ride?pickup=Acacia+Mall%2C+Kololo&destination=Entebbe+International+Airport+(EBB)&is_airport=1&journey_id={{ j.id }}" class="btn btn-primary btn-sm">
+              <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2"/><circle cx="7" cy="17" r="2"/><circle cx="17" cy="17" r="2"/></svg>
+              Book Airport Ride
+            </a>
+          {% endif %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Recent Completed Rides Section with Route Details, Fare Paid, and Repeat Ride -->
+  <div class="card" style="margin-bottom: 2rem;">
+    <div class="card-header">
+      <div>
+        <div class="card-title" style="display: flex; align-items: center; gap: 0.5rem;">
+          <svg class="icon icon-sm" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+          <span>Recent Completed Rides</span>
+        </div>
+        <div class="card-subtitle">Review your past trips, verified route details and fares paid, or request a repeat ride with 1-click</div>
+      </div>
+      <a href="/passenger/book-ride" class="btn btn-secondary btn-sm">+ New Route</a>
+    </div>
+
+    {% if completed_rides %}
+      <div id="completed-rides-container" style="display: flex; flex-direction: column; gap: 1rem;">
+        {% for cr in completed_rides %}
+          <div class="completed-ride-card" id="completed-card-{{ cr.id }}" 
+               data-route="{{ cr.pickup_address }} {{ cr.destination_address }}" 
+               data-date="{{ cr.created_at }}" 
+               data-driver="{{ cr.driver_name or '' }}" 
+               data-ref="{{ cr.id }}"
+               style="border: 1px solid var(--color-light-grey); border-radius: var(--radius-sm); padding: 1.25rem; background-color: var(--color-white); display: flex; flex-direction: column; gap: 1rem;">
+            
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 1.25rem;">
+              <div style="flex: 1; min-width: 280px;">
+                <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 0.5rem;">
+                  <span style="font-weight: 700; font-size: 0.8125rem; background-color: var(--color-black); color: var(--color-white); padding: 0.15rem 0.5rem; border-radius: var(--radius-sm);">
+                    {{ cr.category }}
+                  </span>
+                  <span class="status-indicator" style="font-size: 0.75rem;">
+                    <span class="status-dot"></span> COMPLETED
+                  </span>
+                  <span class="text-subtle" style="font-size: 0.75rem;">Ref #{{ cr.id[:8].upper() }} · {{ cr.created_at[:16] }}</span>
+                </div>
+
+                <!-- Route details -->
+                <div style="display: flex; flex-direction: column; gap: 0.35rem; margin-bottom: 0.75rem;">
+                  <div style="display: flex; align-items: flex-start; gap: 0.5rem;">
+                    <span style="font-weight: 700; color: var(--color-medium-grey); font-size: 0.75rem; text-transform: uppercase; width: 45px; margin-top: 2px;">From</span>
+                    <span style="font-size: 0.9375rem; color: var(--color-dark-grey);">{{ cr.pickup_address }}</span>
+                  </div>
+                  <div style="display: flex; align-items: flex-start; gap: 0.5rem;">
+                    <span style="font-weight: 700; color: var(--color-black); font-size: 0.75rem; text-transform: uppercase; width: 45px; margin-top: 2px;">To</span>
+                    <span style="font-size: 0.9375rem; font-weight: 700; color: var(--color-black);">{{ cr.destination_address }}</span>
+                  </div>
+                </div>
+
+                <!-- Distance & Driver info -->
+                <div class="metadata-row" style="font-size: 0.8125rem; color: var(--color-medium-grey);">
+                  <span>Distance: <strong>{{ cr.estimated_distance_km or '3.5' }} km</strong></span>
+                  {% if cr.driver_name %}
+                    <span class="metadata-separator">·</span>
+                    <span>Driver: <strong>{{ cr.driver_name }}</strong> ({{ cr.plate_number or 'Verified Vehicle' }})</span>
+                  {% endif %}
+                </div>
+              </div>
+
+              <!-- Fare Paid & Action Buttons -->
+              <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 0.75rem; min-width: 200px;">
+                <div style="text-align: right;">
+                  <div style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: var(--color-medium-grey);">Fare Paid</div>
+                  <div style="font-size: 1.375rem; font-weight: 800; color: var(--color-black);">
+                    {{ cr.final_fare_ugx or cr.estimated_fare_ugx | ugx }}
+                  </div>
+                  <div style="font-size: 0.75rem; color: var(--color-dark-grey);">
+                    via {{ (cr.payment_method or 'CASH') | replace('_', ' ') }} · <span style="font-weight: 600;">PAID</span>
+                  </div>
+                </div>
+
+                <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; justify-content: flex-end;">
+                  <a href="/passenger/rides/{{ cr.id }}/receipt" class="btn btn-secondary btn-sm" title="View printable receipt">
+                    Receipt
+                  </a>
+                  <a href="/passenger/book-ride?pickup={{ cr.pickup_address | urlencode }}&destination={{ cr.destination_address | urlencode }}&category={{ cr.category }}" class="btn btn-primary btn-sm" style="display: inline-flex; align-items: center; gap: 0.35rem;" title="Pre-fill booking form with identical route">
+                    <svg class="icon icon-sm" viewBox="0 0 24 24"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
+                    <span>Request Repeat Ride</span>
+                  </a>
+                </div>
+              </div>
+            </div>
+
+            <!-- Star Rating & Driver Feedback Component -->
+            <div class="ride-rating-section" id="rating-section-{{ cr.id }}" style="margin-top: 0.5rem; padding-top: 0.75rem; border-top: 1px dashed var(--color-light-grey); width: 100%;">
+              {% if cr.user_rating %}
+                <div class="rated-badge-box" id="rated-badge-box-{{ cr.id }}" style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem; background-color: var(--color-off-white); padding: 0.5rem 0.75rem; border-radius: var(--radius-sm); border: 1px solid var(--color-light-grey);">
+                  <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+                    <span style="font-size: 0.6875rem; font-weight: 700; text-transform: uppercase; color: var(--color-medium-grey);">Your Rating:</span>
+                    <div class="star-display">
+                      {% for s in range(1, 6) %}
+                        <span class="{% if s <= cr.user_rating %}star-filled{% else %}star-empty{% endif %}">★</span>
+                      {% endfor %}
+                      <strong style="font-size: 0.8125rem; color: var(--color-black);">{{ cr.user_rating }}/5</strong>
+                    </div>
+                    {% if cr.user_review %}
+                      <span style="font-size: 0.75rem; color: var(--color-dark-grey); font-style: italic;">“{{ cr.user_review }}”</span>
+                    {% endif %}
+                  </div>
+                  <button type="button" class="btn btn-secondary btn-sm btn-edit-rating" data-ride-id="{{ cr.id }}" style="font-size: 0.6875rem; padding: 0.15rem 0.5rem;">
+                    Edit Feedback
+                  </button>
+                </div>
+              {% endif %}
+
+              <!-- Interactive Star Rating & Feedback Form -->
+              <form method="POST" action="/passenger/rides/{{ cr.id }}/rate" class="form-ride-rating" id="rating-form-{{ cr.id }}" data-ride-id="{{ cr.id }}" style="display: {% if cr.user_rating %}none{% else %}block{% endif %}; margin: 0; background-color: var(--color-off-white); padding: 0.75rem; border-radius: var(--radius-sm); border: 1px solid var(--color-light-grey);">
+                <input type="hidden" name="next" value="/passenger/dashboard">
+                <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.5rem;">
+                  <div style="display: flex; align-items: center; gap: 0.5rem;">
+                    <span style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: var(--color-black);">Rate This Completed Trip:</span>
+                    <div class="star-rating-group">
+                      {% for s in [5, 4, 3, 2, 1] %}
+                        <input type="radio" id="star-{{ cr.id }}-{{ s }}" name="rating" value="{{ s }}" {% if (cr.user_rating or 5) == s %}checked{% endif %}>
+                        <label for="star-{{ cr.id }}-{{ s }}" title="{{ s }} stars">★</label>
+                      {% endfor %}
+                    </div>
+                  </div>
+                  {% if cr.driver_name %}
+                    <span class="text-subtle" style="font-size: 0.6875rem;">Driver: {{ cr.driver_name }}</span>
+                  {% endif %}
+                </div>
+
+                <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                  <input type="text" name="review" class="form-control form-control-sm input-review-text" placeholder="Share feedback for your driver (e.g. punctual, smooth driving)..." value="{{ cr.user_review or '' }}" style="font-size: 0.8125rem; flex: 1; min-width: 220px;">
+                  <button type="submit" class="btn btn-primary btn-sm btn-submit-rating" style="white-space: nowrap; font-size: 0.75rem;">
+                    Submit Rating
+                  </button>
+                  {% if cr.user_rating %}
+                    <button type="button" class="btn btn-secondary btn-sm btn-cancel-edit-rating" data-ride-id="{{ cr.id }}" style="font-size: 0.75rem;">
+                      Cancel
+                    </button>
+                  {% endif %}
+                </div>
+                <div class="rating-feedback-msg" id="rating-feedback-{{ cr.id }}" style="display: none; font-size: 0.75rem; margin-top: 0.35rem; color: green; font-weight: 600;"></div>
+              </form>
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div style="text-align: center; padding: 2rem 1rem; background-color: var(--color-off-white); border-radius: var(--radius-sm); border: 1px dashed var(--color-light-grey);">
+        {% if search_query %}
+          <p style="margin-bottom: 0.75rem; color: var(--color-dark-grey);">No completed rides on record matching “<strong>{{ search_query }}</strong>”.</p>
+          <a href="/passenger/dashboard" class="btn btn-secondary btn-sm">Clear Search Filter</a>
+        {% else %}
+          <p style="margin-bottom: 0.75rem; color: var(--color-dark-grey);">No completed rides on record yet. Complete your first trip to unlock quick 1-click repeat re-booking.</p>
+          <a href="/passenger/book-ride" class="btn btn-primary btn-sm">Book Your First Ride</a>
+        {% endif %}
+      </div>
+    {% endif %}
+  </div>
+
+  <!-- AI Customer Service Care Section -->
+  <div class="card" id="ai-customer-care-section" style="margin-bottom: 2rem; border-top: 4px solid var(--color-black);">
+    <div class="card-header" style="margin-bottom: 1rem;">
+      <div style="display: flex; align-items: center; gap: 0.75rem;">
+        <div style="width: 36px; height: 36px; background-color: var(--color-black); color: var(--color-white); border-radius: var(--radius-sm); display: flex; align-items: center; justify-content: center;">
+          <svg class="icon icon-sm" viewBox="0 0 24 24" style="stroke: #ffffff;"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        </div>
+        <div>
+          <div class="card-title" style="margin: 0; display: flex; align-items: center; gap: 0.5rem;">
+            <span>RideEasy AI Customer Care Concierge</span>
+            <span class="status-indicator" style="font-size: 0.6875rem;">
+              <span class="status-dot"></span> Online · Gemini 3.8 Flash
+            </span>
+          </div>
+          <div class="card-subtitle">Official 24/7 intelligence on RideEasy services, tariffs, safety policies, and Emtrixz Technology Company</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Suggested Quick Prompts -->
+    <div style="margin-bottom: 1rem;">
+      <div style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: var(--color-medium-grey); margin-bottom: 0.5rem;">
+        Common Inquiries (click to ask):
+      </div>
+      <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+        <button type="button" class="btn btn-secondary btn-sm ai-prompt-btn" data-query="How are ride fares calculated in RideEasy?">
+          💡 How fares work (UGX)
+        </button>
+        <button type="button" class="btn btn-secondary btn-sm ai-prompt-btn" data-query="How do I book an airport transfer to Entebbe Airport (EBB)?">
+          ✈️ Airport transfer to Entebbe
+        </button>
+        <button type="button" class="btn btn-secondary btn-sm ai-prompt-btn" data-query="What is Emtrixz Technology Company and what are its services?">
+          🏢 About Emtrixz Technology
+        </button>
+        <button type="button" class="btn btn-secondary btn-sm ai-prompt-btn" data-query="What payment methods are supported on RideEasy?">
+          💳 MTN MoMo & Airtel Money
+        </button>
+        <button type="button" class="btn btn-secondary btn-sm ai-prompt-btn" data-query="What driver vetting and vehicle safety standards do you enforce?">
+          🛡️ Trust & safety verification
+        </button>
+        <button type="button" class="btn btn-secondary btn-sm ai-prompt-btn" data-query="How can I re-book or repeat a previous ride?">
+          ↺ How to repeat past rides
+        </button>
+      </div>
+    </div>
+
+    <!-- Chat Messages Container -->
+    <div id="ai-chat-thread" style="max-height: 380px; min-height: 180px; overflow-y: auto; border: 1px solid var(--color-light-grey); border-radius: var(--radius-sm); padding: 1rem; background-color: var(--color-off-white); display: flex; flex-direction: column; gap: 0.875rem; margin-bottom: 1rem;">
+      <!-- Welcome Message from AI -->
+      <div class="ai-chat-message bot" style="align-self: flex-start; max-width: 85%; background-color: var(--color-white); border: 1px solid var(--color-light-grey); border-radius: var(--radius-sm); padding: 0.875rem 1rem;">
+        <div style="display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; margin-bottom: 0.35rem;">
+          <strong style="font-size: 0.8125rem; color: var(--color-black); display: flex; align-items: center; gap: 0.35rem;">
+            <span>RideEasy Concierge</span>
+            <span style="font-size: 0.625rem; font-weight: 700; background-color: var(--color-black); color: var(--color-white); padding: 0.1rem 0.35rem; border-radius: 2px;">AI</span>
+          </strong>
+          <span class="text-subtle" style="font-size: 0.6875rem;">Just now</span>
+        </div>
+        <div class="ai-msg-content" style="font-size: 0.875rem; color: var(--color-dark-grey); line-height: 1.45;">
+          Hello <strong>{{ user.full_name }}</strong>! I am the <strong>RideEasy AI Customer Care Concierge</strong> by <strong>Emtrixz Technology Company</strong>. Ask me anything about our ride categories (Boda, Economy, Comfort, Premium), Entebbe airport transfers, school coaster charters, or payment and safety standards.
+        </div>
+      </div>
+    </div>
+
+    <!-- Chat Input Form -->
+    <form id="ai-chat-form" style="display: flex; gap: 0.5rem; align-items: center;">
+      <input type="text" id="ai-chat-input" class="form-control" placeholder="Ask a question about RideEasy, fares, airport trips, or Emtrixz Technology Company..." style="flex: 1;" autocomplete="off" required>
+      <button type="submit" id="ai-chat-send-btn" class="btn btn-primary" style="display: inline-flex; align-items: center; gap: 0.35rem; white-space: nowrap;">
+        <span>Ask Concierge</span>
+        <svg class="icon icon-sm" viewBox="0 0 24 24"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+      </button>
+    </form>
+  </div>
+
+  <!-- Recent Rides Table -->
+  <div class="card">
+    <div class="card-header">
+      <div>
+        <div class="card-title">Recent City Rides</div>
+        <div class="card-subtitle">Your trip history, live statuses, and printable receipts</div>
+      </div>
+      <a href="/passenger/rides" class="btn btn-secondary btn-sm">View All Rides</a>
+    </div>
+
+    {% if recent_rides %}
+      <div class="table-responsive">
+        <table class="table" id="recent-rides-table">
+          <thead>
+            <tr>
+              <th>Trip Reference</th>
+              <th>Pickup & Destination</th>
+              <th>Category</th>
+              <th>Driver / Vehicle</th>
+              <th>Fare</th>
+              <th>Rating</th>
+              <th>Status</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for r in recent_rides %}
+              <tr class="recent-ride-row" 
+                  data-route="{{ r.pickup_address }} {{ r.destination_address }}" 
+                  data-date="{{ r.created_at }}" 
+                  data-driver="{{ r.driver_name or '' }}" 
+                  data-ref="{{ r.id }}">
+                <td>
+                  <a href="/passenger/rides/{{ r.id }}" style="font-weight: 700; text-decoration: underline;">
+                    #{{ r.id[:8].upper() }}
+                  </a>
+                  <div class="text-subtle">{{ r.created_at[:10] }}</div>
+                </td>
+                <td>
+                  <div style="font-weight: 600;">{{ r.destination_address }}</div>
+                  <div class="text-subtle">From: {{ r.pickup_address }}</div>
+                </td>
+                <td>{{ r.category }}</td>
+                <td>
+                  {% if r.driver_name %}
+                    <div>{{ r.driver_name }}</div>
+                    <div class="text-subtle">{{ r.plate_number }} ({{ r.make }} {{ r.model }})</div>
+                  {% else %}
+                    <span class="text-subtle">Awaiting Driver</span>
+                  {% endif %}
+                </td>
+                <td style="font-weight: 700;">{{ r.final_fare_ugx or r.estimated_fare_ugx | ugx }}</td>
+                <td>
+                  {% if r.status == 'COMPLETED' %}
+                    {% if r.user_rating %}
+                      <span class="star-display" style="font-size: 0.8125rem;" title="{{ r.user_review or '' }}">
+                        <span class="star-filled">★</span> {{ r.user_rating }}/5
+                      </span>
+                    {% else %}
+                      <a href="#rating-section-{{ r.id }}" class="text-subtle" style="font-size: 0.75rem; text-decoration: underline;" onclick="focusRideRating('{{ r.id }}')">
+                        ☆ Rate
+                      </a>
+                    {% endif %}
+                  {% else %}
+                    <span class="text-subtle" style="font-size: 0.75rem;">—</span>
+                  {% endif %}
+                </td>
+                <td>
+                  <span class="status-indicator">
+                    <span class="status-dot"></span> {{ r.status.replace('_', ' ') }}
+                  </span>
+                </td>
+                <td>
+                  {% if r.status == 'COMPLETED' %}
+                    <a href="/passenger/rides/{{ r.id }}/receipt" class="btn btn-secondary btn-sm">Receipt</a>
+                  {% else %}
+                    <a href="/passenger/rides/{{ r.id }}" class="btn btn-primary btn-sm">Track Trip</a>
+                  {% endif %}
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <div style="text-align: center; padding: 2.5rem 0;">
+        <p style="margin-bottom: 1rem;">You have not booked any rides yet.</p>
+        <a href="/passenger/book-ride" class="btn btn-primary">Book Your First Ride</a>
+      </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

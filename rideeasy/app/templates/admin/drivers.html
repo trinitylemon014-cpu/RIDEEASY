@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+
+{% block title %}Driver Approvals & Fleet — RideEasy Admin{% endblock %}
+
+{% block content %}
+<div class="container section">
+  <div style="display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 1rem; margin-bottom: 2rem;">
+    <div>
+      <div class="metadata-row" style="margin-bottom: 0.25rem;">
+        <span style="font-weight: 700; color: var(--color-black); text-transform: uppercase;">Regulatory Screening</span>
+        <span class="metadata-separator">·</span>
+        <span>Driver Fleet</span>
+      </div>
+      <h2>Driver Compliance & Vetting</h2>
+    </div>
+
+    <a href="/admin/dashboard" class="btn btn-secondary">← Back to Overview</a>
+  </div>
+
+  <div class="card">
+    <div class="table-responsive">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Driver Name</th>
+            <th>License & NIN</th>
+            <th>Vehicle Details</th>
+            <th>Trips & Rating</th>
+            <th>Status</th>
+            <th>Operational Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for d in drivers %}
+            <tr>
+              <td>
+                <strong>{{ d.full_name }}</strong>
+                <div class="text-subtle">{{ d.phone }} · {{ d.email }}</div>
+              </td>
+              <td>
+                <div>Lic: {{ d.license_number }}</div>
+                <div class="text-subtle">NIN: {{ d.national_id_nin }}</div>
+              </td>
+              <td>
+                {% if d.plate_number %}
+                  <div style="font-weight: 700;">{{ d.plate_number }}</div>
+                  <div class="text-subtle">{{ d.make }} {{ d.model }} ({{ d.vehicle_category }})</div>
+                {% else %}
+                  <span class="text-subtle">No Vehicle</span>
+                {% endif %}
+              </td>
+              <td>
+                <div>{{ d.rating_avg }} / 5.0</div>
+                <div class="text-subtle">{{ d.total_trips }} Completed</div>
+              </td>
+              <td>
+                <span class="status-indicator">
+                  <span class="status-dot"></span> {{ d.verification_status }}
+                </span>
+              </td>
+              <td>
+                <div style="display: flex; gap: 0.35rem;">
+                  {% if d.verification_status != 'APPROVED' %}
+                  <form method="POST" action="/admin/drivers/{{ d.id }}/verify">
+                    <input type="hidden" name="action" value="APPROVED">
+                    <button type="submit" class="btn btn-primary btn-sm">Approve</button>
+                  </form>
+                  {% endif %}
+                  {% if d.verification_status != 'REJECTED' %}
+                  <form method="POST" action="/admin/drivers/{{ d.id }}/verify">
+                    <input type="hidden" name="action" value="REJECTED">
+                    <button type="submit" class="btn btn-secondary btn-sm" style="color: #990000;">Reject</button>
+                  </form>
+                  {% endif %}
+                </div>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+
+{% block title %}Flight Assistance Request — RideEasy{% endblock %}
+
+{% block content %}
+<div class="container section">
+  <div style="max-width: 640px; margin: 0 auto;">
+    <div style="margin-bottom: 1.5rem;">
+      <a href="/passenger/dashboard" class="text-subtle" style="display: inline-flex; align-items: center; gap: 0.25rem; margin-bottom: 0.5rem;">
+        ← Back to Dashboard
+      </a>
+      <h2>Flight Booking Assistance</h2>
+      <p style="font-size: 0.875rem;">
+        RideEasy links passengers to verified, accredited IATA travel agencies who issue genuine airline tickets and PNR references.
+      </p>
+    </div>
+
+    <div class="card" style="margin-bottom: 1.5rem; border-left: 3px solid var(--color-black);">
+      <div style="font-size: 0.8125rem; color: var(--color-dark-grey); line-height: 1.5;">
+        <strong>Important Notice:</strong> RideEasy connects you with certified travel partners in Uganda who issue authentic airline itineraries. Quotations and genuine PNR bookings are completed through licensed partner ticketing consoles.
+      </div>
+    </div>
+
+    <form method="POST" action="/passenger/flight-request" class="card">
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+        <div class="form-group">
+          <label class="form-label" for="departure_city">Departure City / Airport</label>
+          <input type="text" id="departure_city" name="departure_city" class="form-control" placeholder="e.g. Entebbe (EBB)" value="Entebbe (EBB)" required>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="destination_city">Destination City / Airport</label>
+          <input type="text" id="destination_city" name="destination_city" class="form-control" placeholder="e.g. Dubai (DXB) or London (LHR)" required>
+        </div>
+      </div>
+
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+        <div class="form-group">
+          <label class="form-label" for="departure_date">Departure Date</label>
+          <input type="date" id="departure_date" name="departure_date" class="form-control" required>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="return_date">Return Date (Optional)</label>
+          <input type="date" id="return_date" name="return_date" class="form-control">
+        </div>
+      </div>
+
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+        <div class="form-group">
+          <label class="form-label" for="passenger_count">Number of Passengers</label>
+          <input type="number" id="passenger_count" name="passenger_count" class="form-control" min="1" max="9" value="1" required>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="cabin_class">Cabin Preference</label>
+          <select id="cabin_class" name="cabin_class" class="form-select">
+            <option value="Economy" selected>Economy</option>
+            <option value="Premium Economy">Premium Economy</option>
+            <option value="Business Class">Business Class</option>
+            <option value="First Class">First Class</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="preferred_airline">Preferred Airline (Optional)</label>
+        <input type="text" id="preferred_airline" name="preferred_airline" class="form-control" placeholder="e.g. Uganda Airlines, Emirates, Qatar Airways, KLM, Ethiopian">
+      </div>
+
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+        <div class="form-group">
+          <label class="form-label" for="phone">Contact Telephone</label>
+          <input type="tel" id="phone" name="phone" class="form-control" value="{{ user.phone }}" required>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="email">Contact Email</label>
+          <input type="email" id="email" name="email" class="form-control" value="{{ user.email }}" required>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="travel_preferences">Travel Preferences & Baggage</label>
+        <input type="text" id="travel_preferences" name="travel_preferences" class="form-control" placeholder="e.g. Direct flight preferred, 2x 23kg baggage, window seat">
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="notes">Additional Travel Inquiries</label>
+        <textarea id="notes" name="notes" class="form-control" rows="3" placeholder="Provide any passport expiry details or visa assistance needs..."></textarea>
+      </div>
+
+      <button type="submit" class="btn btn-primary btn-block">Submit Flight Request to Partner Agency</button>
+    </form>
+  </div>
+</div>
+{% endblock %}

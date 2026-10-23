@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+
+{% block title %}System Audit Logs — RideEasy Admin{% endblock %}
+
+{% block content %}
+<div class="container section">
+  <div style="display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 1rem; margin-bottom: 2rem;">
+    <div>
+      <div class="metadata-row" style="margin-bottom: 0.25rem;">
+        <span style="font-weight: 700; color: var(--color-black); text-transform: uppercase;">Security Compliance</span>
+        <span class="metadata-separator">·</span>
+        <span>Tamper-Evident Trail</span>
+      </div>
+      <h2>System Audit Logs</h2>
+    </div>
+
+    <a href="/admin/dashboard" class="btn btn-secondary">← Back to Overview</a>
+  </div>
+
+  <div class="card">
+    {% if logs %}
+      <div class="table-responsive">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Timestamp</th>
+              <th>Operator</th>
+              <th>Action Code</th>
+              <th>Resource Type</th>
+              <th>Resource ID</th>
+              <th>Particulars</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for l in logs %}
+              <tr>
+                <td class="text-subtle">{{ l.created_at }}</td>
+                <td>
+                  <strong>{{ l.user_name or 'System Kernel' }}</strong>
+                  <div class="text-subtle">{{ l.role or 'CORE' }}</div>
+                </td>
+                <td><code>{{ l.action }}</code></td>
+                <td>{{ l.resource_type }}</td>
+                <td class="text-subtle">#{{ l.resource_id or 'N/A' }}</td>
+                <td style="font-size: 0.8125rem;">{{ l.details }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <div style="text-align: center; padding: 3rem 0; color: var(--color-medium-grey);">
+        No audit log records available.
+      </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

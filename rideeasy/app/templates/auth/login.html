@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+
+{% block title %}Sign In — RideEasy{% endblock %}
+
+{% block content %}
+<div class="container section">
+  <div style="max-width: 480px; margin: 0 auto;">
+    <div class="card">
+      <div style="text-align: center; margin-bottom: 2rem;">
+        <img src="/static/images/logo.png" alt="RideEasy Logo" style="height: 48px; width: auto; margin-bottom: 1rem; object-fit: contain;" onerror="this.style.display='none'">
+        <div class="metadata-row" style="justify-content: center; margin-bottom: 0.35rem;">
+          <span style="font-weight: 700; color: var(--color-black); text-transform: uppercase;">Authentication</span>
+        </div>
+        <h2>Sign In to RideEasy</h2>
+        <p style="font-size: 0.875rem;">Access your passenger, driver, school, partner, or admin portal</p>
+      </div>
+
+      <form method="POST" action="/auth/login">
+        <div class="form-group">
+          <label class="form-label" for="email">Email Address</label>
+          <input type="email" id="email" name="email" class="form-control" placeholder="name@domain.ug" value="{{ email or '' }}" required autofocus>
+        </div>
+
+        <div class="form-group">
+          <div style="display: flex; justify-content: space-between; align-items: baseline;">
+            <label class="form-label" for="password">Password</label>
+            <a href="/auth/forgot-password" style="font-size: 0.75rem; color: var(--color-medium-grey);">Forgot Password?</a>
+          </div>
+          <input type="password" id="password" name="password" class="form-control" placeholder="••••••••" required>
+        </div>
+
+        <button type="submit" class="btn btn-primary btn-block" style="margin-top: 1rem;">Sign In</button>
+      </form>
+
+      <div style="margin-top: 2rem; padding-top: 1.5rem; border-top: 1px solid var(--color-light-grey);">
+        <div style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: var(--color-medium-grey); margin-bottom: 0.75rem; text-align: center;">
+          Instant 1-Click Demo Login
+        </div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem;">
+          <a href="/auth/demo/passenger" class="btn btn-secondary btn-sm">Passenger Demo</a>
+          <a href="/auth/demo/driver" class="btn btn-secondary btn-sm">Driver Demo</a>
+          <a href="/auth/demo/school" class="btn btn-secondary btn-sm">School Demo</a>
+          <a href="/auth/demo/travel" class="btn btn-secondary btn-sm">Travel Partner</a>
+        </div>
+        <a href="/auth/demo/admin" class="btn btn-secondary btn-sm btn-block" style="margin-top: 0.5rem;">System Administrator</a>
+      </div>
+
+      <div style="text-align: center; margin-top: 1.5rem; font-size: 0.8125rem;">
+        Don't have an account? <a href="/auth/register" style="font-weight: 700; text-decoration: underline;">Create Account</a>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

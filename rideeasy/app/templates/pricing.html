@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+
+{% block title %}Tariffs & Fleet Pricing — RideEasy{% endblock %}
+
+{% block content %}
+<div class="container section">
+  <div style="max-width: 800px; margin: 0 auto;">
+    <div class="metadata-row" style="margin-bottom: 0.5rem;">
+      <span style="font-weight: 700; color: var(--color-black); text-transform: uppercase;">Regulated Fares</span>
+      <span class="metadata-separator">·</span>
+      <span>Ugandan Shillings (UGX)</span>
+    </div>
+    <h1 style="margin-bottom: 1rem;">Transparent Fares & Tariffs</h1>
+    <p style="font-size: 1.125rem; line-height: 1.6; margin-bottom: 2rem;">
+      RideEasy fares are published openly. No surge manipulation or hidden platform penalties.
+    </p>
+
+    <div class="card" style="margin-bottom: 2rem;">
+      <div class="card-title" style="margin-bottom: 1rem;">Official Fleet Tariffs</div>
+      <div class="table-responsive">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Category</th>
+              <th>Flag Fall (Base)</th>
+              <th>Per Kilometer</th>
+              <th>Per Minute</th>
+              <th>Minimum Fare</th>
+              <th>Standard Vehicle</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for p in pricing %}
+              <tr>
+                <td><strong>{{ p.category }}</strong></td>
+                <td>{{ p.base_fare_ugx | ugx }}</td>
+                <td>{{ p.per_km_ugx | ugx }}/km</td>
+                <td>{{ p.per_min_ugx | ugx }}/min</td>
+                <td style="font-weight: 700;">{{ p.min_fare_ugx | ugx }}</td>
+                <td class="text-subtle">
+                  {% if p.category == 'BODA' %}Boxer / TVS 100
+                  {% elif p.category == 'ECONOMY' %}Toyota Premio / Spacio
+                  {% elif p.category == 'COMFORT' %}Toyota Axio / Fielder AC
+                  {% elif p.category == 'PREMIUM' %}Toyota Prado / Harrier
+                  {% elif p.category == 'COASTER' %}Toyota Coaster (30 Seats)
+                  {% elif p.category == 'BUS' %}Coach Bus (60 Seats)
+                  {% endif %}
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Airport Flat Rate Examples -->
+    <div class="card">
+      <div class="card-title">Entebbe Airport (EBB) Transfer Benchmark Fares</div>
+      <p class="card-subtitle" style="margin-bottom: 1rem;">Standard expressway route (~42 km from central Kampala)</p>
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem;">
+        <div style="border: 1px solid var(--color-light-grey); padding: 1rem; border-radius: var(--radius-sm);">
+          <div class="text-subtle">Economy Saloon</div>
+          <div style="font-size: 1.25rem; font-weight: 800;">UGX 85,000</div>
+          <div class="text-subtle">Up to 4 passengers + luggage</div>
+        </div>
+        <div style="border: 1px solid var(--color-light-grey); padding: 1rem; border-radius: var(--radius-sm);">
+          <div class="text-subtle">Comfort Sedan</div>
+          <div style="font-size: 1.25rem; font-weight: 800;">UGX 110,000</div>
+          <div class="text-subtle">Air conditioning & extra legroom</div>
+        </div>
+        <div style="border: 1px solid var(--color-light-grey); padding: 1rem; border-radius: var(--radius-sm);">
+          <div class="text-subtle">Executive SUV</div>
+          <div style="font-size: 1.25rem; font-weight: 800;">UGX 180,000</div>
+          <div class="text-subtle">VIP transfer + expressway toll</div>
+        </div>
+        <div style="border: 1px solid var(--color-light-grey); padding: 1rem; border-radius: var(--radius-sm);">
+          <div class="text-subtle">Group Coaster</div>
+          <div style="font-size: 1.25rem; font-weight: 800;">UGX 350,000</div>
+          <div class="text-subtle">Up to 30 passengers + team baggage</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

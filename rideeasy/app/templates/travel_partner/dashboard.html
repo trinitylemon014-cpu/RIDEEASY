@@ -1,0 +1,146 @@
+{% extends "base.html" %}
+
+{% block title %}Travel Partner Hub — RideEasy{% endblock %}
+
+{% block content %}
+<div class="container section">
+  <div style="display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 1rem; margin-bottom: 2rem;">
+    <div>
+      <div class="metadata-row" style="margin-bottom: 0.25rem;">
+        <span style="font-weight: 700; color: var(--color-black); text-transform: uppercase;">Accredited Agency Console</span>
+        <span class="metadata-separator">·</span>
+        <span>License #{{ company.license_number }}</span>
+      </div>
+      <h2>{{ company.company_name }}</h2>
+    </div>
+
+    <div>
+      <span class="status-indicator">
+        <span class="status-dot"></span> {{ company.verification_status }} IATA PARTNER
+      </span>
+    </div>
+  </div>
+
+  <!-- Assigned Passenger Inquiries -->
+  <div class="card" style="margin-bottom: 2rem;">
+    <div class="card-header">
+      <div>
+        <div class="card-title">Assigned Flight Inquiries</div>
+        <div class="card-subtitle">Passenger requests assigned to your agency for itinerary proposals and booking</div>
+      </div>
+      <span class="status-indicator">
+        <span class="status-dot"></span> {{ requests | length }} Total
+      </span>
+    </div>
+
+    {% if requests %}
+      <div class="table-responsive">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Request Ref</th>
+              <th>Passenger Particulars</th>
+              <th>Route</th>
+              <th>Travel Date</th>
+              <th>Class & Airline</th>
+              <th>Status</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for r in requests %}
+              <tr>
+                <td>
+                  <a href="/travel/requests/{{ r.id }}" style="font-weight: 700; text-decoration: underline;">
+                    #{{ r.id[:8].upper() }}
+                  </a>
+                </td>
+                <td>
+                  <strong>{{ r.passenger_name }}</strong>
+                  <div class="text-subtle">{{ r.passenger_phone }} · {{ r.passenger_email }}</div>
+                </td>
+                <td>
+                  <div style="font-weight: 600;">{{ r.departure_city }} → {{ r.destination_city }}</div>
+                  <div class="text-subtle">{{ r.passenger_count }} Passenger(s)</div>
+                </td>
+                <td>
+                  {{ r.departure_date }}
+                  {% if r.return_date %}<div class="text-subtle">Ret: {{ r.return_date }}</div>{% endif %}
+                </td>
+                <td>{{ r.cabin_class }} ({{ r.preferred_airline or 'Any' }})</td>
+                <td>
+                  <span class="status-indicator">
+                    <span class="status-dot"></span> {{ r.status.replace('_', ' ') }}
+                  </span>
+                </td>
+                <td>
+                  <a href="/travel/requests/{{ r.id }}" class="btn btn-primary btn-sm">Process Quote</a>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <div style="text-align: center; padding: 2.5rem 0; color: var(--color-medium-grey);">
+        No flight requests currently assigned to your agency.
+      </div>
+    {% endif %}
+  </div>
+
+  <!-- Confirmed PNR Bookings -->
+  <div class="card">
+    <div class="card-header">
+      <div class="card-title">Issued Airline Bookings & PNR Archive</div>
+      <div class="card-subtitle">Tickets confirmed through your authorized GDS ticketing terminal</div>
+    </div>
+
+    {% if bookings %}
+      <div class="table-responsive">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>PNR Reference</th>
+              <th>Passenger</th>
+              <th>Airline & Flight</th>
+              <th>Route</th>
+              <th>Departure Time</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for b in bookings %}
+              <tr>
+                <td>
+                  <span style="font-size: 1rem; font-weight: 800; letter-spacing: 0.05em; background-color: var(--color-off-white); border: 1px solid var(--color-light-grey); padding: 0.2rem 0.4rem; border-radius: var(--radius-sm);">
+                    {{ b.booking_reference_pnr }}
+                  </span>
+                  {% if b.airline_ticket_number %}
+                    <div class="text-subtle">Tkt: {{ b.airline_ticket_number }}</div>
+                  {% endif %}
+                </td>
+                <td>{{ b.passenger_name }}</td>
+                <td>
+                  <strong>{{ b.airline_name }}</strong>
+                  <div class="text-subtle">Flight {{ b.flight_number }}</div>
+                </td>
+                <td>{{ b.departure_city }} → {{ b.destination_city }}</td>
+                <td>{{ b.departure_datetime }}</td>
+                <td>
+                  <span class="status-indicator">
+                    <span class="status-dot"></span> {{ b.status }}
+                  </span>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <div style="text-align: center; padding: 2rem 0; color: var(--color-medium-grey); font-size: 0.875rem;">
+        No confirmed bookings registered yet.
+      </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

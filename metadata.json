@@ -1,0 +1,8 @@
+{
+  "name": "RideEasy",
+  "description": "MOVE. TRAVEL. ARRIVE. Professional transportation and travel platform by Emtrixz Technology Company, serving Uganda and East Africa.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
