@@ -67,6 +67,9 @@ def test_route_map_is_available_to_passenger_driver_and_school(client):
         assert page_label in map_response.data
         assert b"route-map" in map_response.data
         assert b"Route Map" in map_response.data
+        assert b'href="/map" class="btn btn-secondary btn-block">Route Map' in map_response.data
+        alias_response = client.get("/maps")
+        assert alias_response.status_code == 200
 
     client.get("/auth/demo/school", follow_redirects=True)
     school_map = client.get(
@@ -83,8 +86,9 @@ def test_route_map_is_available_to_passenger_driver_and_school(client):
     client.get("/auth/demo/travel", follow_redirects=True)
     assert client.get("/map").status_code == 403
 
-def test_route_api_reports_missing_configuration(client):
+def test_route_api_reports_missing_configuration(client, app, monkeypatch):
     client.get("/auth/demo/passenger", follow_redirects=True)
+    monkeypatch.setitem(app.config, "LOCATIONIQ_API_KEY", "")
     response = client.post("/api/route", json={
         "start": "Acacia Mall, Kampala",
         "destination": "Entebbe Airport",

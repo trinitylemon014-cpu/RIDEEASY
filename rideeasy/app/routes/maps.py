@@ -11,6 +11,7 @@ def before_request():
     pass
 
 
+@maps_bp.route("/maps")
 @maps_bp.route("/map")
 def route_planner():
     user = AuthService.get_current_user()

@@ -193,16 +193,20 @@
       </div>
       {% if current_user.role == 'PASSENGER' %}
         <a href="/passenger/dashboard" class="btn btn-secondary btn-block">Dashboard</a>
+        <a href="/map" class="btn btn-secondary btn-block">Route Map</a>
         <a href="/passenger/book-ride" class="btn btn-primary btn-block">Book a Ride</a>
         <a href="/passenger/journeys" class="btn btn-secondary btn-block">My Journeys & Flights</a>
       {% elif current_user.role == 'DRIVER' %}
         <a href="/driver/dashboard" class="btn btn-primary btn-block">Driver Dashboard</a>
+        <a href="/map" class="btn btn-secondary btn-block">Route Map</a>
       {% elif current_user.role == 'SCHOOL' %}
         <a href="/school/dashboard" class="btn btn-primary btn-block">School Portal</a>
+        <a href="/map" class="btn btn-secondary btn-block">Route Map</a>
       {% elif current_user.role == 'TRAVEL_COMPANY' %}
         <a href="/travel/dashboard" class="btn btn-primary btn-block">Travel Partner Dashboard</a>
       {% elif current_user.role == 'ADMIN' %}
         <a href="/admin/dashboard" class="btn btn-primary btn-block">Administrator Console</a>
+        <a href="/map" class="btn btn-secondary btn-block">Route Map</a>
       {% endif %}
       <a href="/auth/logout" class="btn btn-secondary btn-block" style="margin-top: 0.5rem;">Sign Out</a>
     {% else %}
