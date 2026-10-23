@@ -1,5 +1,5 @@
 /* RideEasy Dashboard & Workflow Styles
-   Monochrome, Clean Spatial Mathematics */
+   Executive Sky Blue · White · Yellow */
 
 /* Metric Grid */
 .stats-grid {
@@ -12,8 +12,10 @@
 .stat-card {
   background-color: var(--color-white);
   border: 1px solid var(--color-light-grey);
+  border-top: 3px solid var(--sky-500);
   border-radius: var(--radius-md);
   padding: 1.25rem;
+  box-shadow: var(--shadow-sm);
 }
 
 .stat-label {
@@ -28,7 +30,7 @@
 .stat-value {
   font-size: 1.75rem;
   font-weight: 800;
-  color: var(--color-black);
+  color: var(--sky-800);
   letter-spacing: -0.03em;
 }
 
@@ -57,12 +59,14 @@
 }
 
 .category-card:hover {
-  border-color: var(--color-black);
+  border-color: var(--sky-400);
+  box-shadow: var(--shadow-sm);
 }
 
 .category-card.selected, input[type="radio"]:checked + .category-card {
-  border: 2px solid var(--color-black);
-  background-color: var(--color-off-white);
+  border: 2px solid var(--sky-600);
+  background-color: var(--sky-50);
+  box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.15);
 }
 
 .category-header {
@@ -75,13 +79,13 @@
 .category-name {
   font-size: 0.9375rem;
   font-weight: 700;
-  color: var(--color-black);
+  color: var(--sky-900);
 }
 
 .category-fare {
   font-size: 1.125rem;
   font-weight: 800;
-  color: var(--color-black);
+  color: var(--sky-700);
   margin-top: 0.25rem;
 }
 
@@ -107,8 +111,9 @@
   top: 50%;
   left: 10%;
   right: 10%;
-  height: 2px;
-  background-color: var(--color-light-grey);
+  height: 3px;
+  background-color: var(--sky-100);
+  border-radius: 2px;
   z-index: 1;
 }
 
@@ -124,7 +129,7 @@
   width: 24px;
   height: 24px;
   border-radius: 50%;
-  border: 2px solid var(--color-light-grey);
+  border: 2px solid var(--sky-200);
   background-color: var(--color-white);
   margin: 0 auto 0.5rem auto;
   display: flex;
@@ -135,16 +140,19 @@
   color: var(--color-medium-grey);
 }
 
-.timeline-step.active .timeline-dot {
-  border-color: var(--color-black);
-  background-color: var(--color-black);
+/* Completed steps: solid sky blue */
+.timeline-step.passed .timeline-dot {
+  border-color: var(--sky-600);
+  background-color: var(--sky-600);
   color: var(--color-white);
 }
 
-.timeline-step.passed .timeline-dot {
-  border-color: var(--color-black);
-  background-color: var(--color-black);
-  color: var(--color-white);
+/* Current step: yellow with a soft halo so it stands out */
+.timeline-step.active .timeline-dot {
+  border-color: var(--yellow-500);
+  background-color: var(--yellow-400);
+  color: var(--sky-900);
+  box-shadow: 0 0 0 4px var(--yellow-100);
 }
 
 .timeline-label {
@@ -155,14 +163,15 @@
   color: var(--color-medium-grey);
 }
 
-.timeline-step.active .timeline-label {
-  color: var(--color-black);
+.timeline-step.active .timeline-label,
+.timeline-step.passed .timeline-label {
+  color: var(--sky-900);
 }
 
 /* Reminder Timeline Cards */
 .reminder-card {
   border: 1px solid var(--color-light-grey);
-  border-left: 3px solid var(--color-black);
+  border-left: 3px solid var(--yellow-400);
   border-radius: var(--radius-sm);
   padding: 1rem;
   background-color: var(--color-white);
@@ -179,7 +188,7 @@
 .reminder-title {
   font-size: 0.875rem;
   font-weight: 700;
-  color: var(--color-black);
+  color: var(--sky-900);
 }
 
 .reminder-time {
@@ -202,7 +211,7 @@
     display: none !important;
   }
   .receipt-box {
-    border: 1px solid #000000 !important;
+    border: 1px solid var(--sky-900) !important;
     box-shadow: none !important;
     padding: 2rem !important;
     margin: 0 !important;
@@ -212,7 +221,9 @@
 .receipt-box {
   background-color: var(--color-white);
   border: 1px solid var(--color-light-grey);
+  border-top: 4px solid var(--sky-500);
   border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
   padding: 2rem;
   max-width: 600px;
   margin: 0 auto;
@@ -221,7 +232,7 @@
 .receipt-header {
   text-align: center;
   padding-bottom: 1.5rem;
-  border-bottom: 1px dashed var(--color-light-grey);
+  border-bottom: 1px dashed var(--sky-300);
   margin-bottom: 1.5rem;
 }
 
@@ -234,12 +245,12 @@
 }
 
 .receipt-row.total {
-  border-top: 1px solid var(--color-black);
+  border-top: 2px solid var(--sky-700);
   padding-top: 0.75rem;
   margin-top: 0.75rem;
   font-size: 1.125rem;
   font-weight: 800;
-  color: var(--color-black);
+  color: var(--sky-900);
 }
 
 /* Real-Time Driver Earnings Summary & Chart Component */
@@ -251,15 +262,16 @@
 }
 
 .earnings-kpi-card {
-  background-color: var(--color-off-white);
-  border: 1px solid var(--color-light-grey);
+  background-color: var(--sky-50);
+  border: 1px solid var(--sky-100);
   border-radius: var(--radius-sm);
   padding: 1rem;
-  transition: border-color 0.15s ease;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
 .earnings-kpi-card:hover {
-  border-color: var(--color-dark-grey);
+  border-color: var(--sky-400);
+  box-shadow: var(--shadow-sm);
 }
 
 .earnings-chart-container {
@@ -273,30 +285,30 @@
 }
 
 .chart-bar {
-  fill: var(--color-black);
+  fill: var(--sky-500);
   transition: fill 0.15s ease, opacity 0.15s ease;
   cursor: pointer;
 }
 
 .chart-bar:hover {
-  fill: #444444;
+  fill: var(--sky-700);
 }
 
 .chart-bar.bar-today {
-  fill: var(--color-black);
-  stroke: var(--color-black);
+  fill: var(--yellow-400);
+  stroke: var(--yellow-600);
   stroke-width: 1px;
 }
 
 .chart-bar.is-selected {
-  fill: #000000;
-  stroke: #000000;
+  fill: var(--sky-700);
+  stroke: var(--sky-900);
   stroke-width: 2.5px;
-  filter: drop-shadow(0px 2px 4px rgba(0,0,0,0.3));
+  filter: drop-shadow(0px 2px 4px rgba(12, 74, 110, 0.35));
 }
 
 .chart-dot {
-  fill: var(--color-black);
+  fill: var(--sky-600);
   stroke: var(--color-white);
   stroke-width: 2.5px;
   cursor: pointer;
@@ -305,12 +317,35 @@
 
 .chart-dot:hover, .chart-dot.is-selected {
   r: 7px;
-  fill: #000000;
+  fill: var(--yellow-400);
+  stroke: var(--sky-700);
+}
+
+/* app.js draws the SVG with hard-coded #000 / #E5E5E5 presentation attributes;
+   CSS rules take precedence over those attributes, so recolour them here. */
+.earnings-chart-container polyline[stroke="#000000"] {
+  stroke: var(--sky-600);
+}
+
+.earnings-chart-container line[stroke="#000000"] {
+  stroke: var(--sky-700);
+}
+
+.earnings-chart-container line[stroke="#E5E5E5"] {
+  stroke: var(--sky-100);
+}
+
+.earnings-chart-container rect[fill="#000000"] {
+  fill: var(--sky-800);
+}
+
+.earnings-chart-container text[fill="#000000"] {
+  fill: var(--sky-900);
 }
 
 .chart-tooltip {
   position: absolute;
-  background-color: #000000;
+  background-color: var(--sky-900);
   color: #FFFFFF;
   border-radius: var(--radius-sm);
   padding: 0.5rem 0.75rem;
@@ -318,7 +353,7 @@
   line-height: 1.35;
   pointer-events: none;
   z-index: 100;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+  box-shadow: var(--shadow-lg);
   white-space: nowrap;
   transform: translate(-50%, -100%);
   margin-top: -8px;
@@ -333,7 +368,7 @@
   transform: translateX(-50%);
   border-width: 5px;
   border-style: solid;
-  border-color: #000000 transparent transparent transparent;
+  border-color: var(--sky-900) transparent transparent transparent;
 }
 
 .day-breakdown-pills {
@@ -350,8 +385,8 @@
 }
 
 .day-pill-btn {
-  background-color: var(--color-off-white);
-  border: 1px solid var(--color-light-grey);
+  background-color: var(--sky-50);
+  border: 1px solid var(--sky-100);
   border-radius: var(--radius-sm);
   padding: 0.5rem 0.35rem;
   text-align: center;
@@ -361,23 +396,23 @@
 }
 
 .day-pill-btn:hover {
-  border-color: var(--color-black);
+  border-color: var(--sky-500);
   background-color: var(--color-white);
 }
 
 .day-pill-btn.active {
-  background-color: var(--color-black);
+  background-color: var(--sky-700);
   color: var(--color-white);
-  border-color: var(--color-black);
+  border-color: var(--sky-700);
 }
 
 .day-pill-btn.active .text-subtle {
-  color: #CCCCCC !important;
+  color: var(--sky-100) !important;
 }
 
 .day-trips-list {
-  background-color: var(--color-off-white);
-  border: 1px solid var(--color-light-grey);
+  background-color: var(--sky-50);
+  border: 1px solid var(--sky-100);
   border-radius: var(--radius-sm);
   padding: 0.875rem 1rem;
   margin-top: 0.75rem;
@@ -392,20 +427,21 @@
 }
 
 .rewards-kpi-card {
-  background-color: var(--color-off-white);
-  border: 1px solid var(--color-light-grey);
+  background-color: var(--sky-50);
+  border: 1px solid var(--sky-100);
   border-radius: var(--radius-sm);
   padding: 1.125rem;
-  transition: border-color 0.15s ease;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
 .rewards-kpi-card:hover {
-  border-color: var(--color-dark-grey);
+  border-color: var(--sky-400);
+  box-shadow: var(--shadow-sm);
 }
 
 .rewards-progress-wrapper {
-  background-color: var(--color-off-white);
-  border: 1px solid var(--color-light-grey);
+  background-color: var(--sky-50);
+  border: 1px solid var(--sky-100);
   border-radius: var(--radius-sm);
   padding: 1.125rem;
   margin-bottom: 1.5rem;
@@ -414,7 +450,7 @@
 .rewards-progress-track {
   width: 100%;
   height: 10px;
-  background-color: #E5E5E5;
+  background-color: var(--sky-100);
   border-radius: 5px;
   overflow: hidden;
   margin: 0.6rem 0 0.4rem;
@@ -422,7 +458,7 @@
 
 .rewards-progress-fill {
   height: 100%;
-  background-color: var(--color-black);
+  background: linear-gradient(90deg, var(--sky-500) 0%, var(--sky-400) 70%, var(--yellow-400) 100%);
   border-radius: 5px;
   transition: width 0.4s ease;
 }
@@ -437,7 +473,7 @@
 }
 
 .rewards-tier-milestone.active {
-  color: var(--color-black);
+  color: var(--sky-800);
   font-weight: 700;
 }
 
@@ -461,16 +497,16 @@
 }
 
 .reward-benefit-card:hover {
-  border-color: var(--color-black);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  border-color: var(--sky-400);
+  box-shadow: var(--shadow-md);
 }
 
 .reward-benefit-card.is-unlocked {
-  border-top: 3px solid var(--color-black);
+  border-top: 3px solid var(--yellow-400);
 }
 
 .reward-benefit-card.is-locked {
-  background-color: #FAFAFA;
+  background-color: #F8FBFE;
   opacity: 0.88;
 }
 
@@ -478,8 +514,9 @@
   font-family: var(--font-mono, monospace);
   font-weight: 700;
   letter-spacing: 0.08em;
-  background-color: var(--color-black);
-  color: var(--color-white);
+  background-color: var(--yellow-400);
+  color: var(--sky-900);
+  border: 1px dashed var(--yellow-600);
   padding: 0.2rem 0.5rem;
   border-radius: var(--radius-sm);
   font-size: 0.8125rem;
@@ -488,4 +525,8 @@
   gap: 0.35rem;
 }
 
-
+/* Solid badges that app.js / templates inline-style with --color-black + white
+   text: keep them as a rich sky blue rather than a flat dark fill. */
+span[style*="background-color: var(--color-black)"] {
+  background-color: var(--sky-700) !important;
+}

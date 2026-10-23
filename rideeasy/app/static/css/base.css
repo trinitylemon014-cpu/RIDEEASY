@@ -1,28 +1,68 @@
 /* RideEasy Design System - MOVE. TRAVEL. ARRIVE.
-   Strict Monochrome Aesthetic (#000000, #111111, #FFFFFF, #F7F7F7, #E5E5E5, #777777)
-   Emtrixz Technology Company - Uganda & East Africa */
+   Executive Palette: Sky Blue · White · Yellow
+   Emtrixz Technology Company - Uganda & East Africa
+
+   Token note: the legacy --color-* names are kept (templates and app.js
+   reference them inline) but now map to the sky-blue brand palette:
+     --color-black       -> deep sky ink (headings, strong text, solid badges)
+     --color-light-grey  -> blue-tinted hairline borders
+     --color-off-white   -> pale sky page / panel tint
+*/
 
 :root {
-  --color-black: #000000;
-  --color-near-black: #111111;
-  --color-charcoal: #1C1C1C;
-  --color-white: #FFFFFF;
-  --color-off-white: #F7F7F7;
-  --color-light-grey: #E5E5E5;
-  --color-medium-grey: #777777;
-  --color-dark-grey: #444444;
-  --color-subtle-border: #E0E0E0;
+  /* Sky blue scale */
+  --sky-50:  #F0F9FF;
+  --sky-100: #E0F2FE;
+  --sky-200: #BAE6FD;
+  --sky-300: #7DD3FC;
+  --sky-400: #38BDF8;
+  --sky-500: #0EA5E9;
+  --sky-600: #0284C7;
+  --sky-700: #0369A1;
+  --sky-800: #075985;
+  --sky-900: #0C4A6E;
 
-  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  /* Yellow scale */
+  --yellow-50:  #FEFCE8;
+  --yellow-100: #FEF9C3;
+  --yellow-200: #FEF08A;
+  --yellow-300: #FDE047;
+  --yellow-400: #FACC15;
+  --yellow-500: #EAB308;
+  --yellow-600: #CA8A04;
+  --yellow-700: #A16207;
+
+  /* Semantic roles */
+  --color-primary:       var(--sky-700);
+  --color-primary-hover: var(--sky-800);
+  --color-accent:        var(--yellow-400);
+  --color-accent-hover:  var(--yellow-500);
+  --color-danger:        #B42318;
+  --color-danger-bg:     #FEF3F2;
+
+  /* Legacy tokens (remapped to the new palette) */
+  --color-black: var(--sky-900);
+  --color-near-black: #0F2D44;
+  --color-charcoal: var(--sky-800);
+  --color-white: #FFFFFF;
+  --color-off-white: #F4F9FD;
+  --color-light-grey: #D5E5F2;
+  --color-medium-grey: #5F7A90;
+  --color-dark-grey: #38546B;
+  --color-subtle-border: #DCE9F4;
+
+  --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 
-  --radius-sm: 4px;
-  --radius-md: 8px;
-  --radius-lg: 12px;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
 
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
-  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08);
-  --shadow-lg: 0 10px 25px rgba(0, 0, 0, 0.12);
+  --shadow-sm: 0 1px 2px rgba(12, 74, 110, 0.06);
+  --shadow-md: 0 6px 16px rgba(12, 74, 110, 0.10);
+  --shadow-lg: 0 14px 32px rgba(12, 74, 110, 0.16);
+
+  --focus-ring: 0 0 0 3px rgba(14, 165, 233, 0.28);
 
   --max-width: 1200px;
 }
@@ -58,10 +98,20 @@ a {
   text-decoration: none;
 }
 
+::selection {
+  background-color: var(--yellow-200);
+  color: var(--sky-900);
+}
+
+:focus-visible {
+  outline: 3px solid var(--sky-300);
+  outline-offset: 2px;
+}
+
 /* Typography Hierarchy */
 h1, h2, h3, h4, h5, h6 {
   font-weight: 700;
-  color: var(--color-black);
+  color: var(--sky-900);
   letter-spacing: -0.02em;
   line-height: 1.25;
 }
@@ -82,7 +132,7 @@ p {
 }
 
 .text-black {
-  color: var(--color-black);
+  color: var(--sky-900);
 }
 
 .font-bold {
@@ -93,7 +143,7 @@ p {
   font-weight: 500;
 }
 
-/* Clean Unboxed Metadata (Zero-Pill Rule) */
+/* Clean Unboxed Metadata */
 .metadata-row {
   display: flex;
   align-items: center;
@@ -103,7 +153,7 @@ p {
 }
 
 .metadata-separator {
-  color: var(--color-light-grey);
+  color: var(--sky-300);
   user-select: none;
 }
 
@@ -122,6 +172,15 @@ p {
   padding-bottom: 3.5rem;
 }
 
+/* Hero band (index + any page that opts in with class="hero").
+   The attribute selector styles the existing inline-styled hero without
+   touching the template. */
+.hero,
+main > section[style*="padding: 4rem 0"] {
+  background: linear-gradient(180deg, var(--sky-50) 0%, #FFFFFF 100%) !important;
+  border-bottom: 3px solid var(--yellow-400) !important;
+}
+
 /* Professional Buttons */
 .btn {
   display: inline-flex;
@@ -131,33 +190,55 @@ p {
   padding: 0.625rem 1.25rem;
   font-size: 0.875rem;
   font-weight: 600;
+  letter-spacing: 0.01em;
   border-radius: var(--radius-sm);
-  transition: all 0.15s ease-in-out;
+  transition: background-color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease, transform 0.1s ease;
   cursor: pointer;
   border: 1px solid transparent;
   min-height: 44px;
 }
 
+.btn:active {
+  transform: translateY(1px);
+}
+
 .btn-primary {
-  background-color: var(--color-black);
+  background-color: var(--color-primary);
   color: var(--color-white);
-  border-color: var(--color-black);
+  border-color: var(--color-primary);
+  box-shadow: var(--shadow-sm);
 }
 
 .btn-primary:hover {
-  background-color: var(--color-charcoal);
-  border-color: var(--color-charcoal);
+  background-color: var(--color-primary-hover);
+  border-color: var(--color-primary-hover);
+  box-shadow: var(--shadow-md);
 }
 
 .btn-secondary {
   background-color: var(--color-white);
-  color: var(--color-black);
-  border-color: var(--color-light-grey);
+  color: var(--sky-800);
+  border-color: var(--sky-200);
 }
 
 .btn-secondary:hover {
-  background-color: var(--color-off-white);
-  border-color: var(--color-near-black);
+  background-color: var(--sky-50);
+  border-color: var(--sky-500);
+  color: var(--sky-900);
+}
+
+/* Yellow call-to-action (use for the single most important action on a page) */
+.btn-accent {
+  background-color: var(--color-accent);
+  color: var(--sky-900);
+  border-color: var(--yellow-500);
+  box-shadow: var(--shadow-sm);
+}
+
+.btn-accent:hover {
+  background-color: var(--color-accent-hover);
+  border-color: var(--yellow-600);
+  box-shadow: var(--shadow-md);
 }
 
 .btn-sm {
@@ -170,7 +251,7 @@ p {
   width: 100%;
 }
 
-/* SVG Icon Standards (Strict Black / Stroke 1.75) */
+/* SVG Icon Standards (Stroke 1.75, inherits colour) */
 .icon {
   display: inline-block;
   width: 1.25rem;
@@ -205,7 +286,7 @@ p {
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  color: var(--color-dark-grey);
+  color: var(--sky-800);
   margin-bottom: 0.375rem;
 }
 
@@ -214,17 +295,26 @@ p {
   padding: 0.75rem 0.875rem;
   font-size: 0.9375rem;
   font-family: inherit;
-  color: var(--color-black);
+  color: var(--color-near-black);
   background-color: var(--color-white);
-  border: 1px solid var(--color-light-grey);
+  border: 1px solid var(--sky-200);
   border-radius: var(--radius-sm);
-  transition: border-color 0.15s ease;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
   min-height: 44px;
+}
+
+.form-control::placeholder, textarea::placeholder {
+  color: #8DA5B8;
+}
+
+.form-control:hover, .form-select:hover, textarea:hover {
+  border-color: var(--sky-300);
 }
 
 .form-control:focus, .form-select:focus, textarea:focus {
   outline: none;
-  border-color: var(--color-black);
+  border-color: var(--sky-500);
+  box-shadow: var(--focus-ring);
 }
 
 /* Flash Messages */
@@ -240,20 +330,31 @@ p {
   border-radius: var(--radius-sm);
   margin-bottom: 0.75rem;
   font-size: 0.875rem;
-  border: 1px solid var(--color-near-black);
+  border: 1px solid var(--sky-200);
   background-color: var(--color-white);
-  color: var(--color-black);
+  color: var(--sky-900);
 }
 
 .alert-success {
-  border-left: 4px solid var(--color-black);
+  border-left: 4px solid var(--sky-500);
+  background-color: var(--sky-50);
 }
 
 .alert-error {
-  border-left: 4px solid var(--color-black);
-  background-color: #FAF5F5;
+  border-left: 4px solid var(--color-danger);
+  border-color: #FECDCA;
+  background-color: var(--color-danger-bg);
+  color: #7A271A;
 }
 
-.alert-info, .alert-warning {
-  border-left: 4px solid var(--color-medium-grey);
+.alert-info {
+  border-left: 4px solid var(--sky-400);
+  background-color: var(--sky-50);
+}
+
+.alert-warning {
+  border-left: 4px solid var(--yellow-400);
+  border-color: var(--yellow-200);
+  background-color: var(--yellow-50);
+  color: #713F12;
 }

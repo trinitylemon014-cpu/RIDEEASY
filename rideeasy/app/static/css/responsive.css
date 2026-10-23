@@ -1,5 +1,5 @@
 /* RideEasy Responsive Breakpoints
-   Mobile-First Architecture */
+   Mobile-First Architecture · Sky Blue / White / Yellow */
 
 .mobile-menu-btn {
   display: none;
@@ -7,7 +7,12 @@
   border: none;
   padding: 0.5rem;
   cursor: pointer;
-  color: var(--color-black);
+  color: var(--sky-700);
+  border-radius: var(--radius-sm);
+}
+
+.mobile-menu-btn:hover {
+  background-color: var(--sky-50);
 }
 
 .mobile-nav-drawer {
@@ -49,7 +54,8 @@
     z-index: 49;
     flex-direction: column;
     gap: 1rem;
-    border-top: 1px solid var(--color-light-grey);
+    border-top: 3px solid var(--yellow-400);
+    box-shadow: var(--shadow-lg);
     overflow-y: auto;
   }
 
@@ -60,7 +66,17 @@
   .mobile-nav-drawer .nav-link {
     font-size: 1.125rem;
     padding: 0.75rem 0;
-    border-bottom: 1px solid var(--color-light-grey);
+    border-bottom: 1px solid var(--sky-100);
+  }
+
+  .mobile-nav-drawer .nav-link:hover,
+  .mobile-nav-drawer .nav-link.active {
+    color: var(--sky-700);
+    border-bottom-color: var(--sky-300);
+  }
+
+  .navbar {
+    border-top-width: 2px;
   }
 
   .category-selector-grid {
@@ -84,25 +100,6 @@
 
   .demo-role-bar {
     justify-content: center;
-  }
-
-  .ai-support-widget {
-    right: 0.75rem;
-    bottom: 0.75rem;
-  }
-
-  .ai-support-panel {
-    width: calc(100vw - 1.5rem);
-    height: min(590px, calc(100dvh - 6rem));
-    min-height: 300px;
-  }
-
-  .ai-support-toggle {
-    min-height: 48px;
-  }
-
-  .ai-send-label {
-    display: none;
   }
 }
 
