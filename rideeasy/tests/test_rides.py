@@ -20,7 +20,8 @@ def test_passenger_can_request_ride(client):
         "destination_address": "Entebbe International Airport (EBB)",
         "category": "ECONOMY",
         "payment_method": "MTN_MOMO",
-        "is_airport_ride": "1"
+        "is_airport_ride": "1",
+        "related_journey_id": ""
     }, follow_redirects=True)
     assert response.status_code == 200
     assert b"Ride requested successfully" in response.data

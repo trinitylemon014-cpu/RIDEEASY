@@ -376,7 +376,7 @@ def book_ride():
         category = request.form.get("category", "ECONOMY").upper()
         payment_method = request.form.get("payment_method", "CASH").upper()
         is_airport = 1 if request.form.get("is_airport_ride") == "1" else 0
-        related_journey_id = request.form.get("related_journey_id")
+        related_journey_id = request.form.get("related_journey_id", "").strip() or None
 
         if not pickup_address or not destination_address:
             flash("Please provide both pickup and destination locations.", "error")
