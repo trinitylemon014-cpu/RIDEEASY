@@ -1,10 +1,17 @@
 import os
 import sqlite3
 import logging
+import threading
+import concurrent.futures
 from typing import Any, Dict, List, Optional
 from app.config import Config
 
 logger = logging.getLogger("rideeasy.database")
+
+# Hard cap (seconds) on any single Turso request. Without this, a dead connection
+# makes the sync client wait forever and gunicorn kills the whole worker.
+_QUERY_TIMEOUT = float(os.getenv("DB_QUERY_TIMEOUT", "10"))
+_POOL = concurrent.futures.ThreadPoolExecutor(max_workers=16, thread_name_prefix="db")
 
 # Guard statement used when running atomic batches over Turso's HTTP transport.
 # changes() returns the row count of the most recent INSERT/UPDATE/DELETE in the batch.
@@ -70,6 +77,11 @@ class Database:
     By default libsql:// / wss:// / ws:// URLs are connected to over HTTPS, which avoids
     the WebSocket handshake failures (HTTP 400) seen with the legacy libsql-client.
     Set TURSO_TRANSPORT=websocket to force the WebSocket transport instead.
+
+    Resilience:
+    Every Turso request runs with a hard timeout (DB_QUERY_TIMEOUT, default 10s).
+    On timeout the client is discarded and recreated. Reads are retried once on a
+    fresh client; writes are NOT retried (a timed-out write may have been applied).
     """
     _instance = None
 
@@ -87,20 +99,60 @@ class Database:
             self.db_url and self.db_url.startswith(("libsql://", "https://", "ws://", "wss://"))
         )
         self._connect_url = self._resolve_connect_url(self.db_url) if self.is_turso else ""
+        self._client_lock = threading.Lock()
         self._libsql_client = None
 
         if self.is_turso:
             try:
-                import libsql_client
                 logger.info("Connecting to remote Turso libSQL database: %s", self._connect_url)
-                self._libsql_client = libsql_client.create_client_sync(
-                    url=self._connect_url,
-                    auth_token=self.auth_token
-                )
+                self._libsql_client = self._create_client()
                 logger.info("Turso client created.")
             except Exception as e:
                 logger.error("Failed to connect to configured Turso database: %s", e)
                 raise RuntimeError("Configured Turso database is unavailable; refusing local fallback.") from e
+
+    # ------------------------------------------------------------------
+    # Turso client management
+    # ------------------------------------------------------------------
+    def _create_client(self):
+        import libsql_client
+        return libsql_client.create_client_sync(
+            url=self._connect_url,
+            auth_token=self.auth_token
+        )
+
+    @staticmethod
+    def _safe_close(client) -> None:
+        try:
+            client.close()
+        except Exception:
+            pass
+
+    def _reset_client(self, failed_client) -> None:
+        """Replace a client that stopped responding (only once, even if many threads time out)."""
+        with self._client_lock:
+            if self._libsql_client is not failed_client:
+                return  # another thread already replaced it
+            logger.warning("Turso request timed out; recreating client.")
+            self._libsql_client = self._create_client()
+        # Close the old client off-thread so a hung close() can't block requests.
+        threading.Thread(target=self._safe_close, args=(failed_client,), daemon=True).start()
+
+    def _turso(self, method: str, *args, retry: bool = False):
+        """
+        Call a libsql client method with a hard timeout.
+        Retries once on a fresh client only when retry=True (reads).
+        """
+        attempts = 2 if retry else 1
+        for attempt in range(attempts):
+            client = self._libsql_client
+            future = _POOL.submit(getattr(client, method), *args)
+            try:
+                return future.result(timeout=_QUERY_TIMEOUT)
+            except concurrent.futures.TimeoutError:
+                self._reset_client(client)
+                if attempt == attempts - 1:
+                    raise RuntimeError("Database request timed out") from None
 
     @staticmethod
     def _resolve_connect_url(url: str) -> str:
@@ -144,7 +196,8 @@ class Database:
         """Executes INSERT/UPDATE/DELETE query and returns rowcount or 1."""
         _invalidate_request_cache()
         if self.is_turso and self._libsql_client:
-            rs = self._libsql_client.execute(query, list(params))
+            # No retry for writes: a timed-out write may already have been applied.
+            rs = self._turso("execute", query, list(params))
             return rs.rows_affected if hasattr(rs, "rows_affected") else 1
         else:
             with self._get_sqlite_conn() as conn:
@@ -175,7 +228,7 @@ class Database:
                 statements.append(libsql_client.Statement(_PRECONDITION_SQL, [int(operation[2])]))
 
         try:
-            results = self._libsql_client.batch(statements)
+            results = self._turso("batch", statements)
         except Exception as e:
             if "malformed json" in str(e).lower():
                 raise RuntimeError(_PRECONDITION_MESSAGE) from e
@@ -223,7 +276,7 @@ class Database:
     def fetchone(self, query: str, params: tuple = ()) -> Optional[Dict[str, Any]]:
         """Executes SELECT query and returns a single row as a dictionary."""
         if self.is_turso and self._libsql_client:
-            rs = self._libsql_client.execute(query, list(params))
+            rs = self._turso("execute", query, list(params), retry=True)
             if not rs.rows:
                 return None
             columns = rs.columns
@@ -238,7 +291,7 @@ class Database:
     def fetchall(self, query: str, params: tuple = ()) -> List[Dict[str, Any]]:
         """Executes SELECT query and returns all matching rows as a list of dictionaries."""
         if self.is_turso and self._libsql_client:
-            rs = self._libsql_client.execute(query, list(params))
+            rs = self._turso("execute", query, list(params), retry=True)
             columns = rs.columns
             return [{columns[i]: r[i] for i in range(len(columns))} for r in rs.rows]
         else:
@@ -266,7 +319,7 @@ class Database:
             # Execute statements one by one for Turso libSQL
             # (splitter is trigger- and string-literal-aware)
             for statement in split_sql_statements(sql_script):
-                self._libsql_client.execute(statement)
+                self._turso("execute", statement)
         else:
             with self._get_sqlite_conn() as conn:
                 conn.executescript(sql_script)
