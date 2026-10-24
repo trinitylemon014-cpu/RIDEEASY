@@ -1,3 +1,4 @@
+import math
 import time
 from collections import defaultdict, deque
 
@@ -19,16 +20,25 @@ AUTOCOMPLETE_MAX_PER_MINUTE = 45
 _autocomplete_hits = defaultdict(deque)
 
 
-def _autocomplete_rate_limited():
+REVERSE_MAX_PER_MINUTE = 10
+_reverse_hits = defaultdict(deque)
+
+
+def _throttled(store, limit):
     who = session.get("user_id") or request.remote_addr or "anonymous"
     now = time.monotonic()
-    hits = _autocomplete_hits[who]
+    hits = store[who]
     while hits and now - hits[0] > 60:
         hits.popleft()
-    if len(hits) >= AUTOCOMPLETE_MAX_PER_MINUTE:
+    if len(hits) >= limit:
         return True
     hits.append(now)
     return False
+
+
+def _autocomplete_rate_limited():
+    return _throttled(_autocomplete_hits, AUTOCOMPLETE_MAX_PER_MINUTE)
+
 
 @api_bp.route("/estimate-fare", methods=["POST"])
 def estimate_fare():
@@ -80,6 +90,29 @@ def places_autocomplete():
     except LocationIQRequestError:
         return jsonify({"success": False, "error": "Place search is unavailable.", "suggestions": []}), 502
     return jsonify({"success": True, "suggestions": suggestions})
+
+
+@api_bp.route("/places/reverse")
+@login_required
+@role_required("PASSENGER", "DRIVER", "SCHOOL", "ADMIN")
+def places_reverse():
+    """Name the place at the user's device location (used by 'Use my current location')."""
+    try:
+        lat = float(request.args.get("lat", ""))
+        lng = float(request.args.get("lng", ""))
+    except (TypeError, ValueError):
+        return jsonify({"success": False, "error": "A valid location is required."}), 400
+    if not (math.isfinite(lat) and math.isfinite(lng) and -90 <= lat <= 90 and -180 <= lng <= 180):
+        return jsonify({"success": False, "error": "A valid location is required."}), 400
+    if _throttled(_reverse_hits, REVERSE_MAX_PER_MINUTE):
+        return jsonify({"success": False, "error": "Too many requests. Please wait a moment."}), 429
+    try:
+        place = LocationService.reverse_geocode(lat, lng)
+    except LocationIQConfigurationError:
+        return jsonify({"success": False, "error": "Place search is not configured."}), 503
+    except LocationIQRequestError:
+        return jsonify({"success": False, "error": "Place search is unavailable."}), 502
+    return jsonify({"success": True, "place": place})
 
 
 @api_bp.route("/route", methods=["POST"])
