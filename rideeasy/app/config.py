@@ -18,6 +18,9 @@ class Config:
     TURSO_AUTH_TOKEN = os.getenv("TURSO_AUTH_TOKEN", "").strip()
     LOCAL_DB_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "rideeasy.db")
 
+    # Largest request body Flask will accept (3 car photos of up to 8 MB each, plus form fields)
+    MAX_CONTENT_LENGTH = 26 * 1024 * 1024
+
     # Session & Security Configuration
     SESSION_COOKIE_HTTPONLY = True
     SESSION_COOKIE_SAMESITE = "Lax"
