@@ -20,7 +20,8 @@ def before_request():
 
 def get_school_requests(school_id):
     return get_db().fetchall(
-        """SELECT r.*, u.full_name as driver_name, u.phone as driver_phone,
+        """SELECT r.*, u.full_name as driver_name, u.avatar_url as driver_avatar_url,
+                  u.phone as driver_phone,
                   v.plate_number, v.make, v.model, v.category as vehicle_category
         FROM school_transport_requests r
         LEFT JOIN users u ON r.assigned_driver_id = u.id
@@ -177,7 +178,8 @@ def request_detail(request_id):
     user = AuthService.get_current_user()
     db = get_db()
     req_item = db.fetchone(
-        """SELECT r.*, u.full_name as driver_name, u.phone as driver_phone, 
+        """SELECT r.*, u.full_name as driver_name, u.avatar_url as driver_avatar_url,
+                  u.phone as driver_phone,
                   v.plate_number, v.make, v.model, v.capacity as vehicle_capacity,
                   s.school_name, s.contact_person, s.phone as school_phone
         FROM school_transport_requests r

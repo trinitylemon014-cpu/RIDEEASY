@@ -11,6 +11,7 @@ import re
 from PIL import Image, ImageOps, UnidentifiedImageError
 
 from app.repositories.database import get_db
+from app.services.cloudinary_service import CloudinaryService
 
 SLOTS = ("FRONT", "SIDE", "BACK")
 
@@ -53,12 +54,12 @@ class PhotoError(ValueError):
 class VehiclePhotoService:
     # ------------------------------------------------------------------ images
     @staticmethod
-    def process_image(raw):
+    def process_image(raw, max_upload_bytes=MAX_UPLOAD_BYTES, min_edge_px=MIN_EDGE_PX):
         """Validate an uploaded image and return clean, resized JPEG bytes."""
         if not raw:
             raise PhotoError("The file is empty.")
-        if len(raw) > MAX_UPLOAD_BYTES:
-            raise PhotoError("The photo is larger than 8 MB.")
+        if len(raw) > max_upload_bytes:
+            raise PhotoError(f"The photo is larger than {max_upload_bytes // (1024 * 1024)} MB.")
         try:
             image = Image.open(io.BytesIO(raw))
             detected_format = image.format
@@ -69,8 +70,8 @@ class VehiclePhotoService:
             raise PhotoError("Use a JPG, PNG or WebP photo.")
         if width * height > MAX_PIXELS:
             raise PhotoError("The photo has too many pixels. Take it again at a lower resolution.")
-        if min(width, height) < MIN_EDGE_PX:
-            raise PhotoError("The photo is too small. Use one at least 400 pixels on each side.")
+        if min(width, height) < min_edge_px:
+            raise PhotoError(f"The photo is too small. Use one at least {min_edge_px} pixels on each side.")
         try:
             image.load()
             image = ImageOps.exif_transpose(image)
@@ -94,15 +95,27 @@ class VehiclePhotoService:
     def save_photo(vehicle_id, slot, jpeg_bytes):
         if slot not in SLOTS:
             raise PhotoError("Unknown photo position.")
+        cloud_image = CloudinaryService.upload(
+            jpeg_bytes,
+            folder=f"rideeasy/vehicles/{vehicle_id}",
+            public_id=slot.lower(),
+        )
         get_db().execute(
-            """INSERT INTO vehicle_photos (vehicle_id, slot, mime_type, image_data, byte_size, updated_at)
-               VALUES (?, ?, 'image/jpeg', ?, ?, CURRENT_TIMESTAMP)
+            """INSERT INTO vehicle_photos
+               (vehicle_id, slot, mime_type, image_data, byte_size,
+                cloudinary_public_id, cloudinary_url, updated_at)
+               VALUES (?, ?, 'image/jpeg', '', ?, ?, ?, CURRENT_TIMESTAMP)
                ON CONFLICT(vehicle_id, slot) DO UPDATE SET
                    mime_type = excluded.mime_type,
-                   image_data = excluded.image_data,
+                   image_data = '',
                    byte_size = excluded.byte_size,
+                   cloudinary_public_id = excluded.cloudinary_public_id,
+                   cloudinary_url = excluded.cloudinary_url,
                    updated_at = CURRENT_TIMESTAMP""",
-            (vehicle_id, slot, base64.b64encode(jpeg_bytes).decode("ascii"), len(jpeg_bytes)),
+            (
+                vehicle_id, slot, len(jpeg_bytes),
+                cloud_image["public_id"], cloud_image["secure_url"],
+            ),
         )
 
     @staticmethod
@@ -110,11 +123,14 @@ class VehiclePhotoService:
         if slot not in SLOTS:
             return None
         row = get_db().fetchone(
-            "SELECT mime_type, image_data FROM vehicle_photos WHERE vehicle_id = ? AND slot = ?",
+            """SELECT mime_type, image_data, cloudinary_url
+               FROM vehicle_photos WHERE vehicle_id = ? AND slot = ?""",
             (vehicle_id, slot),
         )
         if not row:
             return None
+        if row.get("cloudinary_url"):
+            return CloudinaryService.fetch(row["cloudinary_url"])
         try:
             return {"mime_type": row["mime_type"], "data": base64.b64decode(row["image_data"])}
         except (ValueError, TypeError):
@@ -124,9 +140,16 @@ class VehiclePhotoService:
     def delete_photo(vehicle_id, slot):
         if slot not in SLOTS:
             return 0
-        return get_db().execute(
+        row = get_db().fetchone(
+            "SELECT cloudinary_public_id FROM vehicle_photos WHERE vehicle_id = ? AND slot = ?",
+            (vehicle_id, slot),
+        )
+        deleted = get_db().execute(
             "DELETE FROM vehicle_photos WHERE vehicle_id = ? AND slot = ?", (vehicle_id, slot)
         )
+        if deleted and row and row.get("cloudinary_public_id"):
+            CloudinaryService.delete(row["cloudinary_public_id"])
+        return deleted
 
     @staticmethod
     def photo_status(vehicle_id):

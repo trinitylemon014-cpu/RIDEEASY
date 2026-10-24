@@ -34,7 +34,8 @@ def dashboard():
     }
 
     recent_rides = db.fetchall(
-        """SELECT r.*, p.full_name as passenger_name, d.full_name as driver_name
+        """SELECT r.*, p.full_name as passenger_name, p.avatar_url as passenger_avatar_url,
+                  d.full_name as driver_name, d.avatar_url as driver_avatar_url
         FROM rides r
         JOIN users p ON r.passenger_id = p.id
         LEFT JOIN users d ON r.driver_id = d.id
@@ -42,7 +43,7 @@ def dashboard():
     )
 
     recent_audit_logs = db.fetchall(
-        """SELECT a.*, u.full_name as user_name, u.role
+        """SELECT a.*, u.full_name as user_name, u.avatar_url as user_avatar_url, u.role
         FROM audit_logs a
         LEFT JOIN users u ON a.user_id = u.id
         ORDER BY a.created_at DESC LIMIT 6"""
@@ -97,7 +98,8 @@ def schools():
     db = get_db()
     requests_list = db.fetchall(
         """SELECT r.*, s.school_name, s.contact_person, s.phone as school_phone,
-                  u.full_name as assigned_driver_name, v.plate_number as assigned_vehicle_plate
+                  u.full_name as assigned_driver_name, u.avatar_url as assigned_driver_avatar_url,
+                  v.plate_number as assigned_vehicle_plate
         FROM school_transport_requests r
         JOIN schools s ON r.school_id = s.user_id
         LEFT JOIN users u ON r.assigned_driver_id = u.id
@@ -144,7 +146,8 @@ def flights():
     user = AuthService.get_current_user()
     db = get_db()
     requests_list = db.fetchall(
-        """SELECT r.*, u.full_name as passenger_name, u.phone as passenger_phone, c.company_name as assigned_company_name
+        """SELECT r.*, u.full_name as passenger_name, u.avatar_url as passenger_avatar_url,
+                  u.phone as passenger_phone, c.company_name as assigned_company_name
         FROM flight_requests r
         JOIN users u ON r.passenger_id = u.id
         LEFT JOIN travel_companies c ON r.assigned_company_id = c.user_id
@@ -199,7 +202,8 @@ def audit_logs():
     user = AuthService.get_current_user()
     db = get_db()
     logs = db.fetchall(
-        """SELECT a.*, u.full_name as user_name, u.email as user_email, u.role
+        """SELECT a.*, u.full_name as user_name, u.avatar_url as user_avatar_url,
+                  u.email as user_email, u.role
         FROM audit_logs a
         LEFT JOIN users u ON a.user_id = u.id
         ORDER BY a.created_at DESC LIMIT 50"""
@@ -252,7 +256,8 @@ def payments():
     ledger = db.fetchall(
         """SELECT l.*, p.reference, p.amount_ugx AS gross_amount_ugx, p.payer_name,
                   COALESCE(p.paid_at, p.created_at) AS payment_date, r.id AS ride_id,
-                  passenger.full_name AS passenger_name, driver.full_name AS driver_name
+                  passenger.full_name AS passenger_name, passenger.avatar_url AS passenger_avatar_url,
+                  driver.full_name AS driver_name, driver.avatar_url AS driver_avatar_url
            FROM payment_ledger l
            JOIN payment_transactions p ON p.id = l.payment_id
            JOIN rides r ON r.id = p.ride_id

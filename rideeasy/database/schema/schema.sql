@@ -14,6 +14,7 @@ CREATE TABLE IF NOT EXISTS users (
     is_active INTEGER NOT NULL DEFAULT 1,
     is_verified INTEGER NOT NULL DEFAULT 0,
     avatar_url TEXT DEFAULT '/static/images/default-avatar.svg',
+    avatar_cloudinary_public_id TEXT,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
@@ -63,12 +64,14 @@ CREATE TABLE IF NOT EXISTS vehicles (
 );
 
 -- Photos a driver uploads so passengers can recognise the exact car that is arriving.
--- Images are re-encoded JPEGs stored base64-encoded (works on Turso and ephemeral hosts).
+-- New images are held in Cloudinary; image_data remains for existing stored photos.
 CREATE TABLE IF NOT EXISTS vehicle_photos (
     vehicle_id TEXT NOT NULL,
     slot TEXT NOT NULL CHECK(slot IN ('FRONT', 'SIDE', 'BACK')),
     mime_type TEXT NOT NULL DEFAULT 'image/jpeg',
-    image_data TEXT NOT NULL,
+    image_data TEXT NOT NULL DEFAULT '',
+    cloudinary_public_id TEXT,
+    cloudinary_url TEXT,
     byte_size INTEGER NOT NULL DEFAULT 0,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (vehicle_id, slot),

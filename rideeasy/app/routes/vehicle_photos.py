@@ -1,10 +1,11 @@
 import secrets
 
-from flask import Blueprint, Response, abort, flash, jsonify, redirect, render_template, request, session, url_for
+from flask import Blueprint, Response, abort, current_app, flash, jsonify, redirect, render_template, request, session, url_for
 from werkzeug.exceptions import RequestEntityTooLarge
 
 from app.repositories.database import get_db
 from app.services.auth_service import AuthService, login_required, role_required
+from app.services.cloudinary_service import CloudinaryError
 from app.services.vehicle_photo_service import (
     MAX_UPLOAD_BYTES,
     SLOT_INFO,
@@ -89,6 +90,9 @@ def manage():
             saved.append(label)
         except PhotoError as error:
             errors.append(f"{label} photo: {error}")
+        except CloudinaryError as error:
+            current_app.logger.warning("Vehicle photo upload failed for vehicle %s: %s", vehicle["id"], error)
+            errors.append(f"{label} photo could not be saved to cloud storage. Please try again.")
 
     if not saved and not errors:
         return _reply(False, "Choose at least one photo to upload.", 400, flash_it=False)
@@ -124,7 +128,12 @@ def delete(slot):
     vehicle = _driver_vehicle(user["id"])
     if not vehicle:
         abort(404)
-    VehiclePhotoService.delete_photo(vehicle["id"], slot)
+    try:
+        VehiclePhotoService.delete_photo(vehicle["id"], slot)
+    except CloudinaryError as error:
+        current_app.logger.warning("Vehicle photo cleanup failed for vehicle %s: %s", vehicle["id"], error)
+        flash("The photo was removed from your profile, but cloud cleanup could not be confirmed.", "warning")
+        return redirect(url_for("vehicle_photos.manage"))
     flash(f"Removed your {SLOT_INFO[slot]['label'].lower()} photo.", "info")
     return redirect(url_for("vehicle_photos.manage"))
 
@@ -158,7 +167,11 @@ def serve(vehicle_id, slot):
     # 404 (not 403) so the URL does not reveal whether a vehicle exists.
     if not vehicle or not _can_view(vehicle):
         abort(404)
-    photo = VehiclePhotoService.get_photo(vehicle_id, slot)
+    try:
+        photo = VehiclePhotoService.get_photo(vehicle_id, slot)
+    except CloudinaryError as error:
+        current_app.logger.warning("Vehicle photo retrieval failed for vehicle %s: %s", vehicle_id, error)
+        abort(502)
     if not photo:
         abort(404)
     response = Response(photo["data"], mimetype=photo["mime_type"])

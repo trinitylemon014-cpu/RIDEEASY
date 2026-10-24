@@ -210,7 +210,7 @@ def dashboard():
     }
     recent_rides = db.fetchall(
         """SELECT r.id, r.pickup_address, r.destination_address, r.status, r.created_at,
-                  u.full_name as driver_name
+                  u.full_name as driver_name, u.avatar_url as driver_avatar_url
         FROM rides r
         LEFT JOIN users u ON r.driver_id = u.id
         WHERE r.passenger_id = ?
@@ -612,6 +612,7 @@ def rides_list():
     search_query = request.args.get("q", "").strip()
     rides = db.fetchall(
         """SELECT r.*, u.full_name as driver_name, u.phone as driver_phone,
+                  u.avatar_url as driver_avatar_url,
                   v.plate_number, v.make, v.model, rr.rating as user_rating, rr.review as user_review
         FROM rides r
         LEFT JOIN users u ON r.driver_id = u.id
@@ -672,7 +673,8 @@ def ride_detail(ride_id):
     user = AuthService.get_current_user()
     db = get_db()
     ride = db.fetchone(
-        """SELECT r.*, u.full_name as driver_name, u.phone as driver_phone, 
+        """SELECT r.*, u.full_name as driver_name, u.phone as driver_phone,
+                  u.avatar_url as driver_avatar_url,
                   d.rating_avg as driver_rating, v.id as vehicle_id, v.year as vehicle_year,
                   v.plate_number, v.make, v.model, v.color
         FROM rides r
@@ -858,7 +860,7 @@ def receipt(ride_id):
     driver = None
     if ride["driver_id"]:
         driver = db.fetchone(
-            """SELECT u.full_name, v.plate_number, v.make, v.model 
+            """SELECT u.full_name, u.avatar_url, v.plate_number, v.make, v.model 
             FROM users u LEFT JOIN vehicles v ON v.driver_id = u.id 
             WHERE u.id = ?""",
             (ride["driver_id"],)

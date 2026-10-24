@@ -1,0 +1,19 @@
+{% macro avatar(url, name, size=36) -%}
+  <img
+    src="{{ url or '/static/images/default-avatar.svg' }}"
+    alt="{{ name }} profile photo"
+    width="{{ size }}"
+    height="{{ size }}"
+    loading="lazy"
+    referrerpolicy="no-referrer"
+    onerror="this.onerror=null;this.src='/static/images/default-avatar.svg'"
+    style="width: {{ size }}px; height: {{ size }}px; border-radius: 50%; object-fit: cover; flex: 0 0 {{ size }}px; background: var(--color-off-white); border: 1px solid var(--color-light-grey);"
+  >
+{%- endmacro %}
+
+{% macro identity(url, name, size=36) -%}
+  <span style="display: inline-flex; align-items: center; gap: 0.55rem; min-width: 0; vertical-align: middle;">
+    {{ avatar(url, name, size) }}
+    <span>{{ name }}</span>
+  </span>
+{%- endmacro %}

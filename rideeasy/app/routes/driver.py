@@ -115,7 +115,7 @@ def dashboard():
     active_ride = None
     if profile and profile["is_online"] and profile["verification_status"] == "APPROVED":
         pending_rides = db.fetchall(
-            """SELECT r.*, u.full_name AS passenger_name,
+            """SELECT r.*, u.full_name AS passenger_name, u.avatar_url AS passenger_avatar_url,
                       o.expires_at
                FROM rides r
                JOIN users u ON u.id = r.passenger_id
@@ -127,7 +127,8 @@ def dashboard():
             (user["id"],)
         )
     active_ride = db.fetchone(
-        """SELECT r.*, u.full_name AS passenger_name, u.phone AS passenger_phone
+        """SELECT r.*, u.full_name AS passenger_name, u.phone AS passenger_phone,
+                  u.avatar_url AS passenger_avatar_url
            FROM rides r
            JOIN users u ON u.id = r.passenger_id
            WHERE r.driver_id = ? AND r.status NOT IN ('COMPLETED', 'CANCELLED')
@@ -233,7 +234,7 @@ def requests_list():
     pending_rides = []
     if profile and profile["is_online"] and profile["verification_status"] == "APPROVED":
         pending_rides = db.fetchall(
-            """SELECT r.*, u.full_name as passenger_name,
+            """SELECT r.*, u.full_name as passenger_name, u.avatar_url as passenger_avatar_url,
                       o.expires_at
             FROM rides r
             JOIN users u ON r.passenger_id = u.id
@@ -280,7 +281,8 @@ def api_pending_offers():
 def active_ride():
     user = AuthService.get_current_user()
     ride = get_db().fetchone(
-        """SELECT r.*, u.full_name as passenger_name, u.phone as passenger_phone
+        """SELECT r.*, u.full_name as passenger_name, u.phone as passenger_phone,
+                  u.avatar_url as passenger_avatar_url
         FROM rides r
         JOIN users u ON r.passenger_id = u.id
         WHERE r.driver_id = ? AND r.status NOT IN ('COMPLETED', 'CANCELLED')

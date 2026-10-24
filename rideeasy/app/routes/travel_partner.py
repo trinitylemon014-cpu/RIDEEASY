@@ -22,7 +22,8 @@ def dashboard():
 
     # Assigned flight requests
     assigned_requests = db.fetchall(
-        """SELECT r.*, u.full_name as passenger_name, u.phone as passenger_phone, u.email as passenger_email
+        """SELECT r.*, u.full_name as passenger_name, u.avatar_url as passenger_avatar_url,
+                  u.phone as passenger_phone, u.email as passenger_email
         FROM flight_requests r
         JOIN users u ON r.passenger_id = u.id
         WHERE r.assigned_company_id = ?
@@ -32,7 +33,8 @@ def dashboard():
 
     # Confirmed bookings recorded by this travel agency
     confirmed_bookings = db.fetchall(
-        """SELECT b.*, r.departure_city, r.destination_city, u.full_name as passenger_name
+        """SELECT b.*, r.departure_city, r.destination_city, u.full_name as passenger_name,
+                  u.avatar_url as passenger_avatar_url
         FROM flight_bookings b
         JOIN flight_requests r ON b.request_id = r.id
         JOIN users u ON r.passenger_id = u.id
@@ -54,7 +56,8 @@ def request_detail(request_id):
     user = AuthService.get_current_user()
     db = get_db()
     req_item = db.fetchone(
-        """SELECT r.*, u.full_name as passenger_name, u.phone as passenger_phone, u.email as passenger_email
+        """SELECT r.*, u.full_name as passenger_name, u.avatar_url as passenger_avatar_url,
+                  u.phone as passenger_phone, u.email as passenger_email
         FROM flight_requests r
         JOIN users u ON r.passenger_id = u.id
         WHERE r.id = ? AND (r.assigned_company_id = ? OR ? = 'ADMIN')""",

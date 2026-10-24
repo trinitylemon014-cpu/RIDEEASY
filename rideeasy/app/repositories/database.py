@@ -149,7 +149,10 @@ class Database:
             ("rewards_redemptions", "ride_id", "TEXT"),
             ("rides", "driver_response_status", "TEXT NOT NULL DEFAULT 'ACCEPTED' CHECK(driver_response_status IN ('PENDING', 'ACCEPTED', 'DECLINED'))"),
             ("rides", "submission_key", "TEXT"),
-            ("rides", "estimated_duration_minutes", "REAL")
+            ("rides", "estimated_duration_minutes", "REAL"),
+            ("users", "avatar_cloudinary_public_id", "TEXT"),
+            ("vehicle_photos", "cloudinary_public_id", "TEXT"),
+            ("vehicle_photos", "cloudinary_url", "TEXT")
         ):
             columns = self.fetchall(f"PRAGMA table_info({table})")
             if not any(item["name"] == column for item in columns):
