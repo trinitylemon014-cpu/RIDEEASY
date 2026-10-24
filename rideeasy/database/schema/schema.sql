@@ -36,6 +36,7 @@ CREATE TABLE IF NOT EXISTS driver_profiles (
     license_number TEXT NOT NULL,
     national_id_nin TEXT NOT NULL,
     years_experience INTEGER DEFAULT 1,
+    date_of_birth TEXT,
     verification_status TEXT NOT NULL DEFAULT 'PENDING' CHECK(verification_status IN ('PENDING', 'APPROVED', 'REJECTED')),
     is_online INTEGER NOT NULL DEFAULT 0,
     current_lat REAL,
