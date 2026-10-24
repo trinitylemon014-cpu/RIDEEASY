@@ -86,26 +86,33 @@ def register():
         pw_hash = generate_password_hash(password)
         is_verified = 1 if role == "PASSENGER" else 0
 
-        db.execute(
+        # Create the user and the role-specific profile in ONE atomic round trip.
+        operations = [(
             "INSERT INTO users (id, email, password_hash, role, full_name, phone, is_active, is_verified) VALUES (?, ?, ?, ?, ?, ?, 1, ?)",
             (user_id, email, pw_hash, role, full_name, phone, is_verified)
-        )
-
-        # Create role-specific profile
+        )]
         if role == "PASSENGER":
-            db.execute("INSERT INTO passenger_profiles (user_id) VALUES (?)", (user_id,))
+            operations.append(("INSERT INTO passenger_profiles (user_id) VALUES (?)", (user_id,)))
         elif role == "DRIVER":
-            db.execute(
+            operations.append((
                 "INSERT INTO driver_profiles (user_id, license_number, national_id_nin, verification_status) VALUES (?, 'PENDING', 'PENDING', 'PENDING')",
                 (user_id,)
-            )
+            ))
         elif role == "SCHOOL":
-            db.execute(
+            operations.append((
                 "INSERT INTO schools (user_id, school_name, registration_number, contact_person, phone, email, address, district, verification_status) VALUES (?, ?, 'PENDING', ?, ?, ?, 'Kampala', 'Kampala', 'PENDING')",
                 (user_id, full_name, full_name, phone, email)
-            )
+            ))
 
-        new_user = db.fetchone("SELECT * FROM users WHERE id = ?", (user_id,))
+        try:
+            db.execute_transaction(operations)
+        except Exception:
+            current_app.logger.exception("Registration failed for %s", email)
+            flash("We could not create your account. Please try again.", "error")
+            return render_template("auth/register.html")
+
+        # login_user() only needs these fields, so there is no need to re-read the row.
+        new_user = {"id": user_id, "email": email, "role": role, "full_name": full_name}
         AuthService.login_user(new_user)
         flash(f"Account registered successfully as {role.capitalize()}.", "success")
         return redirect_to_dashboard(role)
