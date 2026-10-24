@@ -64,24 +64,12 @@
         <form id="ride-booking-form" class="card" onsubmit="event.preventDefault(); window.location.href='/passenger/book-ride?pickup=' + encodeURIComponent(document.getElementById('pickup_address').value) + '&destination=' + encodeURIComponent(document.getElementById('destination_address').value);">
           <div class="form-group">
             <label class="form-label" for="pickup_address">Pickup Point</label>
-            <input type="text" id="pickup_address" class="form-control" placeholder="e.g. Acacia Mall, Kololo, Kampala" value="Acacia Mall, Kisementi, Kololo" required>
-            <div style="margin-top: 0.5rem; display: flex; gap: 0.35rem; flex-wrap: wrap;">
-              <span style="font-size: 0.75rem; color: var(--color-medium-grey); align-self: center;">Quick fill:</span>
-              <button type="button" class="btn btn-secondary btn-sm" data-set-pickup data-place="Acacia Mall, Kisementi, Kololo">Acacia Mall</button>
-              <button type="button" class="btn btn-secondary btn-sm" data-set-pickup data-place="Victoria Towers, Nakasero Road">Victoria Towers</button>
-              <button type="button" class="btn btn-secondary btn-sm" data-set-pickup data-place="Kampala City Centre (Posta Uganda)">Posta Kampala</button>
-            </div>
+            <input type="text" id="pickup_address" class="form-control" placeholder="Search any address or place in Uganda" maxlength="300" autocomplete="off" required>
           </div>
 
           <div class="form-group">
             <label class="form-label" for="destination_address">Destination</label>
-            <input type="text" id="destination_address" class="form-control" placeholder="e.g. Entebbe International Airport (EBB)" value="Entebbe International Airport (EBB)" required>
-            <div style="margin-top: 0.5rem; display: flex; gap: 0.35rem; flex-wrap: wrap;">
-              <span style="font-size: 0.75rem; color: var(--color-medium-grey); align-self: center;">Quick fill:</span>
-              <button type="button" class="btn btn-secondary btn-sm" data-set-pickup data-target="destination" data-place="Entebbe International Airport (EBB)">Entebbe Airport (EBB)</button>
-              <button type="button" class="btn btn-secondary btn-sm" data-set-pickup data-target="destination" data-place="Garden City Mall, Yusuf Lule Road">Garden City</button>
-              <button type="button" class="btn btn-secondary btn-sm" data-set-pickup data-target="destination" data-place="Makerere University Main Gate">Makerere Gate</button>
-            </div>
+            <input type="text" id="destination_address" class="form-control" placeholder="Search any address or place in Uganda" maxlength="300" autocomplete="off" required>
           </div>
 
           <div class="form-group">
@@ -124,8 +112,8 @@
           <div style="background-color: var(--color-off-white); border: 1px solid var(--color-light-grey); border-radius: var(--radius-sm); padding: 1.25rem; margin-bottom: 1.25rem; display: flex; align-items: center; justify-content: space-between;">
             <div>
               <div style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: var(--color-medium-grey);">Estimated Fare</div>
-              <div id="estimated-fare-display" style="font-size: 1.75rem; font-weight: 800; color: var(--color-black);">UGX 85,000</div>
-              <div id="estimated-distance-display" style="font-size: 0.8125rem; color: var(--color-dark-grey);">42.5 km (estimated)</div>
+              <div id="estimated-fare-display" style="font-size: 1.75rem; font-weight: 800; color: var(--color-black);">UGX --</div>
+              <div id="estimated-distance-display" style="font-size: 0.8125rem; color: var(--color-dark-grey);" aria-live="polite">Choose pickup and destination locations.</div>
             </div>
             <button type="submit" class="btn btn-primary">Proceed to Book</button>
           </div>

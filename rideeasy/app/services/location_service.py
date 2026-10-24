@@ -214,12 +214,8 @@ class LocationService:
 
     @classmethod
     def geocode(cls, address):
-        # Prefer results inside the countries RideEasy serves (default: Uganda) so a
-        # place name is not matched to a same-named place on another continent.
         country_codes = cls._country_codes()
         results = cls._search(address, country_codes)
-        if (not isinstance(results, list) or not results) and country_codes:
-            results = cls._search(address)
         if not isinstance(results, list) or not results:
             raise LocationIQNoResultsError(f"No location found for “{address}”.")
 

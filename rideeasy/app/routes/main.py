@@ -1,17 +1,13 @@
-from flask import Blueprint, render_template, request, redirect, url_for, flash, session
+from flask import Blueprint, render_template
 from app.repositories.database import get_db
 from app.services.auth_service import AuthService
-from app.services.pricing_service import MapService, PricingService
 
 main_bp = Blueprint("main", __name__)
 
 @main_bp.route("/")
 def index():
     user = AuthService.get_current_user()
-    db = get_db()
-    pricing = db.fetchall("SELECT * FROM pricing_configs")
-    landmarks = MapService.LANDMARKS
-    return render_template("index.html", user=user, pricing=pricing, landmarks=landmarks)
+    return render_template("index.html", user=user)
 
 @main_bp.route("/about")
 def about():

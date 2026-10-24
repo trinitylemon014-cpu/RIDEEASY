@@ -1,11 +1,17 @@
 import uuid
 from datetime import datetime, timedelta
-from flask import Blueprint, render_template, request, redirect, url_for, flash, session, jsonify, abort
+from flask import Blueprint, current_app, render_template, request, redirect, url_for, flash, session, jsonify, abort
 from app.repositories.database import get_db
 from app.services.auth_service import login_required, role_required, AuthService
-from app.services.pricing_service import MapService, PricingService
+from app.services.pricing_service import PricingService
 from app.services.payment_service import PaymentService
 from app.services.notification_service import NotificationService
+from app.services.location_service import (
+    LocationIQConfigurationError,
+    LocationIQNoResultsError,
+    LocationIQRequestError,
+    LocationService,
+)
 
 passenger_bp = Blueprint("passenger", __name__, url_prefix="/passenger")
 
@@ -330,7 +336,6 @@ def rewards():
 def book_ride():
     user = AuthService.get_current_user()
     db = get_db()
-    landmarks = MapService.LANDMARKS
     eligible_rewards = db.fetchall(
         """SELECT id, reward_title, voucher_code, discount_percent, discount_ugx
            FROM rewards_redemptions
@@ -340,6 +345,23 @@ def book_ride():
            ORDER BY created_at DESC""",
         (user["id"],)
     )
+    saved_routes = db.fetchall(
+        "SELECT * FROM saved_routes WHERE passenger_id = ? ORDER BY created_at DESC",
+        (user["id"],)
+    )
+
+    def render_booking_form():
+        return render_template(
+            "passenger/book_ride.html",
+            user=user,
+            saved_routes=saved_routes,
+            pre_pickup=request.form.get("pickup_address", request.args.get("pickup", "")),
+            pre_destination=request.form.get("destination_address", request.args.get("destination", "")),
+            pre_category=request.form.get("category", request.args.get("category", "ECONOMY")).upper(),
+            is_airport=request.form.get("is_airport_ride", request.args.get("is_airport", "0")),
+            journey_id=request.form.get("related_journey_id", request.args.get("journey_id", "")),
+            eligible_rewards=eligible_rewards,
+        )
 
     if request.method == "POST":
         pickup_address = request.form.get("pickup_address", "").strip()
@@ -351,29 +373,41 @@ def book_ride():
 
         if not pickup_address or not destination_address:
             flash("Please provide both pickup and destination locations.", "error")
-            return render_template(
-                "passenger/book_ride.html", user=user, landmarks=landmarks,
-                eligible_rewards=eligible_rewards
-            )
+            return render_booking_form()
+        if len(pickup_address) > 300 or len(destination_address) > 300:
+            flash("Pickup and destination locations must be 300 characters or fewer.", "error")
+            return render_booking_form()
+        if pickup_address.casefold() == destination_address.casefold():
+            flash("Choose two different locations for pickup and destination.", "error")
+            return render_booking_form()
+        if category not in {"BODA", "ECONOMY", "COMFORT", "PREMIUM"}:
+            flash("Please choose a valid ride category.", "error")
+            return render_booking_form()
         if payment_method not in {"MTN_MOMO", "AIRTEL_MONEY", "CARD"}:
             flash("Please choose an online Paystack payment method.", "error")
-            return render_template(
-                "passenger/book_ride.html", user=user, landmarks=landmarks,
-                eligible_rewards=eligible_rewards
-            )
+            return render_booking_form()
 
-        # Coordinate lookup & distance calculation
-        p_coords = MapService.find_coordinates(pickup_address)
-        d_coords = MapService.find_coordinates(destination_address)
+        try:
+            # Re-geocode the submitted addresses rather than trusting preview
+            # coordinates or a fare supplied by the browser.
+            route = LocationService.get_route(pickup_address, destination_address)
+        except LocationIQConfigurationError:
+            flash("Ride pricing is temporarily unavailable. Please try again later.", "error")
+            return render_booking_form()
+        except LocationIQNoResultsError as error:
+            flash(str(error), "error")
+            return render_booking_form()
+        except LocationIQRequestError as error:
+            current_app.logger.warning("Ride booking route unavailable: %s", error)
+            flash("We could not verify the road route. No ride was booked; please try again.", "error")
+            return render_booking_form()
 
-        # Haversine distance with road curvature
-        distance_km = MapService.calculate_distance_km(
-            p_coords["lat"], p_coords["lng"], d_coords["lat"], d_coords["lng"]
+        p_coords = route["start"]
+        d_coords = route["destination"]
+        distance_km = route["distance_km"]
+        estimated_fare = PricingService.calculate_fare(
+            category, distance_km, route["duration_minutes"]
         )
-        if distance_km < 1.0:
-            distance_km = 3.5  # Sensible minimum for city transfers
-
-        estimated_fare = PricingService.calculate_fare(category, distance_km)
         voucher_code = request.form.get("reward_voucher_code", "").strip().upper()
         selected_voucher = None
         if voucher_code:
@@ -386,10 +420,7 @@ def book_ride():
             )
             if not selected_voucher:
                 flash("That reward voucher is invalid, expired, or already used.", "error")
-                return render_template(
-                    "passenger/book_ride.html", user=user, landmarks=landmarks,
-                    eligible_rewards=eligible_rewards
-                )
+                return render_booking_form()
             discount_percent = int(selected_voucher["discount_percent"] or 0)
             if not 0 <= discount_percent <= 100:
                 abort(400, "Reward discount is invalid.")
@@ -442,16 +473,9 @@ def book_ride():
     is_airport = request.args.get("is_airport", "0")
     journey_id = request.args.get("journey_id", "")
 
-    # Fetch passenger saved routes for quick access
-    saved_routes = db.fetchall(
-        "SELECT * FROM saved_routes WHERE passenger_id = ? ORDER BY created_at DESC",
-        (user["id"],)
-    )
-
     return render_template(
         "passenger/book_ride.html",
         user=user,
-        landmarks=landmarks,
         saved_routes=saved_routes,
         pre_pickup=pre_pickup,
         pre_destination=pre_destination,

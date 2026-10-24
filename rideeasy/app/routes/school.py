@@ -1,8 +1,14 @@
 import uuid
-from flask import Blueprint, render_template, request, redirect, url_for, flash, session, abort
+from flask import Blueprint, current_app, render_template, request, redirect, url_for, flash, session, abort
 from app.repositories.database import get_db
 from app.services.auth_service import login_required, role_required, AuthService
-from app.services.pricing_service import MapService, PricingService
+from app.services.location_service import (
+    LocationIQConfigurationError,
+    LocationIQNoResultsError,
+    LocationIQRequestError,
+    LocationService,
+)
+from app.services.pricing_service import PricingService
 
 school_bp = Blueprint("school", __name__, url_prefix="/school")
 
@@ -54,7 +60,6 @@ def new_request():
     user = AuthService.get_current_user()
     db = get_db()
     school = db.fetchone("SELECT * FROM schools WHERE user_id = ?", (user["id"],))
-    landmarks = MapService.LANDMARKS
     pickup_location = request.args.get("pickup", "").strip() or (school["address"] if school else "")
     destination = request.args.get("destination", "").strip()
 
@@ -75,19 +80,75 @@ def new_request():
                 "school/request.html",
                 user=user,
                 school=school,
-                landmarks=landmarks,
+                pickup_location=pickup_location,
+                destination=destination
+            )
+        if len(pickup_location) > 300 or len(destination) > 300:
+            flash("Pickup and destination locations must be 300 characters or fewer.", "error")
+            return render_template(
+                "school/request.html",
+                user=user,
+                school=school,
+                pickup_location=pickup_location,
+                destination=destination
+            )
+        if pickup_location.casefold() == destination.casefold():
+            flash("Choose two different locations for pickup and destination.", "error")
+            return render_template(
+                "school/request.html",
+                user=user,
+                school=school,
                 pickup_location=pickup_location,
                 destination=destination
             )
 
-        # Estimate benchmark price for school coaster/bus charter
-        p_coords = MapService.find_coordinates(pickup_location)
-        d_coords = MapService.find_coordinates(destination)
-        dist = MapService.calculate_distance_km(p_coords["lat"], p_coords["lng"], d_coords["lat"], d_coords["lng"])
-        if return_date:
-            dist = dist * 2  # Round trip
+        if vehicle_type not in {"COASTER", "BUS"}:
+            flash("Please choose a valid school vehicle type.", "error")
+            return render_template(
+                "school/request.html",
+                user=user,
+                school=school,
+                pickup_location=pickup_location,
+                destination=destination
+            )
+        try:
+            route = LocationService.get_route(pickup_location, destination)
+        except LocationIQConfigurationError:
+            flash("School transport pricing is temporarily unavailable. Please try again later.", "error")
+            return render_template(
+                "school/request.html",
+                user=user,
+                school=school,
+                pickup_location=pickup_location,
+                destination=destination
+            )
+        except LocationIQNoResultsError as error:
+            flash(str(error), "error")
+            return render_template(
+                "school/request.html",
+                user=user,
+                school=school,
+                pickup_location=pickup_location,
+                destination=destination
+            )
+        except LocationIQRequestError as error:
+            current_app.logger.warning("School charter route unavailable: %s", error)
+            flash("We could not verify the road route. No transport request was submitted.", "error")
+            return render_template(
+                "school/request.html",
+                user=user,
+                school=school,
+                pickup_location=pickup_location,
+                destination=destination
+            )
 
-        estimated_price = PricingService.calculate_fare(vehicle_type, dist)
+        dist = route["distance_km"]
+        duration_minutes = route["duration_minutes"]
+        if return_date:
+            dist *= 2
+            duration_minutes *= 2
+
+        estimated_price = PricingService.calculate_fare(vehicle_type, dist, duration_minutes)
 
         req_id = f"sch_req_{uuid.uuid4().hex[:10]}"
         db.execute(
@@ -107,7 +168,6 @@ def new_request():
         "school/request.html",
         user=user,
         school=school,
-        landmarks=landmarks,
         pickup_location=pickup_location,
         destination=destination
     )

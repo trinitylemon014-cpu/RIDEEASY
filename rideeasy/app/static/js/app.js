@@ -112,86 +112,146 @@ document.addEventListener("DOMContentLoaded", () => {
     window.setInterval(checkDriverOffers, 8000);
   }
 
-  // 3. Ugandan Landmark Coordinates & Fare Estimator Logic
-  const UGANDA_LANDMARKS = [
-    { name: "Entebbe International Airport (EBB)", lat: 0.0424, lng: 32.4435 },
-    { name: "Acacia Mall, Kisementi, Kololo", lat: 0.3340, lng: 32.5890 },
-    { name: "Kampala City Centre (Posta Uganda)", lat: 0.3136, lng: 32.5811 },
-    { name: "Victoria Towers, Nakasero Road", lat: 0.3200, lng: 32.5780 },
-    { name: "Makerere University Main Gate", lat: 0.3312, lng: 32.5702 },
-    { name: "Garden City Mall, Yusuf Lule Road", lat: 0.3195, lng: 32.5912 },
-    { name: "Lugogo Mall / Shoprite / Game", lat: 0.3275, lng: 32.6105 },
-    { name: "Greenhill Academy Kibuli", lat: 0.3060, lng: 32.5985 },
-    { name: "Ntinda Complex / Capital Shoppers", lat: 0.3542, lng: 32.6120 },
-    { name: "Bunga / Ggaba Beach Landing Site", lat: 0.2580, lng: 32.6280 },
-    { name: "Namanve Industrial Park", lat: 0.3500, lng: 32.7000 },
-    { name: "Jinja Source of the Nile", lat: 0.4300, lng: 33.2000 },
-    { name: "Uganda Wildlife Education Centre (UWEC)", lat: 0.0570, lng: 32.4750 }
-  ];
+  // 3. LocationIQ-backed fare estimate and location suggestions
+  const fareDisplay = document.getElementById("estimated-fare-display");
+  const distDisplay = document.getElementById("estimated-distance-display");
+  const pickupInput = document.getElementById("pickup_address");
+  const destInput = document.getElementById("destination_address");
+  let estimateRequestId = 0;
 
-  const FARE_TIERS = {
-    BODA: { base: 1500, km: 700, min: 100, minFare: 2500 },
-    ECONOMY: { base: 3500, km: 1500, min: 200, minFare: 6000 },
-    COMFORT: { base: 5000, km: 2200, min: 300, minFare: 9000 },
-    PREMIUM: { base: 8000, km: 3200, min: 450, minFare: 15000 },
-    COASTER: { base: 80000, km: 4500, min: 500, minFare: 250000 },
-    BUS: { base: 150000, km: 7500, min: 800, minFare: 450000 }
-  };
+  function showFareUnavailable(message) {
+    if (fareDisplay) fareDisplay.textContent = "UGX --";
+    if (distDisplay) distDisplay.textContent = message;
+  }
 
-  function findCoordinates(placeName) {
-    if (!placeName) return { lat: 0.3136, lng: 32.5811 };
-    const lower = placeName.toLowerCase().trim();
-    for (const item of UGANDA_LANDMARKS) {
-      const itemLower = item.name.toLowerCase();
-      const primaryKey = itemLower.split(/[,(/]/)[0].trim();
-      if (itemLower.includes(lower) || lower.includes(primaryKey)) {
-        return item;
+  function setupFareAutocomplete(input, kind) {
+    if (!input) return;
+    const group = input.closest(".form-group");
+    if (!group) return;
+
+    const list = document.createElement("ul");
+    list.className = "fare-place-suggestions";
+    list.id = `${kind}-place-suggestions`;
+    list.setAttribute("role", "listbox");
+    list.hidden = true;
+    group.appendChild(list);
+    input.setAttribute("role", "combobox");
+    input.setAttribute("aria-autocomplete", "list");
+    input.setAttribute("aria-controls", list.id);
+    input.setAttribute("aria-expanded", "false");
+    input.setAttribute("autocomplete", "off");
+
+    let timer;
+    let controller;
+    let requestId = 0;
+    let options = [];
+    let activeIndex = -1;
+    const close = () => {
+      list.hidden = true;
+      input.setAttribute("aria-expanded", "false");
+      input.removeAttribute("aria-activedescendant");
+      activeIndex = -1;
+    };
+    const select = (place) => {
+      input.value = place.label;
+      close();
+      window.calculateAndDisplayEstimatedFare();
+    };
+    const render = (places) => {
+      options = places;
+      list.replaceChildren();
+      places.forEach((place, index) => {
+        const option = document.createElement("li");
+        option.id = `${list.id}-${index}`;
+        option.className = "fare-place-suggestion";
+        option.setAttribute("role", "option");
+        option.setAttribute("aria-selected", "false");
+        const title = document.createElement("span");
+        title.textContent = place.title || place.label;
+        option.appendChild(title);
+        if (place.subtitle) {
+          const subtitle = document.createElement("small");
+          subtitle.textContent = place.subtitle;
+          option.appendChild(subtitle);
+        }
+        option.addEventListener("mousedown", (event) => {
+          event.preventDefault();
+          select(place);
+        });
+        option.addEventListener("mousemove", () => {
+          activeIndex = index;
+          list.querySelectorAll("[role='option']").forEach((item, itemIndex) => {
+            item.setAttribute("aria-selected", itemIndex === index ? "true" : "false");
+          });
+        });
+        list.appendChild(option);
+      });
+      list.hidden = !places.length;
+      input.setAttribute("aria-expanded", places.length ? "true" : "false");
+    };
+    const search = async (query) => {
+      if (controller) controller.abort();
+      controller = new AbortController();
+      const currentRequest = ++requestId;
+      try {
+        const response = await fetch(`/api/places/autocomplete?q=${encodeURIComponent(query)}`, {
+          headers: { Accept: "application/json" },
+          signal: controller.signal,
+        });
+        if (!response.ok) {
+          close();
+          return;
+        }
+        const result = await response.json();
+        if (currentRequest === requestId) render(Array.isArray(result.suggestions) ? result.suggestions : []);
+      } catch (error) {
+        if (error.name !== "AbortError" && currentRequest === requestId) close();
       }
-    }
-    return { lat: 0.3136, lng: 32.5811 };
+    };
+
+    input.addEventListener("input", () => {
+      estimateRequestId += 1;
+      window.clearTimeout(timer);
+      const query = input.value.trim();
+      showFareUnavailable("Select a matching place or finish entering the address.");
+      if (query.length < 3) {
+        if (controller) controller.abort();
+        requestId += 1;
+        close();
+        showFareUnavailable("Choose pickup and destination locations.");
+        return;
+      }
+      timer = window.setTimeout(() => search(query), 300);
+    });
+    input.addEventListener("keydown", (event) => {
+      if (list.hidden || !options.length) return;
+      if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+        event.preventDefault();
+        activeIndex = event.key === "ArrowDown"
+          ? (activeIndex + 1) % options.length
+          : (activeIndex <= 0 ? options.length - 1 : activeIndex - 1);
+        list.querySelectorAll("[role='option']").forEach((item, index) => {
+          const selected = index === activeIndex;
+          item.setAttribute("aria-selected", selected ? "true" : "false");
+          if (selected) {
+            input.setAttribute("aria-activedescendant", item.id);
+            item.scrollIntoView({ block: "nearest" });
+          }
+        });
+      } else if (event.key === "Enter" && activeIndex >= 0) {
+        event.preventDefault();
+        select(options[activeIndex]);
+      } else if (event.key === "Escape") {
+        close();
+      }
+    });
+    input.addEventListener("blur", () => {
+      window.setTimeout(close, 100);
+      if (input.value.trim()) window.calculateAndDisplayEstimatedFare();
+    });
   }
 
-  function calculateDistanceKm(lat1, lng1, lat2, lng2) {
-    const R = 6371.0;
-    const dLat = ((lat2 - lat1) * Math.PI) / 180;
-    const dLng = ((lng2 - lng1) * Math.PI) / 180;
-    const a =
-      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-      Math.cos((lat1 * Math.PI) / 180) *
-        Math.cos((lat2 * Math.PI) / 180) *
-        Math.sin(dLng / 2) *
-        Math.sin(dLng / 2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    const roadDistance = Math.round(R * c * 1.3 * 10) / 10;
-    return roadDistance < 1.0 ? 3.5 : roadDistance;
-  }
-
-  function computeLocalFare(category, distanceKm) {
-    const cat = (category || "ECONOMY").toUpperCase();
-    const tier = FARE_TIERS[cat] || FARE_TIERS.ECONOMY;
-    const durationMinutes = Math.max(5, Math.round((distanceKm / 25.0) * 60));
-    const rawFare = tier.base + distanceKm * tier.km + durationMinutes * tier.min;
-    const roundedFare = Math.round(rawFare / 500) * 500;
-    return Math.max(tier.minFare, roundedFare);
-  }
-
-  /**
-   * Calculates and dynamically displays the estimated fare in the ride booking form
-   * based on the distance between the selected pickup and destination locations.
-   *
-   * Dynamically updates the #estimated-fare-display and #estimated-distance-display elements.
-   *
-   * @param {string} [pickupOverride] Optional pickup address
-   * @param {string} [destOverride] Optional destination address
-   * @param {string} [categoryOverride] Optional category (e.g. 'ECONOMY', 'BODA')
-   * @returns {Promise<{distance_km: number, estimated_fare_ugx: number}>}
-   */
   window.calculateAndDisplayEstimatedFare = function (pickupOverride, destOverride, categoryOverride) {
-    const pickupInput = document.getElementById("pickup_address");
-    const destInput = document.getElementById("destination_address");
-    const fareDisplay = document.getElementById("estimated-fare-display");
-    const distDisplay = document.getElementById("estimated-distance-display");
-
     const pickup = (pickupOverride !== undefined ? pickupOverride : (pickupInput ? pickupInput.value : "")).trim();
     const destination = (destOverride !== undefined ? destOverride : (destInput ? destInput.value : "")).trim();
 
@@ -218,106 +278,48 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     if (!pickup || !destination) {
-      if (fareDisplay) fareDisplay.textContent = "UGX --";
-      if (distDisplay) distDisplay.textContent = "Enter pickup and destination";
-      return Promise.resolve({ distance_km: 0, estimated_fare_ugx: 0 });
+      showFareUnavailable("Choose pickup and destination locations.");
+      return Promise.resolve(null);
     }
+    if (fareDisplay) fareDisplay.textContent = "Calculating…";
+    if (distDisplay) distDisplay.textContent = "Calculating driving distance…";
+    const currentRequest = ++estimateRequestId;
 
-    // Instant local calculation (zero-latency update)
-    const pCoords = findCoordinates(pickup);
-    const dCoords = findCoordinates(destination);
-    let distanceKm = calculateDistanceKm(pCoords.lat, pCoords.lng, dCoords.lat, dCoords.lng);
-    let instantFare = computeLocalFare(category, distanceKm);
-
-    if (fareDisplay) {
-      fareDisplay.textContent = `UGX ${instantFare.toLocaleString()}`;
-    }
-    if (distDisplay) {
-      distDisplay.textContent = `${distanceKm} km (estimated)`;
-    }
-
-    // Query backend API for authoritative database pricing
     return fetch("/api/estimate-fare", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", "Accept": "application/json" },
       body: JSON.stringify({ pickup, destination, category })
     })
-      .then((res) => {
-        if (!res.ok) throw new Error("API response not ok");
-        return res.json();
-      })
-      .then((data) => {
-        if (data && data.success) {
-          if (fareDisplay) {
-            fareDisplay.textContent = `UGX ${Number(data.estimated_fare_ugx).toLocaleString()}`;
-          }
-          if (distDisplay) {
-            distDisplay.textContent = `${data.distance_km} km (estimated)`;
-          }
-          return {
-            distance_km: data.distance_km,
-            estimated_fare_ugx: data.estimated_fare_ugx
-          };
+      .then(async (response) => {
+        const data = await response.json();
+        if (!response.ok || !data.success) {
+          throw new Error(data.error || "A road-distance fare estimate is unavailable.");
         }
-        return { distance_km: distanceKm, estimated_fare_ugx: instantFare };
+        if (currentRequest !== estimateRequestId) return null;
+        if (fareDisplay) fareDisplay.textContent = `UGX ${Number(data.estimated_fare_ugx).toLocaleString()}`;
+        if (distDisplay) {
+          distDisplay.textContent = `${Number(data.distance_km).toFixed(1)} km driving · ${data.duration_minutes} min`;
+        }
+        return data;
       })
-      .catch((err) => {
-        // Fallback silently kept in fareDisplay
-        return { distance_km: distanceKm, estimated_fare_ugx: instantFare };
+      .catch((error) => {
+        if (currentRequest === estimateRequestId) {
+          const message = error.name === "TypeError" || error.name === "SyntaxError"
+            ? "Could not reach the route service. Check your connection and try again."
+            : error.message;
+          showFareUnavailable(message);
+        }
+        return null;
       });
   };
 
   // Backward compatibility alias
   window.triggerFareCalculation = window.calculateAndDisplayEstimatedFare;
 
-  // 4. Quick Landmark Ingestion for Booking Forms
-  const landmarkButtons = document.querySelectorAll("[data-set-pickup]");
-  const pickupInput = document.getElementById("pickup_address");
-  const destInput = document.getElementById("destination_address");
-
-  landmarkButtons.forEach((btn) => {
-    btn.addEventListener("click", (e) => {
-      e.preventDefault();
-      const place = btn.getAttribute("data-place");
-      const target = btn.getAttribute("data-target") || "pickup";
-      if (target === "pickup" && pickupInput) {
-        pickupInput.value = place;
-      } else if (target === "destination" && destInput) {
-        destInput.value = place;
-      }
-      window.calculateAndDisplayEstimatedFare();
-    });
-  });
-
-  // 5. Live Fare Recalculation Event Listeners on Ride Booking Form
-  let fareDebounceTimer = null;
-  function debouncedFareCalculation() {
-    clearTimeout(fareDebounceTimer);
-    fareDebounceTimer = setTimeout(() => {
-      window.calculateAndDisplayEstimatedFare();
-    }, 120);
-  }
-
-  if (pickupInput) {
-    pickupInput.addEventListener("input", debouncedFareCalculation);
-    pickupInput.addEventListener("change", () => window.calculateAndDisplayEstimatedFare());
-  }
-
-  if (destInput) {
-    destInput.addEventListener("input", debouncedFareCalculation);
-    destInput.addEventListener("change", () => window.calculateAndDisplayEstimatedFare());
-  }
-
-  const categoryLabels = document.querySelectorAll(".category-selector-grid label");
-  categoryLabels.forEach((label) => {
-    label.addEventListener("click", () => {
-      const radio = label.querySelector("input[name='category']");
-      if (radio) {
-        radio.checked = true;
-        window.calculateAndDisplayEstimatedFare(undefined, undefined, radio.value);
-      }
-    });
-  });
+  setupFareAutocomplete(pickupInput, "pickup");
+  setupFareAutocomplete(destInput, "destination");
+  setupFareAutocomplete(document.getElementById("pickup_location"), "school-pickup");
+  setupFareAutocomplete(document.getElementById("destination"), "school-destination");
 
   const categoryRadios = document.querySelectorAll("input[name='category']");
   categoryRadios.forEach((r) => {

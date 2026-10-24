@@ -1,4 +1,4 @@
-from app.services.pricing_service import MapService, PricingService
+from app.services.pricing_service import PricingService
 
 def test_fare_calculation_formula():
     # 10 km in Economy (3500 base + 1500*10 + min wait)
@@ -6,15 +6,14 @@ def test_fare_calculation_formula():
     assert fare >= 18500
     assert fare % 500 == 0  # Tariff rounded to 500 UGX
 
-def test_haversine_distance_calculation():
-    # Acacia Mall Kololo to Entebbe Airport (~42 km)
-    p_coords = MapService.find_coordinates("Acacia Mall, Kololo")
-    d_coords = MapService.find_coordinates("Entebbe International Airport (EBB)")
-    dist = MapService.calculate_distance_km(p_coords["lat"], p_coords["lng"], d_coords["lat"], d_coords["lng"])
-    assert 35.0 <= dist <= 55.0
-
-def test_passenger_can_request_ride(client):
+def test_passenger_can_request_ride(client, monkeypatch):
     client.get("/auth/demo/passenger", follow_redirects=True)
+    monkeypatch.setattr("app.routes.passenger.LocationService.get_route", lambda *args, **kwargs: {
+        "start": {"lat": 0.334, "lng": 32.589, "label": "Acacia Mall, Uganda"},
+        "destination": {"lat": 0.0424, "lng": 32.4435, "label": "Entebbe Airport, Uganda"},
+        "distance_km": 42.1,
+        "duration_minutes": 90,
+    })
     response = client.post("/passenger/book-ride", data={
         "pickup_address": "Acacia Mall, Kololo",
         "destination_address": "Entebbe International Airport (EBB)",
@@ -27,7 +26,13 @@ def test_passenger_can_request_ride(client):
     assert b"Ride requested successfully" in response.data
     assert b"Trip #" in response.data
 
-def test_api_fare_estimation(client):
+def test_api_fare_estimation(client, monkeypatch):
+    monkeypatch.setattr("app.routes.api.LocationService.get_route", lambda *args, **kwargs: {
+        "start": {"lat": 0.334, "lng": 32.589, "label": "Acacia Mall, Uganda"},
+        "destination": {"lat": 0.0424, "lng": 32.4435, "label": "Entebbe Airport, Uganda"},
+        "distance_km": 42.1,
+        "duration_minutes": 90,
+    })
     # Test valid fare estimation across categories
     res = client.post("/api/estimate-fare", json={
         "pickup": "Acacia Mall, Kisementi, Kololo",
@@ -37,7 +42,8 @@ def test_api_fare_estimation(client):
     assert res.status_code == 200
     data = res.get_json()
     assert data["success"] is True
-    assert data["distance_km"] > 35.0
+    assert data["distance_km"] == 42.1
+    assert data["duration_minutes"] == 90
     assert data["estimated_fare_ugx"] > 50000
     assert data["currency"] == "UGX"
 
@@ -53,6 +59,73 @@ def test_api_fare_estimation(client):
     # Test missing fields error
     err_res = client.post("/api/estimate-fare", json={"pickup": ""})
     assert err_res.status_code == 400
+
+
+def test_booking_recalculates_route_on_server_and_ignores_submitted_fare(client, db, monkeypatch):
+    client.get("/auth/demo/passenger", follow_redirects=True)
+    routes = []
+
+    def fake_route(start, destination, **kwargs):
+        routes.append((start, destination, kwargs))
+        return {
+            "start": {"lat": 0.31, "lng": 32.58, "label": "Route origin, Uganda"},
+            "destination": {"lat": 0.32, "lng": 32.59, "label": "Route destination, Uganda"},
+            "distance_km": 12.4,
+            "duration_minutes": 35,
+        }
+
+    monkeypatch.setattr("app.routes.passenger.LocationService.get_route", fake_route)
+    response = client.post("/passenger/book-ride", data={
+        "pickup_address": "A real pickup",
+        "destination_address": "A real destination",
+        "category": "ECONOMY",
+        "payment_method": "MTN_MOMO",
+        "estimated_fare_ugx": "1",
+        "distance_km": "0.1",
+    })
+
+    assert response.status_code == 302
+    assert routes == [("A real pickup", "A real destination", {})]
+    ride = db.fetchone(
+        "SELECT estimated_distance_km, estimated_fare_ugx FROM rides WHERE pickup_address = ?",
+        ("A real pickup",),
+    )
+    assert ride["estimated_distance_km"] == 12.4
+    assert ride["estimated_fare_ugx"] == PricingService.calculate_fare("ECONOMY", 12.4, 35)
+
+
+def test_fare_estimate_requires_locationiq_configuration(client, app, monkeypatch):
+    monkeypatch.setitem(app.config, "LOCATIONIQ_API_KEY", "")
+    response = client.post("/api/estimate-fare", json={
+        "pickup": "A pickup in Uganda",
+        "destination": "A destination in Uganda",
+        "category": "ECONOMY",
+    })
+    assert response.status_code == 503
+    assert "LOCATIONIQ_API_KEY" in response.get_json()["error"]
+
+
+def test_booking_fails_without_verified_route(client, db, monkeypatch):
+    client.get("/auth/demo/passenger", follow_redirects=True)
+
+    def route_unavailable(*args, **kwargs):
+        from app.services.location_service import LocationIQRequestError
+        raise LocationIQRequestError("Provider unavailable.")
+
+    monkeypatch.setattr("app.routes.passenger.LocationService.get_route", route_unavailable)
+    response = client.post("/passenger/book-ride", data={
+        "pickup_address": "Unverified pickup",
+        "destination_address": "Unverified destination",
+        "category": "ECONOMY",
+        "payment_method": "MTN_MOMO",
+    })
+
+    assert response.status_code == 200
+    assert b"No ride was booked" in response.data
+    assert db.fetchone(
+        "SELECT id FROM rides WHERE pickup_address = ?",
+        ("Unverified pickup",),
+    ) is None
 
 def test_route_map_is_available_to_passenger_driver_and_school(client):
     for role, page_label in [
@@ -344,8 +417,14 @@ def test_dashboard_search_filtering(client):
     assert search_none.status_code == 200
     assert b"No trips match" in search_none.data
 
-def test_passenger_workspace_pages_and_awaiting_ride_filter(client):
+def test_passenger_workspace_pages_and_awaiting_ride_filter(client, monkeypatch):
     client.get("/auth/demo/passenger", follow_redirects=True)
+    monkeypatch.setattr("app.routes.passenger.LocationService.get_route", lambda *args, **kwargs: {
+        "start": {"lat": 0.334, "lng": 32.589, "label": "Acacia Mall, Uganda"},
+        "destination": {"lat": 0.0424, "lng": 32.4435, "label": "Entebbe Airport, Uganda"},
+        "distance_km": 42.1,
+        "duration_minutes": 90,
+    })
     request_res = client.post("/passenger/book-ride", data={
         "pickup_address": "Acacia Mall, Kololo",
         "destination_address": "Entebbe Airport",

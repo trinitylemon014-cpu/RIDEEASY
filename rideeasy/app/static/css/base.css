@@ -305,6 +305,7 @@ img[alt*="Logo"] {
 
 /* Form Inputs */
 .form-group {
+  position: relative;
   margin-bottom: 1.25rem;
 }
 
@@ -431,4 +432,42 @@ main > section[style*="padding: 4rem 0"]::after {
   main > section[style*="padding: 4rem 0"] div[style*="max-width: 760px"] {
     max-width: 100% !important;
   }
+}
+.fare-place-suggestions {
+  position: absolute;
+  z-index: 40;
+  top: calc(100% - 0.25rem);
+  left: 0;
+  right: 0;
+  max-height: 16rem;
+  overflow-y: auto;
+  margin: 0;
+  padding: 0.25rem;
+  list-style: none;
+  background: var(--color-white);
+  border: 1px solid var(--color-light-grey);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.14);
+}
+
+.fare-place-suggestions[hidden] {
+  display: none;
+}
+
+.fare-place-suggestion {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: 0.55rem 0.65rem;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.fare-place-suggestion:hover,
+.fare-place-suggestion[aria-selected="true"] {
+  background: var(--color-off-white);
+}
+
+.fare-place-suggestion small {
+  color: var(--color-medium-grey);
 }

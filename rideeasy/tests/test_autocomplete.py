@@ -2,7 +2,7 @@ import pytest
 import requests
 
 from app.routes import api as api_module
-from app.services.location_service import LocationService
+from app.services.location_service import LocationIQNoResultsError, LocationService
 
 
 class FakeResponse:
@@ -33,15 +33,23 @@ def clean_state():
     LocationService._autocomplete_cache.clear()
     api_module._autocomplete_hits.clear()
     api_module._reverse_hits.clear()
+    api_module._estimate_hits.clear()
     yield
     LocationService._autocomplete_cache.clear()
     api_module._autocomplete_hits.clear()
     api_module._reverse_hits.clear()
+    api_module._estimate_hits.clear()
 
 
-def test_autocomplete_requires_login(client):
+def test_autocomplete_is_available_without_login(client, app, monkeypatch):
+    monkeypatch.setitem(app.config, "LOCATIONIQ_API_KEY", "test-locationiq-key")
+    monkeypatch.setattr(
+        "app.services.location_service.requests.get",
+        lambda *args, **kwargs: FakeResponse(AUTOCOMPLETE_BODY),
+    )
     response = client.get("/api/places/autocomplete?q=Acacia")
-    assert response.status_code in (301, 302, 401, 403)
+    assert response.status_code == 200
+    assert len(response.get_json()["suggestions"]) == 1
 
 
 def test_autocomplete_short_query_makes_no_provider_call(client, app, monkeypatch):
@@ -87,6 +95,22 @@ def test_autocomplete_reports_missing_configuration(client, app, monkeypatch):
     response = client.get("/api/places/autocomplete?q=Acacia")
     assert response.status_code == 503
     assert response.get_json()["suggestions"] == []
+
+
+def test_geocoding_does_not_fall_back_outside_uganda(app, monkeypatch):
+    monkeypatch.setitem(app.config, "LOCATIONIQ_API_KEY", "test-locationiq-key")
+    requests_seen = []
+
+    def no_results(url, params, timeout):
+        requests_seen.append(params.copy())
+        return FakeResponse([])
+
+    monkeypatch.setattr("app.services.location_service.requests.get", no_results)
+    with app.app_context(), pytest.raises(LocationIQNoResultsError):
+        LocationService.geocode("An unknown place")
+
+    assert len(requests_seen) == 1
+    assert requests_seen[0]["countrycodes"] == "ug"
 
 
 def test_autocomplete_is_throttled_per_user(client, app, monkeypatch):

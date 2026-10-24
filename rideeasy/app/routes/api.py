@@ -4,7 +4,7 @@ from collections import defaultdict, deque
 
 from flask import Blueprint, current_app, jsonify, request, session
 from app.repositories.database import get_db
-from app.services.pricing_service import MapService, PricingService
+from app.services.pricing_service import PricingService
 from app.services.auth_service import login_required, role_required
 from app.services.location_service import (
     LocationIQConfigurationError,
@@ -18,16 +18,16 @@ api_bp = Blueprint("api", __name__, url_prefix="/api")
 # Light per-user throttle for the suggestion endpoint (LocationIQ plans are rate limited).
 AUTOCOMPLETE_MAX_PER_MINUTE = 45
 _autocomplete_hits = defaultdict(deque)
-
-
+ESTIMATE_MAX_PER_MINUTE = 12
+_estimate_hits = defaultdict(deque)
 REVERSE_MAX_PER_MINUTE = 10
 _reverse_hits = defaultdict(deque)
 
 
-def _throttled(store, limit):
+def _rate_limited(hits_by_user, limit):
     who = session.get("user_id") or request.remote_addr or "anonymous"
     now = time.monotonic()
-    hits = store[who]
+    hits = hits_by_user[who]
     while hits and now - hits[0] > 60:
         hits.popleft()
     if len(hits) >= limit:
@@ -37,45 +37,70 @@ def _throttled(store, limit):
 
 
 def _autocomplete_rate_limited():
-    return _throttled(_autocomplete_hits, AUTOCOMPLETE_MAX_PER_MINUTE)
+    return _rate_limited(_autocomplete_hits, AUTOCOMPLETE_MAX_PER_MINUTE)
 
 
 @api_bp.route("/estimate-fare", methods=["POST"])
 def estimate_fare():
-    """Calculates live fare estimate between two locations."""
-    data = request.get_json() or {}
-    pickup = data.get("pickup", "").strip()
-    destination = data.get("destination", "").strip()
-    category = data.get("category", "ECONOMY").upper()
+    """Estimate a fare from the LocationIQ driving route and configured tariffs."""
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return jsonify({"success": False, "error": "Enter a pickup and destination."}), 400
 
+    pickup = data.get("pickup")
+    destination = data.get("destination")
+    category = data.get("category", "ECONOMY")
+    if not isinstance(pickup, str) or not isinstance(destination, str):
+        return jsonify({"success": False, "error": "Enter a pickup and destination."}), 400
+    pickup = pickup.strip()
+    destination = destination.strip()
     if not pickup or not destination:
-        return jsonify({"error": "Pickup and destination required"}), 400
+        return jsonify({"success": False, "error": "Enter a pickup and destination."}), 400
+    if len(pickup) > 300 or len(destination) > 300:
+        return jsonify({"success": False, "error": "Locations must be 300 characters or fewer."}), 400
+    if pickup.casefold() == destination.casefold():
+        return jsonify({"success": False, "error": "Choose two different locations."}), 400
+    if not isinstance(category, str) or category.upper() not in {
+        "BODA", "ECONOMY", "COMFORT", "PREMIUM"
+    }:
+        return jsonify({"success": False, "error": "Choose a valid ride category."}), 400
+    category = category.upper()
+    if _rate_limited(_estimate_hits, ESTIMATE_MAX_PER_MINUTE):
+        return jsonify({
+            "success": False,
+            "error": "Too many fare estimates. Please wait a minute and try again."
+        }), 429
 
-    p_coords = MapService.find_coordinates(pickup)
-    d_coords = MapService.find_coordinates(destination)
-    distance_km = MapService.calculate_distance_km(p_coords["lat"], p_coords["lng"], d_coords["lat"], d_coords["lng"])
-    if distance_km < 1.0:
-        distance_km = 3.5
-
-    fare = PricingService.calculate_fare(category, distance_km)
+    try:
+        # Resolve both text addresses server-side. Client coordinates and fares
+        # are never authoritative, even for the preview quote.
+        route = LocationService.get_route(pickup, destination)
+        fare = PricingService.calculate_fare(
+            category, route["distance_km"], route["duration_minutes"]
+        )
+    except LocationIQConfigurationError:
+        return jsonify({
+            "success": False,
+            "error": "Fare estimates are unavailable until the administrator configures LOCATIONIQ_API_KEY."
+        }), 503
+    except LocationIQNoResultsError as error:
+        return jsonify({"success": False, "error": str(error)}), 422
+    except LocationIQRequestError as error:
+        current_app.logger.warning("Fare estimate unavailable: %s", error)
+        return jsonify({"success": False, "error": str(error)}), 502
 
     return jsonify({
         "success": True,
         "category": category,
-        "distance_km": distance_km,
+        "distance_km": route["distance_km"],
+        "duration_minutes": route["duration_minutes"],
         "estimated_fare_ugx": fare,
-        "pickup_coords": p_coords,
-        "destination_coords": d_coords,
+        "pickup_coords": route["start"],
+        "destination_coords": route["destination"],
         "currency": "UGX"
     })
 
-@api_bp.route("/landmarks")
-def landmarks():
-    return jsonify({"landmarks": MapService.LANDMARKS})
-
 @api_bp.route("/places/autocomplete")
-@login_required
-@role_required("PASSENGER", "DRIVER", "SCHOOL", "ADMIN")
 def places_autocomplete():
     """Place suggestions while the user types (Uganda first). Key stays server-side."""
     query = request.args.get("q", "")
@@ -104,7 +129,7 @@ def places_reverse():
         return jsonify({"success": False, "error": "A valid location is required."}), 400
     if not (math.isfinite(lat) and math.isfinite(lng) and -90 <= lat <= 90 and -180 <= lng <= 180):
         return jsonify({"success": False, "error": "A valid location is required."}), 400
-    if _throttled(_reverse_hits, REVERSE_MAX_PER_MINUTE):
+    if _rate_limited(_reverse_hits, REVERSE_MAX_PER_MINUTE):
         return jsonify({"success": False, "error": "Too many requests. Please wait a moment."}), 429
     try:
         place = LocationService.reverse_geocode(lat, lng)

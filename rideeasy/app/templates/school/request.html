@@ -33,18 +33,12 @@
 
       <div class="form-group">
         <label class="form-label" for="pickup_location">Campus Pickup Point</label>
-        <input type="text" id="pickup_location" name="pickup_location" class="form-control" placeholder="e.g. Greenhill Academy Main Campus, Kibuli" value="{{ pickup_location or 'Greenhill Academy Kibuli Campus' }}" required>
+        <input type="text" id="pickup_location" name="pickup_location" class="form-control" placeholder="Search a pickup place anywhere in Uganda" value="{{ pickup_location }}" maxlength="300" autocomplete="off" required>
       </div>
 
       <div class="form-group">
         <label class="form-label" for="destination">Excursion / Event Destination</label>
-        <input type="text" id="destination" name="destination" class="form-control" placeholder="e.g. Uganda Wildlife Education Centre (UWEC), Entebbe" value="{{ destination }}" required>
-        <div style="margin-top: 0.5rem; display: flex; gap: 0.35rem; flex-wrap: wrap;">
-          <span style="font-size: 0.75rem; color: var(--color-medium-grey); align-self: center;">Popular:</span>
-          <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('destination').value='Uganda Wildlife Education Centre (UWEC), Entebbe'">UWEC Entebbe</button>
-          <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('destination').value='Jinja Source of the Nile'">Source of the Nile</button>
-          <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('destination').value='Namboole National Stadium'">Namboole Stadium</button>
-        </div>
+        <input type="text" id="destination" name="destination" class="form-control" placeholder="Search a destination anywhere in Uganda" value="{{ destination }}" maxlength="300" autocomplete="off" required>
       </div>
 
       <a class="btn btn-secondary btn-sm route-planner-link" href="/map?for=school" data-route-role="school" data-start-id="pickup_location" data-destination-id="destination" style="margin-bottom: 1.25rem;">

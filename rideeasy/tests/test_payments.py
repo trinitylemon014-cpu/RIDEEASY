@@ -241,8 +241,14 @@ def test_payment_mismatch_cannot_settle(app, db):
     assert db.fetchone("SELECT COUNT(*) AS count FROM payment_ledger WHERE payment_id = ?", (payment_id,))["count"] == 0
 
 
-def test_5000_point_voucher_discounts_selected_ride_by_25_percent(client, db):
+def test_5000_point_voucher_discounts_selected_ride_by_25_percent(client, db, monkeypatch):
     client.get("/auth/demo/passenger")
+    monkeypatch.setattr("app.routes.passenger.LocationService.get_route", lambda *args, **kwargs: {
+        "start": {"lat": 0.334, "lng": 32.589, "label": "Acacia Mall, Uganda"},
+        "destination": {"lat": 0.3195, "lng": 32.5912, "label": "Garden City, Uganda"},
+        "distance_km": 4.2,
+        "duration_minutes": 18,
+    })
     award_ride_id = f"ride_points_{uuid.uuid4().hex[:10]}"
     _create_completed_ride(db, award_ride_id)
     db.execute(

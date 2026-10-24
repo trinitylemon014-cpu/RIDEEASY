@@ -74,7 +74,7 @@ RideEasy includes a 1-click **Demo Switcher** at the top of every screen. You ca
 ```bash
 python3 -m pytest tests
 ```
-The test suite validates authentication, role-based access control, database seeding, fare calculation math, Paystack payment verification and idempotent ledger allocation, school transport restrictions, and aviation PNR confirmation workflows.
+The test suite validates authentication, role-based access control, database seeding, LocationIQ road-route fare estimates and server-recalculated bookings, Paystack payment verification and idempotent ledger allocation, school transport restrictions, and aviation PNR confirmation workflows.
 
 ---
 
@@ -89,7 +89,7 @@ rideeasy/
 │   │   └── database.py          # Unified Turso libSQL & SQLite layer
 │   ├── services/
 │   │   ├── auth_service.py      # RBAC & password hashing
-│   │   ├── pricing_service.py   # Tariffs & Haversine distance calculator
+│   │   ├── pricing_service.py   # Configurable tariffs applied to routed distance and duration
 │   │   ├── reminder_service.py  # 5-tier travel reminder scheduler
 │   │   ├── payment_service.py   # Paystack verification, settlement ledger & rewards
 │   │   └── sms_service.py       # EgoSMS-compatible payment message delivery

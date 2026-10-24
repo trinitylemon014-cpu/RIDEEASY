@@ -23,7 +23,7 @@ RideEasy is a unified African transportation platform serving urban ride-hailing
                                  │       Services Layer          │
                                  │  - AuthService (RBAC)         │
                                  │  - PricingService (Tariffs)   │
-                                 │  - MapService (Distances)     │
+                                 │  - LocationService (Routes)   │
                                  │  - ReminderService (5-Tier)   │
                                  │  - PaymentService (Gateways)  │
                                  └───────────────┬───────────────┘
@@ -43,7 +43,7 @@ RideEasy is a unified African transportation platform serving urban ride-hailing
 5. **`school` (`/school`)**: Institutional dashboard, Coaster (30 seats) & Bus (60 seats) charter bookings, operator allocation, invoice tracking.
 6. **`travel_partner` (`/travel`)**: Accredited agency console, assigned passenger inquiries, quotation builder, genuine airline PNR confirmation.
 7. **`admin` (`/admin`)**: Operations oversight, user management, driver vetting, school request dispatch, flight routing, pricing configuration, tamper-evident audit logs.
-8. **`api` (`/api`)**: JSON endpoints for live fare calculation, landmark coordinates, and real-time trip status polling.
+8. **`api` (`/api`)**: JSON endpoints for LocationIQ-backed fare quotes, place autocomplete, and real-time trip status polling.
 
 ## Design Constitution & Frontend Rules
 - **Color Palette**: Pure monochrome `#000000`, `#111111`, `#1C1C1C`, `#FFFFFF`, `#F7F7F7`, `#E5E5E5`, `#777777`.
