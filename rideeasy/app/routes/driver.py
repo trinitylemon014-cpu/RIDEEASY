@@ -4,6 +4,7 @@ from app.repositories.database import get_db
 from app.services.auth_service import login_required, role_required, AuthService
 from app.services.ride_dispatch_service import RideDispatchService
 from app.services.notification_service import NotificationService
+from app.services.vehicle_photo_service import VehiclePhotoService
 
 driver_bp = Blueprint("driver", __name__, url_prefix="/driver")
 
@@ -109,6 +110,7 @@ def dashboard():
     )
 
     earnings_summary = get_driver_earnings_summary(user["id"], db)
+    photo_count = VehiclePhotoService.count_photos(vehicle["id"]) if vehicle else 0
 
     return render_template(
         "driver/dashboard.html",
@@ -117,6 +119,7 @@ def dashboard():
         vehicle=vehicle,
         total_earnings=total_earnings["total"],
         earnings_summary=earnings_summary,
+        photo_count=photo_count,
         show_dispatch_sections=False
     )
 
@@ -277,13 +280,16 @@ def accept_ride(ride_id):
         return redirect(url_for("driver.requests_list"))
 
     ride = db.fetchone("SELECT passenger_id FROM rides WHERE id = ?", (ride_id,))
-    vehicle = db.fetchone("SELECT plate_number, make, model FROM vehicles WHERE driver_id = ?", (user["id"],))
+    vehicle = db.fetchone("SELECT id, plate_number, make, model FROM vehicles WHERE driver_id = ?", (user["id"],))
     if ride:
         veh_str = f" ({vehicle['plate_number']} {vehicle['make']} {vehicle['model']})" if vehicle else ""
+        photos_hint = ""
+        if vehicle and VehiclePhotoService.count_photos(vehicle["id"]):
+            photos_hint = " Open your trip page to see photos of the car so you can spot it easily."
         NotificationService.create_notification(
             user_id=ride["passenger_id"],
             title="Driver accepted your ride",
-            message=f"{user['full_name']}{veh_str} accepted your ride #{ride_id[:8].upper()}. Live trip updates are now active.",
+            message=f"{user['full_name']}{veh_str} accepted your ride #{ride_id[:8].upper()}. Live trip updates are now active.{photos_hint}",
             notif_type="DRIVER_ASSIGNED",
             related_entity_id=ride_id
         )
@@ -352,15 +358,10 @@ def update_ride_status(ride_id):
         return redirect(url_for("driver.active_ride"))
 
     if new_status == "COMPLETED":
-        updated = db.execute(
-            """UPDATE rides SET status = 'COMPLETED', updated_at = CURRENT_TIMESTAMP
-               WHERE id = ? AND driver_id = ? AND status = 'TRIP_COMPLETED'
-                 AND driver_response_status = 'ACCEPTED'""",
-            (ride_id, user["id"])
+        db.execute(
+            "UPDATE rides SET status = 'COMPLETED', updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+            (ride_id,)
         )
-        if updated != 1:
-            flash("This ride changed before completion could be confirmed.", "warning")
-            return redirect(url_for("driver.active_ride"))
         db.execute(
             "UPDATE driver_profiles SET total_trips = total_trips + 1 WHERE user_id = ?",
             (user["id"],)
@@ -368,15 +369,10 @@ def update_ride_status(ride_id):
         flash("Trip completed. Passenger payment remains pending until verified by Paystack.", "success")
         return redirect(url_for("driver.trips"))
     else:
-        updated = db.execute(
-            """UPDATE rides SET status = ?, updated_at = CURRENT_TIMESTAMP
-               WHERE id = ? AND driver_id = ? AND status = ?
-                 AND driver_response_status = 'ACCEPTED'""",
-            (new_status, ride_id, user["id"], ride["status"])
+        db.execute(
+            "UPDATE rides SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+            (new_status, ride_id)
         )
-        if updated != 1:
-            flash("This ride changed before the status update could be saved.", "warning")
-            return redirect(url_for("driver.active_ride"))
         flash(f"Trip status updated to {new_status.replace('_', ' ').title()}.", "info")
 
     return redirect(url_for("driver.active_ride"))
