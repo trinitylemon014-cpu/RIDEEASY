@@ -331,6 +331,7 @@ class Database:
             ("rides", "driver_response_status", "TEXT NOT NULL DEFAULT 'ACCEPTED' CHECK(driver_response_status IN ('PENDING', 'ACCEPTED', 'DECLINED'))"),
             ("rides", "submission_key", "TEXT"),
             ("rides", "estimated_duration_minutes", "REAL"),
+            ("driver_profiles", "date_of_birth", "TEXT"),
             ("users", "avatar_cloudinary_public_id", "TEXT"),
             ("vehicle_photos", "cloudinary_public_id", "TEXT"),
             ("vehicle_photos", "cloudinary_url", "TEXT")
