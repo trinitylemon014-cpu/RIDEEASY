@@ -1,3 +1,4 @@
+import time
 import uuid
 from flask import Blueprint, abort, current_app, render_template, request, redirect, url_for, flash, session
 from werkzeug.security import generate_password_hash
@@ -76,14 +77,19 @@ def register():
             flash("All fields are required for registration.", "error")
             return render_template("auth/register.html")
 
+        t_start = time.perf_counter()
         db = get_db()
         existing = db.fetchone("SELECT id FROM users WHERE email = ?", (email,))
+        t_lookup = time.perf_counter()
         if existing:
             flash("An account with this email address already exists.", "error")
             return render_template("auth/register.html")
 
         user_id = f"usr_{uuid.uuid4().hex[:10]}"
-        pw_hash = generate_password_hash(password)
+        pw_hash = generate_password_hash(
+            password, method=current_app.config.get("PASSWORD_HASH_METHOD", "scrypt")
+        )
+        t_hash = time.perf_counter()
         is_verified = 1 if role == "PASSENGER" else 0
 
         # Create the user and the role-specific profile in ONE atomic round trip.
@@ -110,6 +116,13 @@ def register():
             current_app.logger.exception("Registration failed for %s", email)
             flash("We could not create your account. Please try again.", "error")
             return render_template("auth/register.html")
+
+        t_write = time.perf_counter()
+        # Diagnostic: logged at WARNING so it shows in Render's logs. Safe to remove later.
+        current_app.logger.warning(
+            "register timing: lookup=%.0fms hash=%.0fms write=%.0fms",
+            (t_lookup - t_start) * 1000, (t_hash - t_lookup) * 1000, (t_write - t_hash) * 1000
+        )
 
         # login_user() only needs these fields, so there is no need to re-read the row.
         new_user = {"id": user_id, "email": email, "role": role, "full_name": full_name}
