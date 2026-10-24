@@ -1,4 +1,5 @@
 import math
+import time
 from urllib.parse import quote
 
 import requests
@@ -29,13 +30,26 @@ class LocationService:
 
     @staticmethod
     def _get_json(url, params):
-        try:
-            response = requests.get(url, params=params, timeout=(3.05, 10))
-            response.raise_for_status()
-            return response.json()
-        except (requests.RequestException, ValueError) as error:
-            current_app.logger.warning("LocationIQ request failed (%s).", type(error).__name__)
-            raise LocationIQRequestError("The location service is temporarily unavailable.") from error
+        # LocationIQ's free plan allows ~2 requests/second. A route needs three calls
+        # (geocode, geocode, directions), so retry briefly when rate limited (HTTP 429).
+        last_error = None
+        for attempt in range(3):
+            try:
+                response = requests.get(url, params=params, timeout=(3.05, 10))
+                if response.status_code == 429 and attempt < 2:
+                    time.sleep(1.1)
+                    continue
+                response.raise_for_status()
+                return response.json()
+            except (requests.RequestException, ValueError) as error:
+                last_error = error
+                status = getattr(getattr(error, "response", None), "status_code", None)
+                # Log the status code only; never log the URL, which contains the API key.
+                current_app.logger.warning(
+                    "LocationIQ request failed (%s, HTTP status %s).", type(error).__name__, status
+                )
+                break
+        raise LocationIQRequestError("The location service is temporarily unavailable.") from last_error
 
     @classmethod
     def geocode(cls, address):
