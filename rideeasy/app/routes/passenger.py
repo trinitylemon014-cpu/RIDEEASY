@@ -6,6 +6,7 @@ from app.services.auth_service import login_required, role_required, AuthService
 from app.services.pricing_service import PricingService
 from app.services.payment_service import PaymentService
 from app.services.notification_service import NotificationService
+from app.services.vehicle_photo_service import VehiclePhotoService
 from app.services.location_service import (
     LocationIQConfigurationError,
     LocationIQNoResultsError,
@@ -629,7 +630,8 @@ def ride_detail(ride_id):
     db = get_db()
     ride = db.fetchone(
         """SELECT r.*, u.full_name as driver_name, u.phone as driver_phone, 
-                  d.rating_avg as driver_rating, v.plate_number, v.make, v.model, v.color
+                  d.rating_avg as driver_rating, v.id as vehicle_id, v.year as vehicle_year,
+                  v.plate_number, v.make, v.model, v.color
         FROM rides r
         LEFT JOIN users u ON r.driver_id = u.id
         LEFT JOIN driver_profiles d ON d.user_id = u.id
@@ -639,12 +641,13 @@ def ride_detail(ride_id):
     )
     if not ride:
         abort(404)
-    can_cancel = ride["status"] in {
-        "REQUESTED", "SEARCHING_FOR_DRIVER", "DRIVER_ASSIGNED",
-        "DRIVER_ARRIVING", "DRIVER_ARRIVED",
-    }
+    car_photos = VehiclePhotoService.photo_status(ride["vehicle_id"]) if ride.get("vehicle_id") else []
     return render_template(
-        "passenger/ride_detail.html", user=user, ride=ride, can_cancel=can_cancel
+        "passenger/ride_detail.html",
+        user=user,
+        ride=ride,
+        car_photos=car_photos,
+        car_color_hex=VehiclePhotoService.color_hex(ride.get("color")),
     )
 
 @passenger_bp.route("/rides/<ride_id>/cancel", methods=["GET", "POST"])
@@ -663,32 +666,28 @@ def cancel_ride(ride_id):
     if not ride:
         abort(404)
 
-    can_cancel = ride["status"] in {
-        "REQUESTED", "SEARCHING_FOR_DRIVER", "DRIVER_ASSIGNED",
-        "DRIVER_ARRIVING", "DRIVER_ARRIVED",
-    }
+    # Check if driver has already been assigned
+    is_driver_assigned = bool(ride["driver_id"] or ride["status"] not in ("REQUESTED", "SEARCHING_FOR_DRIVER"))
 
     if request.method == "POST":
-        if not can_cancel:
-            flash("This ride can no longer be cancelled online. Please contact RideEasy support.", "error")
+        if is_driver_assigned:
+            flash("Under RideEasy cancellation rules, direct cancellation is locked once a driver has been dispatched. Please contact support or your driver.", "error")
+            return redirect(url_for("passenger.ride_detail", ride_id=ride_id))
+
+        if ride["status"] == "CANCELLED":
+            flash("This ride has already been cancelled.", "info")
             return redirect(url_for("passenger.ride_detail", ride_id=ride_id))
 
         reason = request.form.get("reason", "Cancelled by passenger before driver assignment").strip()
         custom_notes = request.form.get("custom_notes", "").strip()
         full_reason = f"{reason} — {custom_notes}" if custom_notes else reason
 
-        cancelled = db.execute(
+        db.execute(
             """UPDATE rides 
             SET status = 'CANCELLED', cancellation_reason = ?, cancelled_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP 
-            WHERE id = ? AND passenger_id = ?
-              AND status IN ('REQUESTED', 'SEARCHING_FOR_DRIVER', 'DRIVER_ASSIGNED',
-                             'DRIVER_ARRIVING', 'DRIVER_ARRIVED')""",
-            (full_reason, ride_id, user["id"])
+            WHERE id = ?""",
+            (full_reason, ride_id)
         )
-        if cancelled != 1:
-            flash("The ride has already changed state and can no longer be cancelled online.", "warning")
-            return redirect(url_for("passenger.ride_detail", ride_id=ride_id))
-
         db.execute(
             "UPDATE rewards_redemptions SET status = 'ACTIVE', ride_id = NULL WHERE ride_id = ? AND status = 'USED'",
             (ride_id,)
@@ -700,35 +699,20 @@ def cancel_ride(ride_id):
             (f"aud_{uuid.uuid4().hex[:8]}", user["id"], "PASSENGER_CANCELLED_RIDE", "RIDE", ride_id, f"Reason: {full_reason}")
         )
 
+        # In-app notification to passenger
         NotificationService.create_notification(
             user_id=user["id"],
             title="Ride Request Cancelled",
-            message=f"Your ride #{ride_id[:8].upper()} was cancelled successfully.",
+            message=f"Your ride request #{ride_id[:8].upper()} was cancelled successfully before driver assignment.",
             notif_type="CANCELLATION",
             related_entity_id=ride_id
         )
-        if ride["driver_id"]:
-            NotificationService.create_notification(
-                user_id=ride["driver_id"],
-                title="Passenger cancelled the ride",
-                message=(
-                    f"The passenger cancelled ride #{ride_id[:8].upper()}. "
-                    "Stop trip updates and return to your requests."
-                ),
-                notif_type="CANCELLATION",
-                related_entity_id=ride_id
-            )
 
-        flash(f"Ride #{ride_id[:8].upper()} has been cancelled. The driver was notified.", "info")
-        return redirect(url_for("passenger.ride_detail", ride_id=ride_id))
+        flash(f"Ride request #{ride_id[:8].upper()} has been cancelled and logged in your ride history.", "info")
+        return redirect(url_for("passenger.rides_list"))
 
-    return render_template(
-        "passenger/cancel_confirm.html",
-        user=user,
-        ride=ride,
-        can_cancel=can_cancel,
-        is_driver_assigned=bool(ride["driver_id"]),
-    )
+    # GET request displays the confirmation step with clear cancellation rules
+    return render_template("passenger/cancel_confirm.html", user=user, ride=ride, is_driver_assigned=is_driver_assigned)
 
 @passenger_bp.route("/rides/<ride_id>/rate", methods=["POST"])
 def rate_ride(ride_id):
