@@ -29,7 +29,7 @@ class LocationService:
         return api_key
 
     @staticmethod
-    def _get_json(url, params):
+    def _get_json(url, params, label="request"):
         # LocationIQ's free plan allows ~2 requests/second. A route needs three calls
         # (geocode, geocode, directions), so retry briefly when rate limited (HTTP 429).
         last_error = None
@@ -44,9 +44,13 @@ class LocationService:
             except (requests.RequestException, ValueError) as error:
                 last_error = error
                 status = getattr(getattr(error, "response", None), "status_code", None)
-                # Log the status code only; never log the URL, which contains the API key.
+                # Log the step, status and provider error text; never log the URL or key.
+                body = ""
+                if getattr(error, "response", None) is not None:
+                    body = (error.response.text or "")[:200].replace(params.get("key", "\0"), "***")
                 current_app.logger.warning(
-                    "LocationIQ request failed (%s, HTTP status %s).", type(error).__name__, status
+                    "LocationIQ %s failed (%s, HTTP status %s): %s",
+                    label, type(error).__name__, status, body,
                 )
                 break
         raise LocationIQRequestError("The location service is temporarily unavailable.") from last_error
@@ -63,6 +67,7 @@ class LocationService:
                 "addressdetails": 1,
                 "accept-language": "en",
             },
+            label=f"geocode '{address[:40]}'",
         )
         if not isinstance(results, list) or not results:
             raise LocationIQNoResultsError(f"No location found for “{address}”.")
@@ -98,6 +103,7 @@ class LocationService:
                 "geometries": "geojson",
                 "alternatives": "false",
             },
+            label="directions",
         )
         try:
             route = result["routes"][0]
