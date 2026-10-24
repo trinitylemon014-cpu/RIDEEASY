@@ -141,7 +141,7 @@
   const setupAutocomplete = (input, kind) => {
     if (!locationiqConfigured) return;
 
-    const group = input.closest(".form-group");
+    const group = input.closest(".route-input-wrap") || input.closest(".form-group");
     const listId = `route-${kind}-suggestions`;
     const list = document.createElement("ul");
     list.className = "route-suggestions";
@@ -263,6 +263,7 @@
 
     input.addEventListener("input", () => {
       selectedPlaces[kind] = null; // typed text no longer matches a picked place
+      if (kind === "start" && locateStatus) locateStatus.hidden = true;
       window.clearTimeout(timer);
       const query = input.value.trim();
       if (query.length < MIN_CHARS) {
@@ -290,6 +291,7 @@
       }
     });
 
+    input.addEventListener("route:close", close);
     input.addEventListener("blur", close);
     input.addEventListener("focus", () => {
       const cached = suggestionCache.get(input.value.trim().toLocaleLowerCase());
@@ -299,6 +301,89 @@
 
   setupAutocomplete(startInput, "start");
   setupAutocomplete(destinationInput, "destination");
+
+  // ---------------------------------------------------------------------------
+  // "Use my current location": read the device position, name it on the server,
+  // and use it as the start point (exact coordinates, no geocoding needed).
+  // ---------------------------------------------------------------------------
+  const locateButton = document.getElementById("use-my-location");
+  const locateStatus = document.getElementById("route-locate-status");
+
+  const setLocateStatus = (message, isError = false) => {
+    if (!locateStatus) return;
+    locateStatus.textContent = message;
+    locateStatus.hidden = !message;
+    locateStatus.classList.toggle("is-error", isError);
+  };
+
+  const getDevicePosition = () => new Promise((resolve, reject) => {
+    navigator.geolocation.getCurrentPosition(resolve, reject, {
+      enableHighAccuracy: true,
+      timeout: 12000,
+      maximumAge: 60000,
+    });
+  });
+
+  const geolocationMessage = (error) => {
+    if (error && error.code === 1) {
+      return "Location access is blocked. Allow location for this site in your browser settings, or type your start point.";
+    }
+    if (error && error.code === 3) {
+      return "Finding your location took too long. Try again, or type your start point.";
+    }
+    return "We could not find your location. Type your start point instead.";
+  };
+
+  if (locateButton) {
+    if (!("geolocation" in navigator)) {
+      locateButton.hidden = true;
+    } else {
+      const locateLabel = locateButton.querySelector(".route-locate-label");
+      locateButton.addEventListener("click", async () => {
+        if (window.isSecureContext === false) {
+          setLocateStatus("Your browser only shares location on secure (HTTPS) pages.", true);
+          return;
+        }
+        locateButton.disabled = true;
+        locateLabel.textContent = "Finding your location…";
+        setLocateStatus("");
+        try {
+          const position = await getDevicePosition();
+          const lat = position.coords.latitude;
+          const lng = position.coords.longitude;
+          const accuracy = Math.round(position.coords.accuracy || 0);
+
+          let label = `Current location (${lat.toFixed(5)}, ${lng.toFixed(5)})`;
+          try {
+            const response = await fetch(`/api/places/reverse?lat=${lat}&lng=${lng}`, {
+              headers: { Accept: "application/json" },
+            });
+            const data = response.ok ? await response.json() : null;
+            if (data && data.success && data.place && data.place.label) label = data.place.label;
+          } catch {
+            // Keep the coordinate label; the route can still be calculated from the position.
+          }
+
+          startInput.value = label;
+          selectedPlaces.start = { lat, lng, label };
+          startInput.dispatchEvent(new Event("route:close"));
+          errorElement.hidden = true;
+          if (map) map.setView([lat, lng], 14);
+          setLocateStatus(
+            accuracy > 1000
+              ? `Using your approximate location (within about ${Math.round(accuracy / 1000)} km).`
+              : "Using your current location as the start point."
+          );
+          if (!destinationInput.value.trim()) destinationInput.focus();
+        } catch (error) {
+          setLocateStatus(geolocationMessage(error), true);
+        } finally {
+          locateButton.disabled = false;
+          locateLabel.textContent = "Use my current location";
+        }
+      });
+    }
+  }
 
   const pickedPoint = (kind, input) => {
     const picked = selectedPlaces[kind];
