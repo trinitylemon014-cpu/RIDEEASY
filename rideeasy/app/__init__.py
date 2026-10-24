@@ -112,6 +112,18 @@ def create_app(config_class=Config):
     app.register_blueprint(maps_bp)
     app.register_blueprint(vehicle_photos_bp)
 
+    # Health check that actually exercises the database connection.
+    # Point UptimeRobot here (not Render's healthCheckPath, so a Turso outage
+    # doesn't make Render restart the service).
+    @app.route("/health")
+    def health():
+        try:
+            get_db().fetchone("SELECT 1 AS ok")
+            return {"status": "ok"}, 200
+        except Exception:
+            app.logger.exception("Health check failed")
+            return {"status": "db_unavailable"}, 503
+
     # Error Handlers
     @app.errorhandler(403)
     def forbidden(e):
