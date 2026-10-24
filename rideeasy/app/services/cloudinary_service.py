@@ -1,4 +1,4 @@
-"""Small signed Cloudinary REST client for private server-side image workflows."""
+"""Small signed Cloudinary REST client for server-side image workflows."""
 import hashlib
 import logging
 import time
@@ -98,7 +98,12 @@ class CloudinaryService:
     def fetch(cls, image_url):
         cloud_name, _, _ = cls._credentials()
         parsed = urlparse(image_url or "")
-        if parsed.scheme != "https" or parsed.hostname != f"{cloud_name}.res.cloudinary.com":
+        expected_path = f"/{cloud_name}/image/upload/"
+        if (
+            parsed.scheme != "https"
+            or parsed.hostname != "res.cloudinary.com"
+            or not parsed.path.startswith(expected_path)
+        ):
             raise CloudinaryError("Stored image URL is not a trusted Cloudinary image.")
         try:
             with requests.get(image_url, stream=True, timeout=cls.TIMEOUT) as response:

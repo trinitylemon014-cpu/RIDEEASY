@@ -162,6 +162,7 @@
             {{ ride.color }} {{ ride.make }} {{ ride.model }}
           </div>
         </div>
+        </div>
         {% set uploaded_car_photos = car_photos | selectattr('has_photo') | list %}
         {% if uploaded_car_photos %}
           <div style="border-top: 1px solid var(--color-light-grey); margin-top: 1rem; padding-top: 1rem;">
@@ -182,7 +183,6 @@
             <p class="text-subtle" style="margin: 0.65rem 0 0;">These verified vehicle photos help you identify the car at pickup.</p>
           </div>
         {% endif %}
-      </div>
     </div>
     {% endif %}
 

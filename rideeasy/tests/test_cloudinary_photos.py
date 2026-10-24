@@ -3,8 +3,9 @@ import io
 import time
 
 from PIL import Image
+import pytest
 
-from app.services.cloudinary_service import CloudinaryService
+from app.services.cloudinary_service import CloudinaryError, CloudinaryService
 
 
 def _sample_image():
@@ -56,6 +57,40 @@ def test_cloudinary_upload_uses_signed_server_request(app, monkeypatch):
     assert result["public_id"] == "rideeasy/avatars/user-id"
 
 
+def test_cloudinary_fetch_only_reads_configured_cloud_images(app, monkeypatch):
+    class Response:
+        headers = {"Content-Type": "image/jpeg"}
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+        def raise_for_status(self):
+            pass
+
+        @staticmethod
+        def iter_content(chunk_size):
+            return [b"photo-data"]
+
+    monkeypatch.setitem(app.config, "CLOUDINARY_CLOUD_NAME", "demo-cloud")
+    monkeypatch.setitem(app.config, "CLOUDINARY_API_KEY", "test-api-key")
+    monkeypatch.setitem(app.config, "CLOUDINARY_API_SECRET", "test-api-secret")
+    monkeypatch.setattr(
+        "app.services.cloudinary_service.requests.get",
+        lambda *args, **kwargs: Response(),
+    )
+    with app.app_context():
+        image = CloudinaryService.fetch(
+            "https://res.cloudinary.com/demo-cloud/image/upload/rideeasy/car/front.jpg"
+        )
+        with pytest.raises(CloudinaryError):
+            CloudinaryService.fetch("https://attacker.example/image.jpg")
+
+    assert image == {"mime_type": "image/jpeg", "data": b"photo-data"}
+
+
 def test_driver_vehicle_photos_are_cloud_hosted_and_visible_to_matched_passenger(
     client, db, monkeypatch
 ):
@@ -64,7 +99,7 @@ def test_driver_vehicle_photos_are_cloud_hosted_and_visible_to_matched_passenger
         "app.services.cloudinary_service.CloudinaryService.upload",
         lambda image_bytes, folder, public_id: {
             "public_id": f"{folder}/{public_id}",
-            "secure_url": f"https://demo-cloud.res.cloudinary.com/{folder}/{public_id}.jpg",
+            "secure_url": f"https://res.cloudinary.com/demo-cloud/image/upload/{folder}/{public_id}.jpg",
         },
     )
     with client.session_transaction() as session:
@@ -85,7 +120,7 @@ def test_driver_vehicle_photos_are_cloud_hosted_and_visible_to_matched_passenger
         ("veh_01", "FRONT"),
     )
     assert photo["cloudinary_public_id"] == "rideeasy/vehicles/veh_01/front"
-    assert photo["cloudinary_url"].startswith("https://demo-cloud.res.cloudinary.com/")
+    assert photo["cloudinary_url"].startswith("https://res.cloudinary.com/demo-cloud/image/upload/")
     assert photo["image_data"] == ""
 
     client.get("/auth/demo/passenger", follow_redirects=True)
@@ -101,6 +136,9 @@ def test_driver_vehicle_photos_are_cloud_hosted_and_visible_to_matched_passenger
     photo_response = client.get("/vehicle-photos/veh_01/FRONT.jpg")
     assert photo_response.status_code == 200
     assert photo_response.data == b"cloud-photo"
+
+    client.get("/auth/demo/school", follow_redirects=True)
+    assert client.get("/vehicle-photos/veh_01/FRONT.jpg").status_code == 404
 
 
 def test_profile_picture_is_uploaded_to_cloudinary_and_used_for_current_user(
