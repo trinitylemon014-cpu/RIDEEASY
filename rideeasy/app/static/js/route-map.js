@@ -14,14 +14,45 @@
   const useRouteLink = document.getElementById("use-route");
   const locationiqConfigured = planner.dataset.locationiqConfigured === "true";
 
+  const DEFAULT_STATUS = "Map centered on Uganda. Calculate a route to see directions.";
+
   let map;
   let routeLayers;
   if (window.L) {
     map = L.map(mapElement, { scrollWheelZoom: false }).setView([1.2, 32.3], 7);
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      maxZoom: 19,
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-    }).addTo(map);
+
+    // Tiles are served by RideEasy's own /map/tiles proxy (LocationIQ, key kept
+    // server-side). Public OpenStreetMap tile servers block apps that don't follow
+    // their tile usage policy (HTTP 403 "Access blocked"), so they are only used
+    // as a low-volume fallback when LocationIQ is not configured.
+    const tileLayer = locationiqConfigured
+      ? L.tileLayer("/map/tiles/{z}/{x}/{y}.png", {
+          maxZoom: 18,
+          attribution:
+            '&copy; <a href="https://locationiq.com/">LocationIQ</a> &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+        })
+      : L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+          maxZoom: 19,
+          referrerPolicy: "strict-origin-when-cross-origin",
+          attribution:
+            '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+        });
+
+    let tileErrorShown = false;
+    tileLayer.on("tileerror", () => {
+      if (tileErrorShown) return;
+      tileErrorShown = true;
+      mapStatus.textContent =
+        "Map tiles could not be loaded right now. Route distance can still be calculated.";
+    });
+    tileLayer.on("tileload", () => {
+      if (tileErrorShown) {
+        tileErrorShown = false;
+        mapStatus.textContent = DEFAULT_STATUS;
+      }
+    });
+    tileLayer.addTo(map);
+
     routeLayers = L.featureGroup().addTo(map);
   } else {
     mapStatus.textContent = "The interactive map could not be loaded. Route distance can still be calculated.";
