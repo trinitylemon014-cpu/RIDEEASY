@@ -38,6 +38,10 @@
     display: none;
   }
 
+  .nav-actions > .app-install-button {
+    display: none;
+  }
+
   .mobile-menu-btn {
     display: block;
   }

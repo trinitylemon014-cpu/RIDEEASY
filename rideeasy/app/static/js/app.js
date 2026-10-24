@@ -25,6 +25,70 @@ document.addEventListener("DOMContentLoaded", () => {
     }, 6000);
   });
 
+  // 2a. Add RideEasy to the device using the browser's supported install flow.
+  const installButtons = document.querySelectorAll("[data-install-app]");
+  const installHelp = document.getElementById("app-install-help");
+  const installInstructions = document.getElementById("app-install-instructions");
+  const installHelpClose = document.getElementById("app-install-help-close");
+  let deferredInstallPrompt = null;
+  const isStandalone = window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone === true;
+
+  function showInstallInstructions() {
+    if (!installHelp || !installInstructions) return;
+    const userAgent = window.navigator.userAgent || "";
+    if (/iPad|iPhone|iPod/i.test(userAgent)) {
+      installInstructions.textContent = "In Safari, tap Share, then choose “Add to Home Screen”.";
+    } else if (/Android/i.test(userAgent)) {
+      installInstructions.textContent = "In Chrome, open the three-dot menu and choose “Install app” or “Add to Home screen”.";
+    } else {
+      installInstructions.textContent = "In your browser's menu or address bar, choose “Install RideEasy” or “Create shortcut”. If your browser does not offer this option, bookmark this page.";
+    }
+    if (typeof installHelp.showModal === "function") {
+      installHelp.showModal();
+    } else {
+      window.alert(installInstructions.textContent);
+    }
+  }
+
+  if (isStandalone) {
+    installButtons.forEach((button) => {
+      button.hidden = true;
+    });
+  }
+
+  window.addEventListener("beforeinstallprompt", (event) => {
+    event.preventDefault();
+    deferredInstallPrompt = event;
+  });
+
+  window.addEventListener("appinstalled", () => {
+    deferredInstallPrompt = null;
+    installButtons.forEach((button) => {
+      button.hidden = true;
+    });
+  });
+
+  installButtons.forEach((button) => {
+    button.addEventListener("click", async () => {
+      if (!deferredInstallPrompt) {
+        showInstallInstructions();
+        return;
+      }
+
+      const installPrompt = deferredInstallPrompt;
+      deferredInstallPrompt = null;
+      await installPrompt.prompt();
+      await installPrompt.userChoice;
+    });
+  });
+
+  if (installHelpClose && installHelp) {
+    installHelpClose.addEventListener("click", () => installHelp.close());
+    installHelp.addEventListener("click", (event) => {
+      if (event.target === installHelp) installHelp.close();
+    });
+  }
+
   // 3. Ugandan Landmark Coordinates & Fare Estimator Logic
   const UGANDA_LANDMARKS = [
     { name: "Entebbe International Airport (EBB)", lat: 0.0424, lng: 32.4435 },
@@ -1552,4 +1616,3 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   };
 });
-

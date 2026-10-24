@@ -3,22 +3,16 @@
   "name": "RideEasy - Transport & Travel",
   "short_name": "RideEasy",
   "description": "MOVE. TRAVEL. ARRIVE. Professional transportation and travel platform by Emtrixz Technology Company.",
-  "start_url": "/",
+  "start_url": "/?source=installed-app",
   "scope": "/",
   "display": "standalone",
   "background_color": "#FFFFFF",
-  "theme_color": "#000000",
+  "theme_color": "#075985",
   "icons": [
     {
-      "src": "/static/icons/icon-192.png",
-      "sizes": "192x192",
-      "type": "image/png",
-      "purpose": "any"
-    },
-    {
-      "src": "/static/icons/icon-512.png",
-      "sizes": "512x512",
-      "type": "image/png",
+      "src": "/static/icons/rideeasy-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
       "purpose": "any"
     }
   ]
