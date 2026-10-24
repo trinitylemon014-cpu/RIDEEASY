@@ -5,16 +5,26 @@ from flask import current_app, has_app_context
 from app.repositories.database import get_db
 from app.config import Config
 
-def seed_database():
-    """Seeds the database with pricing configs, realistic Ugandan transportation data, and demo accounts."""
+def seed_database(include_demo_data=None):
+    """Initialize shared pricing and provision accounts or test fixtures."""
     db = get_db()
     db.init_db()
+    if include_demo_data is None:
+        include_demo_data = has_app_context() and current_app.testing
     if has_app_context():
         collection_phone = current_app.config["PAYSTACK_COLLECTION_PHONE"]
         admin_payout_phone = current_app.config["PAYSTACK_ADMIN_PAYOUT_PHONE"]
+        admin_email = current_app.config["ADMIN_EMAIL"]
+        admin_name = current_app.config["ADMIN_NAME"]
+        admin_password = current_app.config["ADMIN_PASSWORD"]
+        admin_phone = current_app.config["ADMIN_PHONE"]
     else:
         collection_phone = Config.PAYSTACK_COLLECTION_PHONE
         admin_payout_phone = Config.PAYSTACK_ADMIN_PAYOUT_PHONE
+        admin_email = Config.ADMIN_EMAIL
+        admin_name = Config.ADMIN_NAME
+        admin_password = Config.ADMIN_PASSWORD
+        admin_phone = Config.ADMIN_PHONE
     for setting_key, setting_value in (
         ("collection_phone", collection_phone),
         ("admin_payout_phone", admin_payout_phone),
@@ -72,29 +82,7 @@ def seed_database():
         FOREIGN KEY (passenger_id) REFERENCES users(id) ON DELETE CASCADE
     )""")
 
-    # Check if already seeded
-    existing_admin = db.fetchone("SELECT id FROM users WHERE email = ?", ("admin@rideeasy.ug",))
-    if existing_admin:
-        # Check if notifications table has any entries, seed demo notification if empty
-        notif = db.fetchone("SELECT id FROM notifications LIMIT 1")
-        if not notif:
-            db.execute(
-                "INSERT INTO notifications (id, user_id, title, message, type, is_read, related_entity_id) VALUES (?, ?, ?, ?, ?, 0, ?)",
-                ("notif_demo_01", "usr_pass_01", "Driver Assigned", "David Okello (Toyota Premio UBD 204K) has been assigned to your trip #RIDE_01.", "DRIVER_ASSIGNED", "ride_01")
-            )
-        # Check if demo rewards redemption exists
-        redemption = db.fetchone("SELECT id FROM rewards_redemptions WHERE passenger_id = 'usr_pass_01' LIMIT 1")
-        if not redemption:
-            db.execute(
-                """INSERT INTO rewards_redemptions
-                (id, passenger_id, reward_id, reward_title, points_spent, voucher_code, discount_ugx, status, created_at, expires_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, 'ACTIVE', datetime('now', '-2 days'), datetime('now', '+58 days'))""",
-                ("red_demo_01", "usr_pass_01", "rew_toll_pass", "Entebbe Expressway Toll Pass", 200, "REWARD-TOLL-9421", 5000)
-            )
-    else:
-        print("Seeding RideEasy platform data...")
-
-    # 1. Pricing Configurations (Ugandan Shillings - UGX)
+    # Pricing Configurations (Ugandan Shillings - UGX)
     pricing = [
         ("BODA", 1500, 700, 100, 2500),
         ("ECONOMY", 3500, 1500, 200, 6000),
@@ -109,13 +97,36 @@ def seed_database():
             (cat, base, per_km, per_min, min_f)
         )
 
-    # 2. Demo Users for all 5 roles
-    default_pw = generate_password_hash("password123")
-    admin_pw = generate_password_hash("admin123")
+    if not include_demo_data:
+        if not admin_password:
+            raise RuntimeError("ADMIN_PASSWORD must be set to provision the production administrator.")
+        _remove_legacy_demo_data(db)
+        admin = db.fetchone("SELECT id, role FROM users WHERE email = ?", (admin_email,))
+        if admin and admin["role"] != "ADMIN":
+            raise RuntimeError(f"Cannot provision administrator: {admin_email} is already assigned to another role.")
+        if not admin:
+            db.execute(
+                """INSERT INTO users
+                   (id, email, password_hash, role, full_name, phone, is_active, is_verified)
+                   VALUES (?, ?, ?, 'ADMIN', ?, ?, 1, 1)""",
+                (f"usr_{uuid.uuid4().hex[:10]}", admin_email, generate_password_hash(admin_password), admin_name, admin_phone)
+            )
+        else:
+            db.execute(
+                "UPDATE users SET full_name = ?, is_active = 1, is_verified = 1 WHERE id = ?",
+                (admin_name, admin["id"])
+            )
+        return
+
+    # Demo accounts and fixtures are only created by the test suite.
+    if not admin_password:
+        raise RuntimeError("ADMIN_PASSWORD must be set when seeding test accounts.")
+    default_pw = generate_password_hash(uuid.uuid4().hex)
+    admin_pw = generate_password_hash(admin_password)
 
     users = [
         # (id, email, pw, role, full_name, phone, is_verified)
-        ("usr_admin_01", "admin@rideeasy.ug", admin_pw, "ADMIN", "Arthur Katende", "+256 701 999 888", 1),
+        ("usr_admin_01", admin_email, admin_pw, "ADMIN", admin_name, admin_phone, 1),
         ("usr_pass_01", "passenger@rideeasy.ug", default_pw, "PASSENGER", "Grace Namubiru", "+256 772 123 456", 1),
         ("usr_driver_01", "driver@rideeasy.ug", default_pw, "DRIVER", "David Okello", "+256 754 445 566", 1),
         ("usr_school_01", "school@rideeasy.ug", default_pw, "SCHOOL", "Greenhill Academy Kampala", "+256 414 342 900", 1),
@@ -127,6 +138,23 @@ def seed_database():
             "INSERT OR IGNORE INTO users (id, email, password_hash, role, full_name, phone, is_active, is_verified) VALUES (?, ?, ?, ?, ?, ?, 1, ?)",
             (uid, email, pw, role, name, phone, verified)
         )
+
+    existing_admin = db.fetchone("SELECT id FROM users WHERE email = ?", (admin_email,))
+    if existing_admin:
+        notif = db.fetchone("SELECT id FROM notifications WHERE id = ?", ("notif_demo_01",))
+        if not notif:
+            db.execute(
+                "INSERT INTO notifications (id, user_id, title, message, type, is_read, related_entity_id) VALUES (?, ?, ?, ?, ?, 0, ?)",
+                ("notif_demo_01", "usr_pass_01", "Driver Assigned", "David Okello (Toyota Premio UBD 204K) has been assigned to your trip #RIDE_01.", "DRIVER_ASSIGNED", "ride_01")
+            )
+        redemption = db.fetchone("SELECT id FROM rewards_redemptions WHERE id = ?", ("red_demo_01",))
+        if not redemption:
+            db.execute(
+                """INSERT INTO rewards_redemptions
+                (id, passenger_id, reward_id, reward_title, points_spent, voucher_code, discount_ugx, status, created_at, expires_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, 'ACTIVE', datetime('now', '-2 days'), datetime('now', '+58 days'))""",
+                ("red_demo_01", "usr_pass_01", "rew_toll_pass", "Entebbe Expressway Toll Pass", 200, "REWARD-TOLL-9421", 5000)
+            )
 
     # 3. Passenger Profile
     db.execute(
@@ -272,3 +300,102 @@ def _seed_saved_routes(db):
             VALUES (?, ?, ?, ?, ?, ?)""",
             (r_id, p_id, r_name, p_addr, d_addr, cat)
         )
+
+
+def _remove_legacy_demo_data(db):
+    """Remove the built-in demo identities and their linked sample records."""
+    demo_emails = (
+        "admin@rideeasy.ug",
+        "passenger@rideeasy.ug",
+        "driver@rideeasy.ug",
+        "school@rideeasy.ug",
+        "travel@rideeasy.ug",
+    )
+    demo_ids = "SELECT id FROM users WHERE email IN (?, ?, ?, ?, ?)"
+    demo_ride_ids = "SELECT id FROM rides WHERE passenger_id IN (" + demo_ids + ")"
+    demo_flight_request_ids = (
+        "SELECT id FROM flight_requests WHERE passenger_id IN (" + demo_ids + ")"
+    )
+    operations = [
+        (
+            """UPDATE school_transport_requests
+               SET assigned_driver_id = NULL, assigned_vehicle_id = NULL
+               WHERE assigned_driver_id IN (""" + demo_ids + """)
+                  OR assigned_vehicle_id IN (
+                      SELECT id FROM vehicles WHERE driver_id IN (""" + demo_ids + """)
+                  )""",
+            demo_emails * 2,
+        ),
+        (
+            "UPDATE flight_requests SET assigned_company_id = NULL WHERE assigned_company_id IN (" + demo_ids + ")",
+            demo_emails,
+        ),
+        (
+            """DELETE FROM ride_ratings
+               WHERE passenger_id IN (""" + demo_ids + """)
+                  OR driver_id IN (""" + demo_ids + """)""",
+            demo_emails * 2,
+        ),
+        (
+            """DELETE FROM reward_point_awards
+               WHERE passenger_id IN (""" + demo_ids + """)
+                  OR ride_id IN (""" + demo_ride_ids + """)""",
+            demo_emails * 2,
+        ),
+        (
+            """DELETE FROM flight_quotations
+               WHERE travel_company_id IN (""" + demo_ids + """)
+                  OR request_id IN (""" + demo_flight_request_ids + """)""",
+            demo_emails * 2,
+        ),
+        (
+            """DELETE FROM flight_bookings
+               WHERE travel_company_id IN (""" + demo_ids + """)
+                  OR request_id IN (""" + demo_flight_request_ids + """)""",
+            demo_emails * 2,
+        ),
+        (
+            """DELETE FROM payment_ledger
+               WHERE recipient_id IN (""" + demo_ids + """)
+                  OR payment_id IN (
+                      SELECT id FROM payment_transactions
+                      WHERE passenger_id IN (""" + demo_ids + """)
+                         OR ride_id IN (""" + demo_ride_ids + """)
+                  )""",
+            demo_emails * 3,
+        ),
+        (
+            """DELETE FROM sms_messages WHERE payment_id IN (
+                   SELECT id FROM payment_transactions
+                   WHERE passenger_id IN (""" + demo_ids + """)
+                      OR ride_id IN (""" + demo_ride_ids + """)
+               )""",
+            demo_emails * 2,
+        ),
+        (
+            """DELETE FROM payment_transactions
+               WHERE passenger_id IN (""" + demo_ids + """)
+                  OR ride_id IN (""" + demo_ride_ids + """)""",
+            demo_emails * 2,
+        ),
+        (
+            """UPDATE rides SET related_journey_id = NULL
+               WHERE related_journey_id IN (
+                   SELECT id FROM confirmed_journeys WHERE passenger_id IN (""" + demo_ids + """)
+               )""",
+            demo_emails,
+        ),
+        (
+            "UPDATE rides SET driver_id = NULL WHERE driver_id IN (" + demo_ids + ")",
+            demo_emails,
+        ),
+        (
+            "DELETE FROM vehicles WHERE driver_id IN (" + demo_ids + ")",
+            demo_emails,
+        ),
+        (
+            "DELETE FROM users WHERE email IN (?, ?, ?, ?, ?)",
+            demo_emails,
+        ),
+    ]
+    db.execute_transaction(operations)

@@ -1,5 +1,5 @@
 import uuid
-from flask import Blueprint, render_template, request, redirect, url_for, flash, session
+from flask import Blueprint, abort, current_app, render_template, request, redirect, url_for, flash, session
 from werkzeug.security import generate_password_hash
 from app.repositories.database import get_db
 from app.services.auth_service import AuthService
@@ -31,9 +31,11 @@ def login():
 
 @auth_bp.route("/demo/<role>")
 def demo_login(role):
-    """Convenience 1-click login for demonstration of all 5 system roles."""
+    """Test-only convenience login for the seeded test fixtures."""
+    if not current_app.testing:
+        abort(404)
     role_map = {
-        "admin": "admin@rideeasy.ug",
+        "admin": current_app.config["ADMIN_EMAIL"],
         "passenger": "passenger@rideeasy.ug",
         "driver": "driver@rideeasy.ug",
         "school": "school@rideeasy.ug",

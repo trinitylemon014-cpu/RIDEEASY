@@ -48,7 +48,19 @@ turso db show rideeasy-db --url
 ## 3. Local Development Database
 When `TURSO_DATABASE_URL` is omitted or empty, RideEasy initializes local SQLite (`rideeasy.db`). A configured Turso connection failure raises an error; RideEasy does not silently switch production traffic or payment records to a local file. Payment settlement requires a transactional `libsql://`, `ws://`, or `wss://` connection; the HTTP-only `https://` transport cannot atomically commit ledger entries.
 
-## 4. Key Relational Tables & Constraints
+## 4. Initial Administrator and Production Data
+Production startup provisions `ADMIN_EMAIL` (default `admin@rideeasy.com`) with
+`ADMIN_NAME` (default `katongole kylee`) when that account does not already
+exist. Set `ADMIN_PASSWORD` in the deployment's secret store before the first
+startup; only a password hash is stored. Existing built-in demo accounts and
+their seeded sample records are removed during production initialization.
+Sample users and journeys are created only by automated tests.
+
+Render deployments must configure both `TURSO_DATABASE_URL` and
+`TURSO_AUTH_TOKEN`. Startup fails if either is missing, preventing production
+from silently using Render's non-persistent local filesystem.
+
+## 5. Key Relational Tables & Constraints
 - `users`: Core authentication identity with role enum check (`PASSENGER`, `DRIVER`, `SCHOOL`, `TRAVEL_COMPANY`, `ADMIN`).
 - `driver_profiles` & `driver_documents`: National ID (NIN), permit, police clearances, rating aggregates.
 - `vehicles`: License plates, seating capacities, vehicle types (`BODA`, `ECONOMY`, `COMFORT`, `PREMIUM`, `COASTER`, `BUS`).

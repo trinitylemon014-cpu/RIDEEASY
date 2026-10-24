@@ -41,9 +41,11 @@ source venv/bin/activate       # macOS / Linux
 # 3. Install dependencies
 pip install -r requirements.txt
 
-# 4. Set a private SECRET_KEY in your environment (required)
+# 4. Configure required local secrets
 export SECRET_KEY="$(python -c 'import secrets; print(secrets.token_hex(32))')"
 export FLASK_ENV=development
+# Set this to your initial administrator password before first startup.
+export ADMIN_PASSWORD="<initial-admin-password>"
 # For production, also configure Turso, Paystack, callback URL, and EgoSMS secrets.
 # See docs/API_INTEGRATIONS.md and docs/DEPLOYMENT.md.
 
@@ -51,21 +53,22 @@ export FLASK_ENV=development
 python run.py
 ```
 
-The platform will automatically initialize tables, seed demo data, and start on `http://127.0.0.1:5000`. Payment checkout is disabled until a Paystack secret and public HTTPS callback URL are configured.
+The platform initializes tables and pricing, provisions the configured administrator, and starts on `http://127.0.0.1:5000`. Local development uses SQLite unless Turso is configured. Payment checkout is disabled until a Paystack secret and public HTTPS callback URL are configured.
 
----
+## 4. Production Admin & Deployment
 
-## 4. Demo Accounts & Credentials
+Production starts with only the administrator account configured by `ADMIN_EMAIL`
+and `ADMIN_NAME` (defaults: `admin@rideeasy.com` and `katongole kylee`).
+Set `ADMIN_PASSWORD` in your private environment or deployment secret store before
+the first startup. The password is stored as a password hash. Production startup
+removes the previous built-in demo accounts and associated sample records; demo
+fixtures are available only to automated tests.
 
-RideEasy includes a 1-click **Demo Switcher** at the top of every screen. You can also sign in manually using:
-
-| Role | Email Address | Password | Profile Overview |
-| :--- | :--- | :--- | :--- |
-| **Passenger** | `passenger@rideeasy.ug` | `password123` | Grace Namubiru (Kololo, Kampala) |
-| **Driver** | `driver@rideeasy.ug` | `password123` | David Okello (Toyota Premio `UBD 204K`) |
-| **School** | `school@rideeasy.ug` | `password123` | Greenhill Academy Kibuli (Charter Coasters/Buses) |
-| **Travel Partner** | `travel@rideeasy.ug` | `password123` | Nile Equatorial Travel Ltd (IATA Accredited Agency) |
-| **Administrator** | `admin@rideeasy.ug` | `admin123` | Arthur Katende (Operations Director) |
+Deploy to Render using the repository's `render.yaml` Blueprint. Configure
+`TURSO_DATABASE_URL` and `TURSO_AUTH_TOKEN` in Render from your Turso database;
+the deployment intentionally fails if either is missing rather than using
+ephemeral local SQLite. Follow [docs/DEPLOYMENT.md](./docs/DEPLOYMENT.md) for
+Turso setup and Render deployment instructions.
 
 ---
 
@@ -109,7 +112,7 @@ rideeasy/
 │   └── templates/               # Jinja2 HTML templates
 ├── database/
 │   ├── schema/schema.sql        # Turso & SQLite schema
-│   └── migrations/seed_data.py  # Ugandan transportation fixtures & demo accounts
+│   └── migrations/seed_data.py  # Shared defaults, production admin, test fixtures
 ├── docs/                        # Complete architecture, database, security, and packaging guides
 ├── tests/                       # Comprehensive pytest suite
 ├── requirements.txt

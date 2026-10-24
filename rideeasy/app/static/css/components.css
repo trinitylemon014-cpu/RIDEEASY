@@ -822,46 +822,6 @@
   background-color: var(--blue-50);
 }
 
-/* Demo Role Bar */
-.demo-role-bar {
-  background-color: var(--blue-900);
-  color: var(--color-white);
-  padding: 0.5rem 1rem;
-  font-size: 0.75rem;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-}
-
-.demo-role-links {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  flex-wrap: wrap;
-}
-
-.demo-btn {
-  background-color: transparent;
-  color: var(--blue-100);
-  border: 1px solid rgba(186, 230, 253, 0.45);
-  padding: 0.2rem 0.5rem;
-  font-size: 0.6875rem;
-  font-weight: 600;
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  transition: all 0.15s ease;
-}
-
-.demo-btn:hover {
-  background-color: var(--yellow-400);
-  color: var(--blue-900);
-  border-color: var(--yellow-400);
-}
-
 /* Footer */
 .footer {
   background-color: var(--blue-800);

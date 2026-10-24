@@ -11,6 +11,7 @@ from app.repositories.database import get_db
 
 class TestConfig(Config):
     SECRET_KEY = "test-only-rideeasy-secret"
+    ADMIN_PASSWORD = "test-admin-password"
     TESTING = True
     DEBUG = False
     FLASK_ENV = "testing"

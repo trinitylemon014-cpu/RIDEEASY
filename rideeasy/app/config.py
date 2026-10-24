@@ -17,6 +17,10 @@ class Config:
     TURSO_DATABASE_URL = os.getenv("TURSO_DATABASE_URL", "").strip()
     TURSO_AUTH_TOKEN = os.getenv("TURSO_AUTH_TOKEN", "").strip()
     LOCAL_DB_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "rideeasy.db")
+    ADMIN_EMAIL = os.getenv("ADMIN_EMAIL", "admin@rideeasy.com").strip().lower()
+    ADMIN_NAME = os.getenv("ADMIN_NAME", "katongole kylee").strip()
+    ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "")
+    ADMIN_PHONE = os.getenv("ADMIN_PHONE", "").strip()
 
     # Largest request body Flask will accept (3 car photos of up to 8 MB each, plus form fields)
     MAX_CONTENT_LENGTH = 26 * 1024 * 1024

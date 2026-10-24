@@ -1,0 +1,25 @@
+services:
+  - type: web
+    name: rideeasy
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn --chdir rideeasy --bind 0.0.0.0:$PORT wsgi:app
+    healthCheckPath: /
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.8
+      - key: FLASK_ENV
+        value: production
+      - key: ADMIN_EMAIL
+        value: admin@rideeasy.com
+      - key: ADMIN_NAME
+        value: katongole kylee
+      - key: SECRET_KEY
+        generateValue: true
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: TURSO_DATABASE_URL
+        sync: false
+      - key: TURSO_AUTH_TOKEN
+        sync: false

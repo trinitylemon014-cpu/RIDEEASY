@@ -4,6 +4,7 @@
 ## 1. Authentication & Password Security
 - **Algorithm**: Passwords are cryptographically hashed using PBKDF2 with SHA-256 (via `werkzeug.security.generate_password_hash` with random salt).
 - **Storage**: Plaintext passwords are never logged, cached, or written to disk.
+- **Initial administrator**: The password is supplied through the `ADMIN_PASSWORD` deployment secret and only a hash is stored. Built-in demo login is unavailable outside tests.
 - **Session Security**: Session cookies are configured with:
   - `SESSION_COOKIE_HTTPONLY = True` (prevents XSS access)
   - `SESSION_COOKIE_SAMESITE = 'Lax'` (mitigates CSRF)

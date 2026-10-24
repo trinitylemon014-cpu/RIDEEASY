@@ -206,7 +206,7 @@
   body {
     background-color: #FFFFFF !important;
   }
-  .navbar, .footer, .btn, .demo-role-bar, .no-print {
+  .navbar, .footer, .btn, .no-print {
     display: none !important;
   }
   .receipt-box {

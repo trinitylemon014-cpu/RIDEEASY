@@ -13,8 +13,20 @@ def create_app(config_class=Config):
     app.config.from_object(config_class)
     if not app.config.get("SECRET_KEY") and not app.config.get("TESTING"):
         raise RuntimeError("SECRET_KEY must be set to a strong deployment secret.")
+    if not app.config.get("TESTING") and app.config.get("FLASK_ENV") == "production":
+        required_secrets = ("TURSO_DATABASE_URL", "TURSO_AUTH_TOKEN", "ADMIN_PASSWORD")
+        missing_secrets = [key for key in required_secrets if not app.config.get(key)]
+        if missing_secrets:
+            raise RuntimeError(
+                "Production deployment requires these environment variables: "
+                + ", ".join(missing_secrets)
+            )
+        if not app.config["TURSO_DATABASE_URL"].startswith(("libsql://", "ws://", "wss://")):
+            raise RuntimeError(
+                "Production TURSO_DATABASE_URL must use libsql://, ws://, or wss://."
+            )
 
-    # Initialize database & seed demo data if needed
+    # Initialize database and provision production or test accounts.
     with app.app_context():
         from database.migrations.seed_data import seed_database
         seed_database()

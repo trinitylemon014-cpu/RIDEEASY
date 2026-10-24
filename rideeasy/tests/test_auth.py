@@ -32,7 +32,13 @@ def test_demo_login_travel_partner(client):
 def test_demo_login_admin(client):
     response = client.get("/auth/demo/admin", follow_redirects=True)
     assert response.status_code == 200
-    assert b"Operations Desk: Arthur Katende" in response.data
+    assert b"Operations Desk: katongole kylee" in response.data
+
+def test_demo_login_is_not_available_outside_testing(app):
+    app.testing = False
+    response = app.test_client().get("/auth/demo/passenger")
+    assert response.status_code == 404
+    app.testing = True
 
 def test_logout(client):
     client.get("/auth/demo/passenger", follow_redirects=True)

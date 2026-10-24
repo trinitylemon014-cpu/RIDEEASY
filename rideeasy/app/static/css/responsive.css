@@ -106,9 +106,6 @@
     text-align: center;
   }
 
-  .demo-role-bar {
-    justify-content: center;
-  }
 }
 
 @media (max-width: 480px) {

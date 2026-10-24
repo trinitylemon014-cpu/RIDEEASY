@@ -20,14 +20,41 @@ source venv/bin/activate  # On Windows: venv\Scripts\activate
 # Install dependencies
 pip install -r requirements.txt
 
-# Run database setup & seeding
+# Configure local development secrets (keep these out of Git)
+export FLASK_ENV=development
+export SECRET_KEY="$(python3 -c 'import secrets; print(secrets.token_hex(32))')"
+export ADMIN_PASSWORD="<initial-admin-password>"
+
+# Run database setup and administrator provisioning
 python run.py
 ```
 Open your browser at `http://127.0.0.1:5000` to interact with the live application.
 
 ---
 
-## 2. Production Deployment (Linux / Ubuntu / Debian)
+## 2. Production Deployment on Render
+
+The repository includes a Render Blueprint at `render.yaml`. Create a Blueprint
+deployment from this repository and provide these values when prompted:
+
+- `TURSO_DATABASE_URL`: the database URL from Turso (use `libsql://` for
+  transactional payment support).
+- `TURSO_AUTH_TOKEN`: a token generated for the database.
+- `ADMIN_PASSWORD`: the initial password for `admin@rideeasy.com`.
+
+The Blueprint generates `SECRET_KEY` and configures `ADMIN_EMAIL=admin@rideeasy.com`
+and `ADMIN_NAME=katongole kylee`. Keep `ADMIN_PASSWORD`, `TURSO_AUTH_TOKEN`, and
+other credentials in Render's environment settings, never in Git. On first
+startup, the app creates the admin account and hashes the configured password.
+Production refuses to start without Turso URL/token and admin password, and
+never stores persistent user or payment data in Render's ephemeral filesystem.
+
+Create the Turso database and token as described in
+[docs/DATABASE.md](./DATABASE.md), then enter those values in Render. After
+deployment, verify the service logs and sign in using the configured admin email
+and password.
+
+## 3. Production Deployment (Linux / Ubuntu / Debian)
 
 Before enabling payments, set deployment secrets outside source control:
 
@@ -36,6 +63,9 @@ SECRET_KEY=<strong-random-secret>
 FLASK_ENV=production
 TURSO_DATABASE_URL=libsql://<database>.turso.io
 TURSO_AUTH_TOKEN=<database-token>
+ADMIN_EMAIL=admin@rideeasy.com
+ADMIN_NAME=katongole kylee
+ADMIN_PASSWORD=<initial-admin-password>
 PAYSTACK_SECRET_KEY=<Paystack-secret-key>
 PAYSTACK_CALLBACK_URL=https://rideeasy.ug/payments/paystack/callback
 PAYSTACK_CURRENCY=UGX
