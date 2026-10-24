@@ -200,13 +200,18 @@ def get_passenger_rewards_summary(passenger_id, db):
 def dashboard():
     user = AuthService.get_current_user()
     db = get_db()
+    stats_row = db.fetchone(
+        """SELECT
+               (SELECT COUNT(*) FROM rides WHERE passenger_id = ?) AS rides,
+               (SELECT COUNT(*) FROM rides WHERE passenger_id = ?
+                   AND status IN ('REQUESTED', 'SEARCHING_FOR_DRIVER')) AS awaiting_rides,
+               (SELECT COUNT(*) FROM flight_requests WHERE passenger_id = ?) AS flight_requests""",
+        (user["id"], user["id"], user["id"])
+    )
     overview_stats = {
-        "rides": db.fetchone("SELECT COUNT(*) as count FROM rides WHERE passenger_id = ?", (user["id"],))["count"],
-        "awaiting_rides": db.fetchone(
-            "SELECT COUNT(*) as count FROM rides WHERE passenger_id = ? AND status IN ('REQUESTED', 'SEARCHING_FOR_DRIVER')",
-            (user["id"],)
-        )["count"],
-        "flight_requests": db.fetchone("SELECT COUNT(*) as count FROM flight_requests WHERE passenger_id = ?", (user["id"],))["count"]
+        "rides": stats_row["rides"],
+        "awaiting_rides": stats_row["awaiting_rides"],
+        "flight_requests": stats_row["flight_requests"]
     }
     recent_rides = db.fetchall(
         """SELECT r.id, r.pickup_address, r.destination_address, r.status, r.created_at,
