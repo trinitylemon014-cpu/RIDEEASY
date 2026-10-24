@@ -39,13 +39,27 @@
                 <div class="text-subtle">{{ d.phone }} · {{ d.email }}</div>
               </td>
               <td>
-                <div>Lic: {{ d.license_number }}</div>
-                <div class="text-subtle">NIN: {{ d.national_id_nin }}</div>
+                <div>Lic: {{ d.license_display }}</div>
+                <div class="text-subtle">NIN: {{ d.nin_display }}</div>
+                <div class="text-subtle">
+                  {% if d.age is not none %}Age {{ d.age }}{% else %}Age not given{% endif %}
+                  · {{ d.years_experience if d.date_of_birth else '—' }} yrs driving
+                </div>
               </td>
               <td>
                 {% if d.plate_number %}
                   <div style="font-weight: 700;">{{ d.plate_number }}</div>
-                  <div class="text-subtle">{{ d.make }} {{ d.model }} ({{ d.vehicle_category }})</div>
+                  <div class="text-subtle">{{ d.vehicle_color }} {{ d.make }} {{ d.model }} ({{ d.vehicle_year }})</div>
+                  <div class="text-subtle">{{ d.vehicle_category }} · {{ d.vehicle_capacity }} seats</div>
+                  <div class="text-subtle">
+                    Photos {{ d.photo_count }}/3
+                    {% if d.photo_count %}
+                      ·
+                      {% for slot, label in (('FRONT', 'Front'), ('SIDE', 'Side'), ('BACK', 'Back')) %}
+                        <a href="{{ url_for('vehicle_photos.serve', vehicle_id=d.vehicle_id, slot=slot) }}" target="_blank" rel="noopener" style="text-decoration: underline;">{{ label }}</a>{% if not loop.last %} {% endif %}
+                      {% endfor %}
+                    {% endif %}
+                  </div>
                 {% else %}
                   <span class="text-subtle">No Vehicle</span>
                 {% endif %}
