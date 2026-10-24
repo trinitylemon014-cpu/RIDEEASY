@@ -22,6 +22,11 @@ class Config:
     ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "")
     ADMIN_PHONE = os.getenv("ADMIN_PHONE", "").strip()
 
+    # Password hashing cost for NEW accounts. "scrypt" is Werkzeug's default and the safest.
+    # On very small CPUs (e.g. Render free plan) it can take over a second per hash;
+    # "scrypt:16384:8:1" is about 4x faster. Existing hashes keep verifying either way.
+    PASSWORD_HASH_METHOD = os.getenv("PASSWORD_HASH_METHOD", "scrypt").strip() or "scrypt"
+
     # Largest request body Flask will accept (3 car photos of up to 8 MB each, plus form fields)
     MAX_CONTENT_LENGTH = 26 * 1024 * 1024
 
