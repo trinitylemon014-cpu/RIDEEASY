@@ -4,6 +4,7 @@ import secrets
 from flask import Blueprint, render_template, request, redirect, url_for, flash, session, abort
 from app.repositories.database import get_db
 from app.services.auth_service import login_required, role_required, AuthService
+from app.services import driver_profile_service
 
 admin_bp = Blueprint("admin", __name__, url_prefix="/admin")
 
@@ -68,12 +69,19 @@ def drivers():
     db = get_db()
     drivers_list = db.fetchall(
         """SELECT u.*, d.license_number, d.national_id_nin, d.verification_status, d.is_online, d.rating_avg, d.total_trips,
-                  v.plate_number, v.make, v.model, v.category as vehicle_category
+                  d.date_of_birth, d.years_experience,
+                  v.id AS vehicle_id, v.plate_number, v.make, v.model, v.year AS vehicle_year, v.color AS vehicle_color,
+                  v.capacity AS vehicle_capacity, v.category as vehicle_category,
+                  (SELECT COUNT(*) FROM vehicle_photos p WHERE p.vehicle_id = v.id) AS photo_count
         FROM users u
         JOIN driver_profiles d ON d.user_id = u.id
         LEFT JOIN vehicles v ON v.driver_id = u.id
         ORDER BY u.created_at DESC"""
     )
+    for row in drivers_list:
+        row["age"] = driver_profile_service.age_from_dob(row.get("date_of_birth"))
+        row["license_display"] = driver_profile_service.display_value(row.get("license_number")) or "Not provided"
+        row["nin_display"] = driver_profile_service.display_value(row.get("national_id_nin")) or "Not provided"
     return render_template("admin/drivers.html", user=user, drivers=drivers_list)
 
 @admin_bp.route("/drivers/<driver_id>/verify", methods=["POST"])
