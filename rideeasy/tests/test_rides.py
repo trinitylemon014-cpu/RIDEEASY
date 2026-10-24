@@ -107,6 +107,15 @@ def test_map_uses_current_database_role_if_session_role_is_stale(client):
     assert response.status_code == 200
     assert b"Back to ride booking" in response.data
 
+def test_map_redirects_when_session_user_no_longer_exists(client):
+    client.get("/auth/demo/passenger", follow_redirects=True)
+    with client.session_transaction() as session:
+        session["user_id"] = "missing-user"
+
+    response = client.get("/map")
+    assert response.status_code == 302
+    assert response.headers["Location"].startswith("/auth/login?next=")
+
 def test_route_api_returns_locationiq_road_distance(client, app, monkeypatch):
     client.get("/auth/demo/passenger", follow_redirects=True)
     monkeypatch.setitem(app.config, "LOCATIONIQ_API_KEY", "test-locationiq-key")

@@ -125,3 +125,36 @@
     font-size: 0.5625rem;
   }
 }
+
+/* AI support chat widget — small screens */
+@media (max-width: 768px) {
+  .ai-support-widget {
+    right: 0.75rem;
+    bottom: calc(0.75rem + env(safe-area-inset-bottom, 0px));
+  }
+
+  .ai-support-panel {
+    width: calc(100vw - 1.5rem);
+    height: min(600px, calc(100dvh - 6rem));
+    min-height: 320px;
+    border-radius: 20px;
+  }
+
+  .ai-support-toggle {
+    min-height: 50px;
+    padding: 0 1.05rem 0 0.9rem;
+  }
+
+  .ai-send-label {
+    display: none;
+  }
+
+  .ai-chat-form .btn {
+    width: 44px;
+    padding: 0;
+  }
+
+  .ai-chat-message {
+    max-width: 92%;
+  }
+}
