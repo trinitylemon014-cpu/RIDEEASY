@@ -21,15 +21,25 @@ def create_app(config_class=Config):
                 "Production deployment requires these environment variables: "
                 + ", ".join(missing_secrets)
             )
-        if not app.config["TURSO_DATABASE_URL"].startswith(("libsql://", "ws://", "wss://")):
+        if not app.config["TURSO_DATABASE_URL"].startswith(("libsql://", "https://", "ws://", "wss://")):
             raise RuntimeError(
-                "Production TURSO_DATABASE_URL must use libsql://, ws://, or wss://."
+                "Production TURSO_DATABASE_URL must use libsql://, https://, ws://, or wss://."
             )
 
     # Initialize database and provision production or test accounts.
+    # A database problem must not stop the web server from binding its port
+    # (otherwise Render only reports "No open ports detected" and hides the real error).
     with app.app_context():
-        from database.migrations.seed_data import seed_database
-        seed_database()
+        try:
+            from database.migrations.seed_data import seed_database
+            seed_database()
+        except Exception:
+            if app.config.get("TESTING"):
+                raise
+            app.logger.exception(
+                "Database initialization/seeding failed; starting without it. "
+                "Check TURSO_DATABASE_URL and TURSO_AUTH_TOKEN."
+            )
 
     # Register Jinja custom filters & context processors
     @app.template_filter("ugx")
