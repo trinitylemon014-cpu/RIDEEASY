@@ -129,6 +129,182 @@
     }
   };
 
+  // ---------------------------------------------------------------------------
+  // Place suggestions (type-ahead). Suggestions come from RideEasy's own
+  // /api/places/autocomplete endpoint, so the LocationIQ key never reaches the browser.
+  // ---------------------------------------------------------------------------
+  const selectedPlaces = { start: null, destination: null };
+  const suggestionCache = new Map();
+  const MIN_CHARS = 3;
+  const DEBOUNCE_MS = 300;
+
+  const setupAutocomplete = (input, kind) => {
+    if (!locationiqConfigured) return;
+
+    const group = input.closest(".form-group");
+    const listId = `route-${kind}-suggestions`;
+    const list = document.createElement("ul");
+    list.className = "route-suggestions";
+    list.id = listId;
+    list.setAttribute("role", "listbox");
+    list.setAttribute("aria-label", kind === "start" ? "Start point suggestions" : "Destination suggestions");
+    list.hidden = true;
+    group.appendChild(list);
+
+    input.setAttribute("role", "combobox");
+    input.setAttribute("aria-autocomplete", "list");
+    input.setAttribute("aria-controls", listId);
+    input.setAttribute("aria-expanded", "false");
+    input.setAttribute("autocomplete", "off");
+
+    let items = [];
+    let activeIndex = -1;
+    let timer = null;
+    let controller = null;
+    let requestId = 0;
+
+    const close = () => {
+      list.hidden = true;
+      input.setAttribute("aria-expanded", "false");
+      input.removeAttribute("aria-activedescendant");
+      activeIndex = -1;
+    };
+
+    const setActive = (index) => {
+      const options = list.querySelectorAll("[role='option']");
+      options.forEach((option, i) => {
+        const isActive = i === index;
+        option.classList.toggle("is-active", isActive);
+        option.setAttribute("aria-selected", isActive ? "true" : "false");
+        if (isActive) {
+          input.setAttribute("aria-activedescendant", option.id);
+          option.scrollIntoView({ block: "nearest" });
+        }
+      });
+      activeIndex = index;
+      if (index < 0) input.removeAttribute("aria-activedescendant");
+    };
+
+    const choose = (place) => {
+      input.value = place.label;
+      selectedPlaces[kind] = { lat: place.lat, lng: place.lng, label: place.label };
+      close();
+    };
+
+    const render = (places) => {
+      items = places;
+      list.replaceChildren();
+      if (!places.length) {
+        close();
+        return;
+      }
+      places.forEach((place, index) => {
+        const option = document.createElement("li");
+        option.id = `${listId}-${index}`;
+        option.setAttribute("role", "option");
+        option.setAttribute("aria-selected", "false");
+        option.className = "route-suggestion";
+
+        const title = document.createElement("span");
+        title.className = "route-suggestion-title";
+        title.textContent = place.title || place.label;
+        option.appendChild(title);
+
+        if (place.subtitle) {
+          const subtitle = document.createElement("span");
+          subtitle.className = "route-suggestion-subtitle";
+          subtitle.textContent = place.subtitle;
+          option.appendChild(subtitle);
+        }
+
+        // mousedown (not click) so the input keeps focus and does not blur first.
+        option.addEventListener("mousedown", (event) => {
+          event.preventDefault();
+          choose(place);
+        });
+        option.addEventListener("mousemove", () => {
+          if (activeIndex !== index) setActive(index);
+        });
+        list.appendChild(option);
+      });
+      list.hidden = false;
+      input.setAttribute("aria-expanded", "true");
+      setActive(-1);
+    };
+
+    const fetchSuggestions = async (query) => {
+      const cacheKey = query.toLocaleLowerCase();
+      if (suggestionCache.has(cacheKey)) {
+        render(suggestionCache.get(cacheKey));
+        return;
+      }
+      if (controller) controller.abort();
+      controller = new AbortController();
+      const currentRequest = ++requestId;
+      try {
+        const response = await fetch(`/api/places/autocomplete?q=${encodeURIComponent(query)}`, {
+          headers: { Accept: "application/json" },
+          signal: controller.signal,
+        });
+        if (!response.ok) {
+          close();
+          return;
+        }
+        const data = await response.json();
+        if (currentRequest !== requestId) return; // a newer search replaced this one
+        const places = Array.isArray(data.suggestions) ? data.suggestions : [];
+        suggestionCache.set(cacheKey, places);
+        if (input.value.trim().toLocaleLowerCase() === cacheKey) render(places);
+      } catch {
+        // Aborted or offline: suggestions are optional, typing still works.
+        if (currentRequest === requestId) close();
+      }
+    };
+
+    input.addEventListener("input", () => {
+      selectedPlaces[kind] = null; // typed text no longer matches a picked place
+      window.clearTimeout(timer);
+      const query = input.value.trim();
+      if (query.length < MIN_CHARS) {
+        if (controller) controller.abort();
+        requestId += 1;
+        close();
+        return;
+      }
+      timer = window.setTimeout(() => fetchSuggestions(query), DEBOUNCE_MS);
+    });
+
+    input.addEventListener("keydown", (event) => {
+      if (list.hidden || !items.length) return;
+      if (event.key === "ArrowDown") {
+        event.preventDefault();
+        setActive((activeIndex + 1) % items.length);
+      } else if (event.key === "ArrowUp") {
+        event.preventDefault();
+        setActive(activeIndex <= 0 ? items.length - 1 : activeIndex - 1);
+      } else if (event.key === "Enter" && activeIndex >= 0) {
+        event.preventDefault();
+        choose(items[activeIndex]);
+      } else if (event.key === "Escape") {
+        close();
+      }
+    });
+
+    input.addEventListener("blur", close);
+    input.addEventListener("focus", () => {
+      const cached = suggestionCache.get(input.value.trim().toLocaleLowerCase());
+      if (cached && cached.length && !selectedPlaces[kind]) render(cached);
+    });
+  };
+
+  setupAutocomplete(startInput, "start");
+  setupAutocomplete(destinationInput, "destination");
+
+  const pickedPoint = (kind, input) => {
+    const picked = selectedPlaces[kind];
+    return picked && picked.label === input.value.trim() ? picked : null;
+  };
+
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
     if (!locationiqConfigured) {
@@ -155,7 +331,12 @@
       const response = await fetch("/api/route", {
         method: "POST",
         headers: { "Content-Type": "application/json", "Accept": "application/json" },
-        body: JSON.stringify({ start, destination }),
+        body: JSON.stringify({
+          start,
+          destination,
+          start_point: pickedPoint("start", startInput),
+          destination_point: pickedPoint("destination", destinationInput),
+        }),
       });
       const data = await response.json();
       if (!response.ok || !data.success) {
