@@ -6,6 +6,9 @@
 - The offer remains pending until the assigned driver accepts or declines. Ride status updates and the passenger's live status tracker begin only after acceptance.
 - A decline or going offline releases pending offers, notifies the passenger, and tries another eligible online driver. If no eligible driver is online, the request remains in `SEARCHING_FOR_DRIVER`.
 - Acceptance and dispatch recheck online/active-trip eligibility in the database update so a driver who goes offline or already has an active trip cannot accept another assignment. The passenger page polls for the driver's response; driver trip-progress controls are available only after acceptance. This is status tracking, not GPS location streaming.
+- After accepting, the driver is taken directly to the live-ride controls and the passenger's trip tracker refreshes to the accepted-driver view. Both pages poll the authorized ride-status endpoint for updates.
+- Passengers may cancel before the driver marks the trip started, including after a driver accepts. Cancellation changes the ride state atomically, restores any unused ride voucher, and creates an in-app notification for the assigned driver; both passenger and driver views update to the cancelled state. Online cancellation is unavailable after trip start.
+- `GET /api/ride-status/<ride_id>` requires sign-in and only returns ride details to the passenger, assigned driver, or admin. The endpoint supports polling and is not a substitute for GPS location streaming.
 
 ## 2. Paystack ride payments
 - Passenger checkout is initialized server-side at `POST /payments/paystack/checkout/<ride_id>` after a ride is completed.

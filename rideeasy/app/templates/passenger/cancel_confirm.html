@@ -19,11 +19,11 @@
       <ul style="list-style: none; display: flex; flex-direction: column; gap: 0.75rem; font-size: 0.8125rem; color: var(--color-dark-grey); line-height: 1.5;">
         <li style="display: flex; gap: 0.5rem; align-items: flex-start;">
           <svg class="icon icon-sm" viewBox="0 0 24 24" style="margin-top: 2px;"><polyline points="20 6 9 17 4 12"/></svg>
-          <span><strong>Rule 1 (Free Cancellation):</strong> You may cancel without any penalty or fee while the ride status is <em>REQUESTED</em> or <em>SEARCHING FOR DRIVER</em>.</span>
+          <span><strong>Cancellation before pickup:</strong> You may cancel online before your driver starts the trip. If a driver has accepted, they are notified immediately.</span>
         </li>
         <li style="display: flex; gap: 0.5rem; align-items: flex-start;">
           <svg class="icon icon-sm" viewBox="0 0 24 24" style="margin-top: 2px;"><polyline points="20 6 9 17 4 12"/></svg>
-          <span><strong>Rule 2 (Assigned Driver Protection):</strong> Once a verified driver accepts dispatch and initiates travel to your pickup point, online cancellation is locked to safeguard driver operating and fuel costs.</span>
+          <span><strong>After trip start:</strong> Online cancellation is unavailable after the driver marks the trip as started. Contact RideEasy support if you need urgent help.</span>
         </li>
         <li style="display: flex; gap: 0.5rem; align-items: flex-start;">
           <svg class="icon icon-sm" viewBox="0 0 24 24" style="margin-top: 2px;"><polyline points="20 6 9 17 4 12"/></svg>
@@ -32,17 +32,22 @@
       </ul>
     </div>
 
-    {% if is_driver_assigned %}
-      <!-- Cancellation Locked Notice if Driver is already assigned -->
+    {% if not can_cancel %}
       <div class="card" style="border: 2px solid var(--color-black); margin-bottom: 1.5rem;">
         <div style="display: flex; gap: 1rem; align-items: flex-start;">
           <div style="background-color: var(--color-off-white); border: 1px solid var(--color-light-grey); padding: 0.75rem; border-radius: var(--radius-sm);">
             <svg class="icon icon-lg" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
           </div>
           <div>
-            <h3 style="margin-bottom: 0.35rem;">Direct Cancellation Locked</h3>
+            <h3 style="margin-bottom: 0.35rem;">Online Cancellation Unavailable</h3>
             <p style="font-size: 0.875rem; margin-bottom: 1rem; line-height: 1.5;">
-              Driver <strong>{{ ride.driver_name or 'Assigned Operator' }}</strong> ({{ ride.plate_number or 'Inspected Vehicle' }}) has already been dispatched and is currently en route to your pickup location. Under Rule 2 of the RideEasy Carriage Policy, online cancellation is locked to protect drivers against uncompensated transit expenses.
+              {% if ride.status == 'CANCELLED' %}
+                This ride has already been cancelled.
+              {% elif ride.status in ('COMPLETED', 'TRIP_COMPLETED') %}
+                This ride is complete and can no longer be cancelled.
+              {% else %}
+                This trip has already started. Contact support if you need urgent assistance.
+              {% endif %}
             </p>
             <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
               <a href="/passenger/rides/{{ ride.id }}" class="btn btn-primary btn-sm">Return to Trip Tracker</a>
@@ -55,6 +60,15 @@
         </div>
       </div>
     {% else %}
+      {% if is_driver_assigned %}
+      <div class="card" role="status" style="margin-bottom: 1.5rem;">
+        <strong>
+          {% if ride.driver_response_status == 'ACCEPTED' %}Your driver has accepted this ride.{% else %}A driver is reviewing this request.{% endif %}
+        </strong>
+        <p>Cancel now if needed; the assigned driver will receive an immediate cancellation update.</p>
+      </div>
+      {% endif %}
+
       <!-- Trip Particulars Summary -->
       <div class="card" style="margin-bottom: 1.5rem;">
         <div class="card-title" style="margin-bottom: 0.75rem;">Trip To Be Cancelled</div>

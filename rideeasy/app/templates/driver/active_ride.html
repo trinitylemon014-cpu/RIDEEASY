@@ -14,13 +14,22 @@
   </div>
 
   {% if ride %}
-    <div class="card" style="border: 2px solid var(--color-black);">
+    <div id="driver-live-ride-tracker"
+         data-ride-id="{{ ride.id }}"
+         data-status="{{ ride.status }}"
+         data-driver-id="{{ ride.driver_id }}"
+         class="card"
+         style="border: 2px solid var(--color-black);">
       <div class="card-header">
         <div>
           <div class="card-title">Ride #{{ ride.id[:8].upper() }}</div>
           <div class="card-subtitle">{{ ride.passenger_name }} · {{ ride.passenger_phone }}</div>
         </div>
-        <span class="status-indicator"><span class="status-dot"></span>{{ ride.status.replace('_', ' ') }}</span>
+        <span id="driver-live-ride-status" class="status-indicator"><span class="status-dot"></span>{{ ride.status.replace('_', ' ') }}</span>
+      </div>
+      <div id="driver-ride-cancelled-alert" class="alert alert-warning" role="status" hidden>
+        The passenger cancelled this ride. Stop trip updates and return to your requests.
+        <a href="/driver/requests" class="btn btn-secondary btn-sm">View requests</a>
       </div>
       <div class="stats-grid" style="margin-bottom: 1.5rem;">
         <div class="stat-card"><div class="stat-label">Pickup</div><div style="font-weight: 700;">{{ ride.pickup_address }}</div></div>
@@ -29,7 +38,7 @@
         <div class="stat-card"><div class="stat-label">Estimated fare</div><div class="stat-value" style="font-size: 1rem;">{{ ride.final_fare_ugx or ride.estimated_fare_ugx | ugx }}</div></div>
       </div>
       <a class="btn btn-secondary btn-sm" href="/map?pickup={{ ride.pickup_address | urlencode }}&destination={{ ride.destination_address | urlencode }}">View route on map</a>
-      <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; border-top: 1px solid var(--color-light-grey); padding-top: 1rem;">
+      <div id="driver-live-ride-controls" style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; border-top: 1px solid var(--color-light-grey); padding-top: 1rem;">
         {% if ride.status == 'DRIVER_ASSIGNED' %}
           <form method="POST" action="/driver/rides/{{ ride.id }}/status"><input type="hidden" name="status" value="DRIVER_ARRIVING"><button class="btn btn-primary" type="submit">En route to pickup</button></form>
         {% elif ride.status == 'DRIVER_ARRIVING' %}

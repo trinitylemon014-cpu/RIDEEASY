@@ -84,6 +84,7 @@ def test_dispatch_assigns_only_online_driver_and_waits_for_acceptance(db, app, i
 
 def test_driver_acceptance_starts_live_trip_state(client, app, db, isolated_dispatch_drivers):
     driver_id = isolated_dispatch_drivers(uuid.uuid4().hex[:6], online=True)
+    other_driver_id = isolated_dispatch_drivers(uuid.uuid4().hex[:6], online=False)
     ride_id = _create_dispatch_ride(db)
     with app.app_context():
         assert RideDispatchService.dispatch_ride(ride_id) == driver_id
@@ -110,6 +111,41 @@ def test_driver_acceptance_starts_live_trip_state(client, app, db, isolated_disp
         (ride_id,)
     )["message"].encode()
     assert b"Pickup" in client.get("/driver/active-ride").data
+    live_page = client.get("/driver/active-ride")
+    assert b'data-ride-id="' + ride_id.encode() + b'"' in live_page.data
+    assert b"driver-live-ride-tracker" in live_page.data
+
+    status_response = client.get(f"/api/ride-status/{ride_id}")
+    assert status_response.status_code == 200
+    assert status_response.get_json()["ride"]["driver_response_status"] == "ACCEPTED"
+
+    with client.session_transaction() as browser_session:
+        browser_session["user_id"] = other_driver_id
+        browser_session["user_role"] = "DRIVER"
+    assert client.get(f"/api/ride-status/{ride_id}").status_code == 404
+
+    with client.session_transaction() as browser_session:
+        browser_session["user_id"] = "usr_pass_01"
+        browser_session["user_role"] = "PASSENGER"
+    passenger_page = client.get(f"/passenger/rides/{ride_id}")
+    assert b"Your driver accepted the trip" in passenger_page.data
+    assert b'href="/passenger/rides/' + ride_id.encode() + b'/cancel"' in passenger_page.data
+    assert client.get(f"/api/ride-status/{ride_id}").status_code == 200
+
+    cancel_response = client.post(
+        f"/passenger/rides/{ride_id}/cancel",
+        data={"reason": "Passenger cancelled"},
+    )
+    assert cancel_response.status_code == 302
+    with client.session_transaction() as browser_session:
+        browser_session["user_id"] = driver_id
+        browser_session["user_role"] = "DRIVER"
+    cancelled_status = client.get(f"/api/ride-status/{ride_id}")
+    assert cancelled_status.get_json()["ride"]["status"] == "CANCELLED"
+    assert db.fetchone(
+        "SELECT title FROM notifications WHERE user_id = ? AND related_entity_id = ? ORDER BY rowid DESC LIMIT 1",
+        (driver_id, ride_id),
+    )["title"] == "Passenger cancelled the ride"
 
 
 def test_declining_reassigns_to_another_online_driver_and_notifies_passenger(

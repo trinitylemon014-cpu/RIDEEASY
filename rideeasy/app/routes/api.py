@@ -5,7 +5,7 @@ from collections import defaultdict, deque
 from flask import Blueprint, current_app, jsonify, request, session
 from app.repositories.database import get_db
 from app.services.pricing_service import PricingService
-from app.services.auth_service import login_required, role_required
+from app.services.auth_service import AuthService, login_required, role_required
 from app.services.location_service import (
     LocationIQConfigurationError,
     LocationIQNoResultsError,
@@ -182,10 +182,13 @@ def calculate_route():
     return jsonify({"success": True, "route": route})
 
 @api_bp.route("/ride-status/<ride_id>")
+@login_required
+@role_required("PASSENGER", "DRIVER", "ADMIN")
 def ride_status(ride_id):
     db = get_db()
     ride = db.fetchone(
-        """SELECT r.id, r.status, r.driver_id, r.driver_response_status,
+        """SELECT r.id, r.passenger_id, r.status, r.driver_id, r.driver_response_status,
+                  r.cancellation_reason,
                   r.estimated_fare_ugx, r.final_fare_ugx, r.payment_status,
                   u.full_name as driver_name, u.phone as driver_phone,
                   v.plate_number, v.make, v.model, v.color
@@ -197,7 +200,15 @@ def ride_status(ride_id):
     )
     if not ride:
         return jsonify({"error": "Ride not found"}), 404
-    return jsonify({"success": True, "ride": ride})
+    user = AuthService.get_current_user()
+    if user["role"] != "ADMIN" and user["id"] not in {
+        ride["passenger_id"], ride["driver_id"]
+    }:
+        return jsonify({"error": "Ride not found"}), 404
+    return jsonify({
+        "success": True,
+        "ride": {key: value for key, value in ride.items() if key != "passenger_id"},
+    })
 
 @api_bp.route("/support/chat", methods=["POST"])
 def support_chat():

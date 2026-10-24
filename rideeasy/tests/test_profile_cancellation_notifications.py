@@ -50,7 +50,7 @@ def test_profile_view_and_update(client):
 
 
 def test_ride_cancellation_workflow(client):
-    """Test cancellation rules, unassigned cancellation, and driver-assigned protection."""
+    """Test cancellation before assignment and after driver acceptance."""
     client.get("/auth/demo/passenger", follow_redirects=True)
     db = get_db()
 
@@ -71,7 +71,7 @@ def test_ride_cancellation_workflow(client):
     res_rules = client.get(f"/passenger/rides/{ride_id}/cancel")
     assert res_rules.status_code == 200
     assert b"Official RideEasy Cancellation Rules" in res_rules.data
-    assert b"Rule 1 (Free Cancellation)" in res_rules.data
+    assert b"Cancellation before pickup" in res_rules.data
     assert b"Confirmation Step" in res_rules.data
 
     # Confirm cancellation
@@ -100,15 +100,41 @@ def test_ride_cancellation_workflow(client):
         (ride_assigned_id, user["id"], driver["id"])
     )
 
-    # GET confirmation shows cancellation locked
+    # An assigned driver does not block cancellation before the trip starts.
     res_locked_get = client.get(f"/passenger/rides/{ride_assigned_id}/cancel")
-    assert b"Direct Cancellation Locked" in res_locked_get.data
+    assert b"Your driver has accepted this ride." in res_locked_get.data
 
-    # POST cancellation is rejected under Rule 2
-    res_locked_post = client.post(f"/passenger/rides/{ride_assigned_id}/cancel", data={
+    res_assigned_cancel = client.post(f"/passenger/rides/{ride_assigned_id}/cancel", data={
         "reason": "Changed my mind"
     }, follow_redirects=True)
-    assert b"locked once a driver has been dispatched" in res_locked_post.data
+    assert b"Ride cancelled" in res_assigned_cancel.data
+    assert db.fetchone(
+        "SELECT status FROM rides WHERE id = ?", (ride_assigned_id,)
+    )["status"] == "CANCELLED"
+    assert db.fetchone(
+        "SELECT title FROM notifications WHERE user_id = ? AND related_entity_id = ? ORDER BY rowid DESC LIMIT 1",
+        (driver["id"], ride_assigned_id),
+    )["title"] == "Passenger cancelled the ride"
+
+    ride_started_id = f"ride_{uuid.uuid4().hex[:10]}"
+    db.execute(
+        """INSERT INTO rides
+        (id, passenger_id, driver_id, category, pickup_address, pickup_lat, pickup_lng,
+         destination_address, destination_lat, destination_lng, estimated_distance_km,
+         estimated_fare_ugx, final_fare_ugx, payment_method, status)
+        VALUES (?, ?, ?, 'ECONOMY', 'Kisementi', 0.334, 32.585, 'Garden City',
+                0.318, 32.590, 3.5, 9500, 9500, 'CASH', 'TRIP_STARTED')""",
+        (ride_started_id, user["id"], driver["id"])
+    )
+    res_started_cancel = client.post(
+        f"/passenger/rides/{ride_started_id}/cancel",
+        data={"reason": "Changed my mind"},
+        follow_redirects=True,
+    )
+    assert b"can no longer be cancelled online" in res_started_cancel.data
+    assert db.fetchone(
+        "SELECT status FROM rides WHERE id = ?", (ride_started_id,)
+    )["status"] == "TRIP_STARTED"
 
 def test_in_app_notification_system(client):
     """Test creating, displaying, and dismissing notifications for driver assignment."""

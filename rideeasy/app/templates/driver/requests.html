@@ -38,7 +38,7 @@
           <thead><tr><th>Passenger</th><th>Pickup & destination</th><th>Distance</th><th>Fare</th><th></th></tr></thead>
           <tbody>
             {% for ride in pending_rides %}
-              <tr>
+              <tr {% if ride.driver_id == user.id and ride.driver_response_status == 'PENDING' %}data-driver-offer-id="{{ ride.id }}"{% endif %}>
                 <td>
                   <strong>{{ ride.passenger_name }}</strong>
                   <div class="text-subtle">{{ ride.passenger_phone }}</div>

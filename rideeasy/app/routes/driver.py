@@ -352,10 +352,15 @@ def update_ride_status(ride_id):
         return redirect(url_for("driver.active_ride"))
 
     if new_status == "COMPLETED":
-        db.execute(
-            "UPDATE rides SET status = 'COMPLETED', updated_at = CURRENT_TIMESTAMP WHERE id = ?",
-            (ride_id,)
+        updated = db.execute(
+            """UPDATE rides SET status = 'COMPLETED', updated_at = CURRENT_TIMESTAMP
+               WHERE id = ? AND driver_id = ? AND status = 'TRIP_COMPLETED'
+                 AND driver_response_status = 'ACCEPTED'""",
+            (ride_id, user["id"])
         )
+        if updated != 1:
+            flash("This ride changed before completion could be confirmed.", "warning")
+            return redirect(url_for("driver.active_ride"))
         db.execute(
             "UPDATE driver_profiles SET total_trips = total_trips + 1 WHERE user_id = ?",
             (user["id"],)
@@ -363,10 +368,15 @@ def update_ride_status(ride_id):
         flash("Trip completed. Passenger payment remains pending until verified by Paystack.", "success")
         return redirect(url_for("driver.trips"))
     else:
-        db.execute(
-            "UPDATE rides SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
-            (new_status, ride_id)
+        updated = db.execute(
+            """UPDATE rides SET status = ?, updated_at = CURRENT_TIMESTAMP
+               WHERE id = ? AND driver_id = ? AND status = ?
+                 AND driver_response_status = 'ACCEPTED'""",
+            (new_status, ride_id, user["id"], ride["status"])
         )
+        if updated != 1:
+            flash("This ride changed before the status update could be saved.", "warning")
+            return redirect(url_for("driver.active_ride"))
         flash(f"Trip status updated to {new_status.replace('_', ' ').title()}.", "info")
 
     return redirect(url_for("driver.active_ride"))

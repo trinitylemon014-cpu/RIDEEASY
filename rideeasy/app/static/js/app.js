@@ -98,6 +98,14 @@ document.addEventListener("DOMContentLoaded", () => {
         const result = await response.json();
         if (!result.success || !Array.isArray(result.offers)) return;
 
+        const currentOfferIds = new Set(result.offers.map((offer) => offer.id));
+        const removedOffer = Array.from(document.querySelectorAll("[data-driver-offer-id]"))
+          .some((row) => !currentOfferIds.has(row.dataset.driverOfferId));
+        if (removedOffer) {
+          window.location.reload();
+          return;
+        }
+
         result.offers.forEach((offer) => {
           if (seenOfferIds.has(offer.id)) return;
           seenOfferIds.add(offer.id);
@@ -598,6 +606,47 @@ document.addEventListener("DOMContentLoaded", () => {
           .catch(() => {});
       }, 5000);
     }
+  }
+
+  const driverRideTracker = document.getElementById("driver-live-ride-tracker");
+  if (driverRideTracker) {
+    const rideId = driverRideTracker.dataset.rideId;
+    const statusLabel = document.getElementById("driver-live-ride-status");
+    const controls = document.getElementById("driver-live-ride-controls");
+    const cancelledAlert = document.getElementById("driver-ride-cancelled-alert");
+    let stopped = false;
+    const pollDriverRide = async () => {
+      if (stopped || document.hidden || !rideId) return;
+      try {
+        const response = await fetch(`/api/ride-status/${encodeURIComponent(rideId)}`, {
+          headers: { Accept: "application/json" },
+          cache: "no-store",
+        });
+        if (!response.ok) return;
+        const result = await response.json();
+        if (!result.success || !result.ride) return;
+        const ride = result.ride;
+        if (ride.status === "CANCELLED") {
+          stopped = true;
+          driverRideTracker.dataset.status = ride.status;
+          if (statusLabel) statusLabel.textContent = "CANCELLED";
+          if (controls) controls.hidden = true;
+          if (cancelledAlert) cancelledAlert.hidden = false;
+          return;
+        }
+        if (ride.driver_id !== driverRideTracker.dataset.driverId) {
+          window.location.reload();
+          return;
+        }
+        if (ride.status !== driverRideTracker.dataset.status) {
+          window.location.reload();
+        }
+      } catch (error) {
+        console.warn("Unable to refresh the live ride status.", error);
+      }
+    };
+    pollDriverRide();
+    window.setInterval(pollDriverRide, 5000);
   }
 
   // 6. Notification Dropdown Toggle and Dismiss Handlers

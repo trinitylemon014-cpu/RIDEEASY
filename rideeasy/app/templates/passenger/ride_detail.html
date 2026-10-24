@@ -63,6 +63,8 @@
             <div id="live-status-text" style="font-size: 1.25rem; font-weight: 800; color: var(--color-black);">
               {% if ride.status == 'DRIVER_ASSIGNED' and ride.driver_response_status == 'PENDING' %}
                 Waiting for driver response
+              {% elif ride.driver_response_status == 'ACCEPTED' and ride.status == 'DRIVER_ASSIGNED' %}
+                Driver accepted · preparing to head to pickup
               {% elif ride.status == 'SEARCHING_FOR_DRIVER' %}
                 Finding an available driver
               {% else %}
@@ -76,6 +78,11 @@
               <strong>Waiting for driver confirmation</strong>
               <p>The driver has been notified. Live trip updates will begin after they accept.</p>
             </div>
+          {% elif ride.driver_response_status == 'ACCEPTED' and ride.status == 'DRIVER_ASSIGNED' %}
+            <div class="card" style="margin-bottom: 1.5rem;" role="status">
+          <strong>Your driver accepted the trip</strong>
+          <p>Live trip updates are active. We’ll keep this page in sync as your driver heads to the pickup point.</p>
+            </div>
           {% elif ride.status == 'SEARCHING_FOR_DRIVER' %}
             <div class="card" style="margin-bottom: 1.5rem;">
               <strong>Finding your driver</strong>
@@ -84,10 +91,10 @@
           {% endif %}
 
           <div>
-            {% if ride.status in ('REQUESTED', 'SEARCHING_FOR_DRIVER') and not ride.driver_id %}
-              <a href="/passenger/rides/{{ ride.id }}/cancel" class="btn btn-secondary btn-sm" style="color: #990000; border-color: #E5E5E5;">Cancel Request</a>
-            {% elif ride.driver_name and ride.status not in ('COMPLETED', 'CANCELLED') %}
-              <a href="/passenger/rides/{{ ride.id }}/cancel" class="btn btn-secondary btn-sm" style="font-size: 0.75rem;">Cancellation Rules</a>
+            {% if can_cancel %}
+              <a href="/passenger/rides/{{ ride.id }}/cancel" class="btn btn-secondary btn-sm" style="color: #990000; border-color: #E5E5E5;">Cancel Ride</a>
+            {% elif ride.status == 'TRIP_STARTED' %}
+              <a href="/contact" class="btn btn-secondary btn-sm">Contact support</a>
             {% elif ride.status == 'COMPLETED' %}
               <a href="/passenger/rides/{{ ride.id }}/receipt" class="btn btn-primary btn-sm">View Official Receipt</a>
             {% elif ride.status == 'CANCELLED' %}
@@ -99,6 +106,13 @@
         </div>
       </div>
     </div>
+
+    {% if ride.status == 'CANCELLED' %}
+    <div class="card" role="status" style="margin-bottom: 1.5rem; border-left: 3px solid var(--color-danger);">
+      <strong>Ride cancelled</strong>
+      <p>Your ride was cancelled. {% if ride.driver_id %}Your driver has been notified.{% endif %}</p>
+    </div>
+    {% endif %}
 
     {% if ride.status == 'COMPLETED' %}
     <div class="card" style="margin-bottom: 1.5rem;">
