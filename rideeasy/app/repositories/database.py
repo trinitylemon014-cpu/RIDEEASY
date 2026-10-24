@@ -6,11 +6,60 @@ from app.config import Config
 
 logger = logging.getLogger("rideeasy.database")
 
+# Guard statement used when running atomic batches over Turso's HTTP transport.
+# changes() returns the row count of the most recent INSERT/UPDATE/DELETE in the batch.
+# If it doesn't match the expected count, json() raises "malformed JSON", the whole
+# batch fails, and Turso rolls the implicit transaction back.
+_PRECONDITION_SQL = (
+    "SELECT json(CASE WHEN changes() = ? THEN '{}' ELSE 'precondition_failed' END)"
+)
+_PRECONDITION_MESSAGE = "Atomic database operation did not meet its row-count precondition."
+
+
+def _has_sql(statement: str) -> bool:
+    """True if the statement contains something other than blank lines / -- comments."""
+    return any(
+        line.strip() and not line.strip().startswith("--")
+        for line in statement.splitlines()
+    )
+
+
+def split_sql_statements(script: str) -> List[str]:
+    """
+    Split a SQL script into individual statements.
+
+    Uses sqlite3.complete_statement so semicolons inside string literals and
+    CREATE TRIGGER ... BEGIN ... END blocks are handled correctly.
+    """
+    statements: List[str] = []
+    buffer = ""
+    for chunk in script.split(";"):
+        buffer += chunk + ";"
+        if sqlite3.complete_statement(buffer):
+            statement = buffer.strip()
+            if statement.endswith(";"):
+                statement = statement[:-1].strip()
+            if statement and _has_sql(statement):
+                statements.append(statement)
+            buffer = ""
+    leftover = buffer.strip()
+    if leftover.endswith(";"):
+        leftover = leftover[:-1].strip()
+    if leftover and _has_sql(leftover):
+        statements.append(leftover)
+    return statements
+
+
 class Database:
     """
     Unified Database abstraction layer supporting:
     1. Production: Turso libSQL client (via libsql_client sync driver)
     2. Local Development: Local SQLite database file when no remote URL is configured
+
+    Turso transport:
+    By default libsql:// / wss:// / ws:// URLs are connected to over HTTPS, which avoids
+    the WebSocket handshake failures (HTTP 400) seen with the legacy libsql-client.
+    Set TURSO_TRANSPORT=websocket to force the WebSocket transport instead.
     """
     _instance = None
 
@@ -20,30 +69,53 @@ class Database:
         auth_token: Optional[str] = None,
         local_path: Optional[str] = None
     ):
+        # NOTE: self.db_url stays exactly as configured (get_db() compares against it).
         self.db_url = Config.TURSO_DATABASE_URL if db_url is None else db_url
         self.auth_token = Config.TURSO_AUTH_TOKEN if auth_token is None else auth_token
         self.local_path = local_path or Config.LOCAL_DB_PATH
         self.is_turso = bool(
             self.db_url and self.db_url.startswith(("libsql://", "https://", "ws://", "wss://"))
         )
+        self._connect_url = self._resolve_connect_url(self.db_url) if self.is_turso else ""
         self._libsql_client = None
 
         if self.is_turso:
             try:
                 import libsql_client
-                logger.info("Connecting to remote Turso libSQL database: %s", self.db_url)
+                logger.info("Connecting to remote Turso libSQL database: %s", self._connect_url)
                 self._libsql_client = libsql_client.create_client_sync(
-                    url=self.db_url,
+                    url=self._connect_url,
                     auth_token=self.auth_token
                 )
-                logger.info("Successfully established connection to Turso database.")
+                logger.info("Turso client created.")
             except Exception as e:
                 logger.error("Failed to connect to configured Turso database: %s", e)
                 raise RuntimeError("Configured Turso database is unavailable; refusing local fallback.") from e
 
+    @staticmethod
+    def _resolve_connect_url(url: str) -> str:
+        """Map the configured URL to the URL actually used by the client."""
+        url = url.strip()
+        transport = os.getenv("TURSO_TRANSPORT", "http").strip().lower()
+
+        if transport in ("ws", "websocket"):
+            for prefix in ("libsql://", "https://"):
+                if url.startswith(prefix):
+                    return "wss://" + url[len(prefix):]
+            return url
+
+        # Default: HTTP(S)
+        for prefix in ("libsql://", "wss://"):
+            if url.startswith(prefix):
+                return "https://" + url[len(prefix):]
+        if url.startswith("ws://"):
+            return "http://" + url[len("ws://"):]
+        return url
+
     @property
     def supports_transactions(self) -> bool:
-        return not self.is_turso or self.db_url.startswith(("libsql://", "ws://", "wss://"))
+        """Interactive transactions need the WebSocket transport (or local SQLite)."""
+        return not self.is_turso or self._connect_url.startswith(("ws://", "wss://"))
 
     def _get_sqlite_conn(self) -> sqlite3.Connection:
         conn = sqlite3.connect(self.local_path, timeout=10.0, check_same_thread=False)
@@ -62,9 +134,46 @@ class Database:
                 conn.commit()
                 return cur.rowcount
 
+    def _execute_batch_transaction(self, operations: List[tuple]) -> List[int]:
+        """
+        Atomic transaction for the HTTP transport using a single batch request.
+
+        A batch runs in one implicit transaction: if any statement fails, everything
+        is rolled back. Optional row-count preconditions (third tuple element) are
+        enforced with a guard statement placed right after the operation.
+        """
+        import libsql_client
+
+        if not operations:
+            return []
+
+        statements = []
+        result_positions = []
+        for operation in operations:
+            query, params = operation[:2]
+            result_positions.append(len(statements))
+            statements.append(libsql_client.Statement(query, list(params)))
+            if len(operation) > 2 and operation[2] is not None:
+                statements.append(libsql_client.Statement(_PRECONDITION_SQL, [int(operation[2])]))
+
+        try:
+            results = self._libsql_client.batch(statements)
+        except Exception as e:
+            if "malformed json" in str(e).lower():
+                raise RuntimeError(_PRECONDITION_MESSAGE) from e
+            raise
+
+        return [
+            results[i].rows_affected if hasattr(results[i], "rows_affected") else 1
+            for i in result_positions
+        ]
+
     def execute_transaction(self, operations: List[tuple]) -> List[int]:
         """Run a sequence of parameterized statements atomically."""
         if self.is_turso and self._libsql_client:
+            if not self.supports_transactions:
+                return self._execute_batch_transaction(operations)
+
             transaction = self._libsql_client.transaction()
             try:
                 rowcounts = []
@@ -74,7 +183,7 @@ class Database:
                     rowcount = result.rows_affected if hasattr(result, "rows_affected") else 1
                     rowcounts.append(rowcount)
                     if len(operation) > 2 and operation[2] is not None and rowcount != operation[2]:
-                        raise RuntimeError("Atomic database operation did not meet its row-count precondition.")
+                        raise RuntimeError(_PRECONDITION_MESSAGE)
                 transaction.commit()
                 return rowcounts
             except Exception:
@@ -88,7 +197,7 @@ class Database:
                 result = conn.execute(query, params)
                 rowcounts.append(result.rowcount)
                 if len(operation) > 2 and operation[2] is not None and result.rowcount != operation[2]:
-                    raise RuntimeError("Atomic database operation did not meet its row-count precondition.")
+                    raise RuntimeError(_PRECONDITION_MESSAGE)
             conn.commit()
             return rowcounts
 
@@ -135,9 +244,9 @@ class Database:
             sql_script = f.read()
 
         if self.is_turso and self._libsql_client:
-            # Split and execute statements for Turso libSQL
-            statements = [statement.strip() for statement in sql_script.split(";") if statement.strip()]
-            for statement in statements:
+            # Execute statements one by one for Turso libSQL
+            # (splitter is trigger- and string-literal-aware)
+            for statement in split_sql_statements(sql_script):
                 self._libsql_client.execute(statement)
         else:
             with self._get_sqlite_conn() as conn:
