@@ -1,0 +1,171 @@
+{% extends "base.html" %}
+
+{% block title %}My Work Profile — RideEasy{% endblock %}
+
+{% macro field(name, label, type="text", hint="", attrs="") %}
+  <div class="form-group">
+    <label class="form-label" for="{{ name }}">{{ label }}</label>
+    <input type="{{ type }}" id="{{ name }}" name="{{ name }}" class="form-control"
+           value="{{ form[name] }}" {{ attrs | safe }}
+           {% if errors[name] %}aria-invalid="true" aria-describedby="err-{{ name }}"{% elif hint %}aria-describedby="hint-{{ name }}"{% endif %}>
+    {% if errors[name] %}
+      <div class="form-error" id="err-{{ name }}" role="alert">{{ errors[name] }}</div>
+    {% elif hint %}
+      <div class="field-hint" id="hint-{{ name }}">{{ hint }}</div>
+    {% endif %}
+  </div>
+{% endmacro %}
+
+{% block content %}
+<link rel="stylesheet" href="/static/css/driver_profile.css">
+<div class="container section">
+  <div style="max-width: 760px; margin: 0 auto;">
+    <div style="margin-bottom: 1.5rem;">
+      <a href="/driver/dashboard" class="text-subtle" style="display: inline-flex; align-items: center; gap: 0.25rem; margin-bottom: 0.5rem;">
+        ← Back to Console
+      </a>
+      <h2>My work profile</h2>
+      <p style="font-size: 0.875rem;">Tell RideEasy and your passengers who is driving and what you drive. An admin reviews these details before you can go online.</p>
+    </div>
+
+    <!-- Progress -->
+    <div class="card" style="margin-bottom: 1.5rem;">
+      <div style="display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 0.5rem;">
+        <div class="card-title">{{ 'Profile complete' if completion.complete else 'Finish setting up your profile' }}</div>
+        <span class="status-indicator">
+          <span class="status-dot"></span>
+          {{ profile.verification_status if profile else 'PENDING' }}
+        </span>
+      </div>
+      <div class="completion-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ completion.percent }}" aria-label="Profile completion">
+        <span style="width: {{ completion.percent }}%;"></span>
+      </div>
+      <ul class="completion-list">
+        {% for step in completion.steps %}
+          <li class="{{ 'is-done' if step.done }}">{{ step.label }}</li>
+        {% endfor %}
+      </ul>
+      {% if profile and profile.verification_status == 'REJECTED' %}
+        <p class="field-hint" style="margin-top: 0.9rem;">Your profile was not approved. Check your details below, update anything that is wrong and save, then contact RideEasy support.</p>
+      {% elif profile and profile.verification_status == 'PENDING' and completion.complete %}
+        <p class="field-hint" style="margin-top: 0.9rem;">Everything is in. Your details are waiting for admin approval.</p>
+      {% endif %}
+    </div>
+
+    <form method="POST" action="{{ url_for('driver.profile') }}" novalidate>
+      <input type="hidden" name="csrf_token" value="{{ payment_csrf_token }}">
+
+      <!-- About you -->
+      <div class="card" style="margin-bottom: 1.5rem;">
+        <h3 class="profile-section-title">About you</h3>
+        <p class="profile-section-sub">Your name and phone come from your account. You can change them on your <a href="/profile" style="text-decoration: underline;">account page</a>.</p>
+        <div class="profile-grid">
+          <div class="form-group">
+            <label class="form-label" for="full_name_display">Full name</label>
+            <input type="text" id="full_name_display" class="form-control" value="{{ user.full_name }}" readonly tabindex="-1">
+          </div>
+          {{ field("date_of_birth", "Date of birth", "date",
+                   hint=("You are " ~ age ~ " years old." if age is not none else "You must be 18 or older."),
+                   attrs='min="' ~ dob_min ~ '" max="' ~ dob_max ~ '" required') }}
+          {{ field("years_experience", "Years of driving experience", "number",
+                   hint="Enter 0 if you are new to driving.",
+                   attrs='min="0" max="60" step="1" inputmode="numeric" required') }}
+        </div>
+      </div>
+
+      <!-- Licence & ID -->
+      <div class="card" style="margin-bottom: 1.5rem;">
+        <h3 class="profile-section-title">Driving permit and ID</h3>
+        <p class="profile-section-sub">Used only to verify you. Passengers never see these numbers.</p>
+        <div class="profile-grid">
+          {{ field("license_number", "Driving permit number", "text",
+                   hint="Exactly as printed on your driving permit.",
+                   attrs='maxlength="20" autocomplete="off" autocapitalize="characters" required') }}
+          {{ field("national_id_nin", "National ID number (NIN)", "text",
+                   hint="14 characters, starting with CM or CF.",
+                   attrs='maxlength="16" autocomplete="off" autocapitalize="characters" spellcheck="false" required') }}
+        </div>
+      </div>
+
+      <!-- Vehicle -->
+      <div class="card" style="margin-bottom: 1.5rem;">
+        <h3 class="profile-section-title">Your vehicle</h3>
+        <p class="profile-section-sub">Passengers see the type, colour and plate so they can recognise your car.</p>
+        <div class="profile-grid">
+          <div class="form-group">
+            <label class="form-label" for="category">Vehicle type</label>
+            <select id="category" name="category" class="form-select" required
+                    {% if errors.category %}aria-invalid="true" aria-describedby="err-category"{% endif %}>
+              <option value="" {{ 'selected' if not form.category }}>Choose type</option>
+              {% for code, info in categories.items() %}
+                <option value="{{ code }}" data-max="{{ info.max_capacity }}" {{ 'selected' if form.category == code }}>{{ info.label }}</option>
+              {% endfor %}
+            </select>
+            {% if errors.category %}<div class="form-error" id="err-category" role="alert">{{ errors.category }}</div>{% endif %}
+          </div>
+          {{ field("plate_number", "Number plate", "text",
+                   hint="For example UBA 123X.",
+                   attrs='maxlength="12" autocomplete="off" autocapitalize="characters" spellcheck="false" required') }}
+          {{ field("make", "Make", "text", hint="For example Toyota.", attrs='maxlength="40" required') }}
+          {{ field("model", "Model", "text", hint="For example Premio.", attrs='maxlength="40" required') }}
+          {{ field("year", "Year made", "number",
+                   attrs='min="1980" max="' ~ year_max ~ '" step="1" inputmode="numeric" required') }}
+          {{ field("color", "Colour", "text", hint="For example Silver.", attrs='maxlength="30" required') }}
+          {{ field("capacity", "Passenger seats", "number",
+                   hint="Seats for passengers, not counting the driver.",
+                   attrs='min="1" max="80" step="1" inputmode="numeric" required') }}
+        </div>
+      </div>
+
+      <div class="profile-actions" style="margin-bottom: 1.5rem;">
+        <button type="submit" class="btn btn-primary">Save profile</button>
+        <a href="/driver/dashboard" class="btn btn-secondary">Cancel</a>
+      </div>
+    </form>
+
+    <!-- Photos -->
+    <div class="card">
+      <div style="display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 0.5rem;">
+        <h3 class="profile-section-title" style="margin: 0;">Car photos</h3>
+        {% if vehicle %}<strong style="font-size: 0.875rem;">{{ photo_count }} of 3 added</strong>{% endif %}
+      </div>
+      {% if vehicle %}
+        <p class="profile-section-sub" style="margin-top: 0.25rem;">Front, side and back. Passengers see these on their trip page.</p>
+        <div class="profile-photos">
+          {% for p in photos %}
+            <div class="profile-photo">
+              {% if p.has_photo %}
+                <img src="{{ url_for('vehicle_photos.serve', vehicle_id=vehicle.id, slot=p.slot) }}?v={{ p.version }}" alt="Your {{ p.label | lower }} photo" loading="lazy">
+              {% else %}
+                <span>{{ p.label }}<br>needed</span>
+              {% endif %}
+            </div>
+          {% endfor %}
+        </div>
+        <a href="{{ url_for('vehicle_photos.manage') }}" class="btn btn-secondary btn-sm">{{ 'Change photos' if photo_count else 'Add photos' }}</a>
+      {% else %}
+        <p class="profile-section-sub" style="margin: 0.25rem 0 0;">Save your vehicle details above first. Then you can add photos of your car.</p>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+  // Keep the seat limit and a sensible default in step with the vehicle type.
+  const category = document.getElementById("category");
+  const capacity = document.getElementById("capacity");
+  if (!category || !capacity) return;
+  const apply = (userChanged) => {
+    const option = category.options[category.selectedIndex];
+    const max = option ? parseInt(option.dataset.max || "80", 10) : 80;
+    capacity.max = max;
+    if (userChanged && (!capacity.value || parseInt(capacity.value, 10) > max)) {
+      capacity.value = max <= 2 ? 1 : Math.min(max, 4);
+    }
+  };
+  category.addEventListener("change", () => apply(true));
+  apply(false);
+})();
+</script>
+{% endblock %}
