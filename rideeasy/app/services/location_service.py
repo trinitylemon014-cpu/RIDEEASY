@@ -165,6 +165,33 @@ class LocationService:
         return suggestions
 
     @classmethod
+    def reverse_geocode(cls, lat, lng):
+        """Turn device coordinates into a readable place name for the start field."""
+        label = ""
+        try:
+            result = cls._get_json(
+                f"{cls.BASE_URL}/reverse",
+                {
+                    "key": cls._api_key(),
+                    "lat": lat,
+                    "lon": lng,
+                    "format": "json",
+                    "addressdetails": 1,
+                    "accept-language": "en",
+                },
+                label="reverse geocode",
+            )
+            if isinstance(result, dict):
+                label = str(result.get("display_name") or "").strip()
+        except LocationIQRequestError as error:
+            # 404 "Unable to geocode" means nothing is mapped at this spot; fall back to coordinates.
+            if not (error.provider_code and "unable to geocode" in str(error.provider_code).lower()):
+                raise
+        if not label:
+            label = f"Current location ({lat:.5f}, {lng:.5f})"
+        return {"label": label[:300], "lat": lat, "lng": lng}
+
+    @classmethod
     def _search(cls, address, country_codes=None):
         params = {
             "key": cls._api_key(),
