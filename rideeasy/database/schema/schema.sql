@@ -62,6 +62,19 @@ CREATE TABLE IF NOT EXISTS vehicles (
     FOREIGN KEY (driver_id) REFERENCES users(id) ON DELETE SET NULL
 );
 
+-- Photos a driver uploads so passengers can recognise the exact car that is arriving.
+-- Images are re-encoded JPEGs stored base64-encoded (works on Turso and ephemeral hosts).
+CREATE TABLE IF NOT EXISTS vehicle_photos (
+    vehicle_id TEXT NOT NULL,
+    slot TEXT NOT NULL CHECK(slot IN ('FRONT', 'SIDE', 'BACK')),
+    mime_type TEXT NOT NULL DEFAULT 'image/jpeg',
+    image_data TEXT NOT NULL,
+    byte_size INTEGER NOT NULL DEFAULT 0,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (vehicle_id, slot),
+    FOREIGN KEY (vehicle_id) REFERENCES vehicles(id) ON DELETE CASCADE
+);
+
 -- Driver Verification Documents
 CREATE TABLE IF NOT EXISTS driver_documents (
     id TEXT PRIMARY KEY,
