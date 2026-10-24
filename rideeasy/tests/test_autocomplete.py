@@ -1,4 +1,5 @@
 import pytest
+import requests
 
 from app.routes import api as api_module
 from app.services.location_service import LocationService
@@ -31,9 +32,11 @@ AUTOCOMPLETE_BODY = [
 def clean_state():
     LocationService._autocomplete_cache.clear()
     api_module._autocomplete_hits.clear()
+    api_module._reverse_hits.clear()
     yield
     LocationService._autocomplete_cache.clear()
     api_module._autocomplete_hits.clear()
+    api_module._reverse_hits.clear()
 
 
 def test_autocomplete_requires_login(client):
@@ -151,3 +154,85 @@ def test_route_ignores_invalid_picked_coordinates(client, app, monkeypatch):
     })
     assert response.status_code == 200
     assert sum(u.endswith("/search") for u in urls) == 2  # fell back to geocoding
+
+
+def _provider_error(status, body):
+    response = requests.Response()
+    response.status_code = status
+    response._content = body
+    return response
+
+
+def test_reverse_requires_login(client):
+    response = client.get("/api/places/reverse?lat=0.31&lng=32.58")
+    assert response.status_code in (301, 302, 401, 403)
+
+
+@pytest.mark.parametrize("query", ["", "lat=abc&lng=32", "lat=95&lng=32", "lat=0.3&lng=181", "lat=nan&lng=1"])
+def test_reverse_rejects_invalid_coordinates(client, app, monkeypatch, query):
+    client.get("/auth/demo/passenger", follow_redirects=True)
+    monkeypatch.setitem(app.config, "LOCATIONIQ_API_KEY", "test-locationiq-key")
+    response = client.get(f"/api/places/reverse?{query}")
+    assert response.status_code == 400
+
+
+def test_reverse_names_the_current_place(client, app, monkeypatch):
+    client.get("/auth/demo/passenger", follow_redirects=True)
+    monkeypatch.setitem(app.config, "LOCATIONIQ_API_KEY", "test-locationiq-key")
+    seen = []
+
+    def fake_get(url, params, timeout):
+        seen.append((url, params))
+        return FakeResponse({"display_name": "Acacia Avenue, Kololo, Kampala, Uganda"})
+
+    monkeypatch.setattr("app.services.location_service.requests.get", fake_get)
+    response = client.get("/api/places/reverse?lat=0.3136&lng=32.5811")
+    data = response.get_json()
+    assert response.status_code == 200
+    assert data["place"]["label"].startswith("Acacia Avenue")
+    assert data["place"]["lat"] == pytest.approx(0.3136)
+    assert seen[0][0].endswith("/reverse")
+    assert b"test-locationiq-key" not in response.data
+
+
+def test_reverse_falls_back_to_coordinates_when_nothing_is_mapped(client, app, monkeypatch):
+    client.get("/auth/demo/passenger", follow_redirects=True)
+    monkeypatch.setitem(app.config, "LOCATIONIQ_API_KEY", "test-locationiq-key")
+    monkeypatch.setattr(
+        "app.services.location_service.requests.get",
+        lambda url, params, timeout: _provider_error(404, b'{"error":"Unable to geocode"}'),
+    )
+    response = client.get("/api/places/reverse?lat=0.5&lng=32.5")
+    assert response.status_code == 200
+    assert response.get_json()["place"]["label"] == "Current location (0.50000, 32.50000)"
+
+
+def test_reverse_reports_provider_failure_and_missing_config(client, app, monkeypatch):
+    client.get("/auth/demo/passenger", follow_redirects=True)
+    monkeypatch.setitem(app.config, "LOCATIONIQ_API_KEY", "")
+    assert client.get("/api/places/reverse?lat=0.5&lng=32.5").status_code == 503
+
+    monkeypatch.setitem(app.config, "LOCATIONIQ_API_KEY", "test-locationiq-key")
+    monkeypatch.setattr(
+        "app.services.location_service.requests.get",
+        lambda url, params, timeout: _provider_error(401, b'{"error":"Invalid key"}'),
+    )
+    assert client.get("/api/places/reverse?lat=0.5&lng=32.5").status_code == 502
+
+
+def test_reverse_is_throttled_per_user(client, app, monkeypatch):
+    client.get("/auth/demo/passenger", follow_redirects=True)
+    monkeypatch.setitem(app.config, "LOCATIONIQ_API_KEY", "test-locationiq-key")
+    monkeypatch.setattr(api_module, "REVERSE_MAX_PER_MINUTE", 1)
+    monkeypatch.setattr(
+        "app.services.location_service.requests.get",
+        lambda url, params, timeout: FakeResponse({"display_name": "Somewhere, Uganda"}),
+    )
+    codes = [client.get("/api/places/reverse?lat=0.5&lng=32.5").status_code for _ in range(2)]
+    assert codes == [200, 429]
+
+
+def test_map_page_has_current_location_button(client):
+    client.get("/auth/demo/passenger", follow_redirects=True)
+    page = client.get("/map")
+    assert b"use-my-location" in page.data
