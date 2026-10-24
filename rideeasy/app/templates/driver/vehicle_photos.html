@@ -1,0 +1,195 @@
+{% extends "base.html" %}
+
+{% block title %}Car Photos — RideEasy{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="/static/css/vehicle_photos.css">
+<div class="container section">
+  <div style="max-width: 760px; margin: 0 auto;">
+    <div style="margin-bottom: 1.5rem;">
+      <a href="/driver/dashboard" class="text-subtle" style="display: inline-flex; align-items: center; gap: 0.25rem; margin-bottom: 0.5rem;">
+        ← Back to Console
+      </a>
+      <h2>Show passengers your car</h2>
+      <p style="font-size: 0.875rem;">Add three clear photos of your car. Passengers see them on their trip page, so they can spot your exact car the moment you arrive.</p>
+    </div>
+
+    {% if not vehicle %}
+      <div class="card" style="text-align: center; padding: 2.5rem 1rem;">
+        <p>No vehicle is registered to your account yet, so there is nothing to photograph. Contact RideEasy support to register your car.</p>
+      </div>
+    {% else %}
+      <div class="card" style="margin-bottom: 1.5rem;">
+        <div style="display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 0.5rem;">
+          <div>
+            <div class="card-title">{{ vehicle.color }} {{ vehicle.make }} {{ vehicle.model }}</div>
+            <div class="card-subtitle">Plate {{ vehicle.plate_number }}</div>
+          </div>
+          <strong>{{ photo_count }} of 3 photos added</strong>
+        </div>
+        <div class="photo-progress" role="progressbar" aria-valuemin="0" aria-valuemax="3" aria-valuenow="{{ photo_count }}" aria-label="Car photos added">
+          <span style="width: {{ (photo_count * 100 / 3) | round(0) | int }}%;"></span>
+        </div>
+
+        <form id="photo-form" method="POST" action="{{ url_for('vehicle_photos.manage') }}" enctype="multipart/form-data" novalidate>
+          <input type="hidden" name="csrf_token" value="{{ payment_csrf_token }}">
+
+          <div class="photo-slots">
+            {% for p in photos %}
+              <div class="photo-slot" data-slot="{{ p.slot }}">
+                <div class="photo-slot-head">
+                  <strong>{{ loop.index }}. {{ p.label }}</strong>
+                  <span class="photo-slot-state {% if p.has_photo %}is-done{% endif %}">{{ 'Added' if p.has_photo else 'Needed' }}</span>
+                </div>
+                <div class="photo-slot-preview">
+                  {% if p.has_photo %}
+                    <img src="{{ url_for('vehicle_photos.serve', vehicle_id=vehicle.id, slot=p.slot) }}?v={{ p.version }}" alt="Your {{ p.label | lower }} photo">
+                  {% else %}
+                    <div class="photo-slot-empty">
+                      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 8a2 2 0 0 1 2-2h2l1.5-2h7L17 6h2a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><circle cx="12" cy="13" r="3.5"/></svg>
+                      <span>No photo yet</span>
+                    </div>
+                  {% endif %}
+                </div>
+                <p class="photo-slot-tip">{{ p.tip }}</p>
+                <label class="btn btn-secondary btn-sm photo-slot-pick">
+                  <span>{{ 'Replace photo' if p.has_photo else 'Choose photo' }}</span>
+                  <input class="photo-input visually-hidden" type="file" name="photo_{{ p.slot }}" accept="image/jpeg,image/png,image/webp">
+                </label>
+                <span class="photo-slot-file" aria-live="polite"></span>
+                {% if p.has_photo %}
+                  <button type="submit" class="photo-remove" form="delete-{{ p.slot }}">Remove this photo</button>
+                {% endif %}
+              </div>
+            {% endfor %}
+          </div>
+
+          <div class="photo-actions">
+            <button type="submit" id="photo-submit" class="btn btn-primary">Save photos</button>
+            <span id="photo-status" role="status" aria-live="polite"></span>
+          </div>
+        </form>
+
+        {% for p in photos if p.has_photo %}
+          <form id="delete-{{ p.slot }}" method="POST" action="{{ url_for('vehicle_photos.delete', slot=p.slot) }}"
+                onsubmit="return confirm('Remove your {{ p.label | lower }} photo?');">
+            <input type="hidden" name="csrf_token" value="{{ payment_csrf_token }}">
+          </form>
+        {% endfor %}
+      </div>
+
+      <div class="card">
+        <div class="card-title" style="margin-bottom: 0.5rem;">Photos passengers can recognise</div>
+        <ul class="photo-guide">
+          <li>Take them in daylight with the whole car in the frame.</li>
+          <li>Keep the number plate clear and readable in the front and back photos.</li>
+          <li>Photograph the car you actually drive, as it looks today. Update the photos if you repaint or change cars.</li>
+          <li>Leave people out of the pictures.</li>
+          <li>Photos are shrunk automatically and location data is removed before they are saved.</li>
+        </ul>
+      </div>
+    {% endif %}
+  </div>
+</div>
+
+{% if vehicle %}
+<script>
+(() => {
+  const form = document.getElementById("photo-form");
+  if (!form) return;
+  const status = document.getElementById("photo-status");
+  const submit = document.getElementById("photo-submit");
+  const MAX_BYTES = {{ max_upload_mb }} * 1024 * 1024;
+  const ALLOWED = /^image\/(jpeg|png|webp)$/;
+
+  const setStatus = (message, isError = false) => {
+    status.textContent = message;
+    status.classList.toggle("is-error", isError);
+  };
+
+  // Phone cameras make 5-12 MB photos. Shrinking them first saves mobile data and time.
+  const downscale = (file) => new Promise((resolve) => {
+    if (!window.createImageBitmap) return resolve(file);
+    createImageBitmap(file, { imageOrientation: "from-image" }).then((bitmap) => {
+      const scale = Math.min(1, 1600 / Math.max(bitmap.width, bitmap.height));
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.round(bitmap.width * scale);
+      canvas.height = Math.round(bitmap.height * scale);
+      const context = canvas.getContext("2d");
+      context.fillStyle = "#fff";
+      context.fillRect(0, 0, canvas.width, canvas.height);
+      context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+      canvas.toBlob((blob) => resolve(blob && blob.size < file.size ? blob : file), "image/jpeg", 0.85);
+    }).catch(() => resolve(file));
+  });
+
+  form.querySelectorAll(".photo-input").forEach((input) => {
+    let previewUrl = null;
+    input.addEventListener("change", () => {
+      const slot = input.closest(".photo-slot");
+      const fileLabel = slot.querySelector(".photo-slot-file");
+      const preview = slot.querySelector(".photo-slot-preview");
+      const file = input.files[0];
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
+      previewUrl = null;
+      if (!file) {
+        fileLabel.textContent = "";
+        return;
+      }
+      if (!ALLOWED.test(file.type)) {
+        setStatus("Use a JPG, PNG or WebP photo.", true);
+        input.value = "";
+        fileLabel.textContent = "";
+        return;
+      }
+      setStatus("");
+      previewUrl = URL.createObjectURL(file);
+      const image = document.createElement("img");
+      image.src = previewUrl;
+      image.alt = "Preview of the photo you chose";
+      preview.replaceChildren(image);
+      fileLabel.textContent = file.name;
+    });
+  });
+
+  form.addEventListener("submit", async (event) => {
+    if (event.submitter && event.submitter.getAttribute("form")) return; // a "Remove" button
+    event.preventDefault();
+    const chosen = [...form.querySelectorAll(".photo-input")].filter((input) => input.files.length);
+    if (!chosen.length) {
+      setStatus("Choose at least one photo first.", true);
+      return;
+    }
+    submit.disabled = true;
+    setStatus("Preparing your photos…");
+    const data = new FormData();
+    data.append("csrf_token", form.querySelector("[name=csrf_token]").value);
+    try {
+      for (const input of chosen) {
+        const blob = await downscale(input.files[0]);
+        if (blob.size > MAX_BYTES) throw new Error("A photo is still larger than {{ max_upload_mb }} MB. Choose a smaller one.");
+        data.append(input.name, blob, "photo.jpg");
+      }
+      setStatus("Uploading…");
+      const response = await fetch(form.action, {
+        method: "POST",
+        body: data,
+        credentials: "same-origin",
+        headers: { "X-Requested-With": "XMLHttpRequest", "Accept": "application/json" },
+      });
+      let result = null;
+      try { result = await response.json(); } catch { /* not JSON */ }
+      if (response.ok && result && result.success) {
+        window.location.reload();
+        return;
+      }
+      setStatus((result && result.message) || "The upload failed. Check your connection and try again.", true);
+    } catch (error) {
+      setStatus(error.message || "The upload failed. Check your connection and try again.", true);
+    }
+    submit.disabled = false;
+  });
+})();
+</script>
+{% endif %}
+{% endblock %}
