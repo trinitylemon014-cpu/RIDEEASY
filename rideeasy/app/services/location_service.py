@@ -11,7 +11,9 @@ class LocationIQConfigurationError(Exception):
 
 
 class LocationIQRequestError(Exception):
-    pass
+    def __init__(self, message, provider_code=None):
+        super().__init__(message)
+        self.provider_code = provider_code
 
 
 class LocationIQNoResultsError(Exception):
@@ -52,23 +54,47 @@ class LocationService:
                     "LocationIQ %s failed (%s, HTTP status %s): %s",
                     label, type(error).__name__, status, body,
                 )
-                break
+                provider_code = None
+                if getattr(error, "response", None) is not None:
+                    try:
+                        payload = error.response.json()
+                        provider_code = payload.get("code") or payload.get("error")
+                    except (ValueError, AttributeError):
+                        provider_code = None
+                raise LocationIQRequestError(
+                    "The location service is temporarily unavailable.", provider_code=provider_code
+                ) from error
         raise LocationIQRequestError("The location service is temporarily unavailable.") from last_error
 
     @classmethod
+    def _search(cls, address, country_codes=None):
+        params = {
+            "key": cls._api_key(),
+            "q": address,
+            "format": "json",
+            "limit": 1,
+            "addressdetails": 1,
+            "accept-language": "en",
+        }
+        if country_codes:
+            params["countrycodes"] = country_codes
+        try:
+            results = cls._get_json(f"{cls.BASE_URL}/search", params, label=f"geocode '{address[:40]}'")
+        except LocationIQRequestError as error:
+            # LocationIQ answers 404 "Unable to geocode" when nothing matches.
+            if error.provider_code and "unable to geocode" in str(error.provider_code).lower():
+                return []
+            raise
+        return results
+
+    @classmethod
     def geocode(cls, address):
-        results = cls._get_json(
-            f"{cls.BASE_URL}/search",
-            {
-                "key": cls._api_key(),
-                "q": address,
-                "format": "json",
-                "limit": 1,
-                "addressdetails": 1,
-                "accept-language": "en",
-            },
-            label=f"geocode '{address[:40]}'",
-        )
+        # Prefer results inside the countries RideEasy serves (default: Uganda) so a
+        # place name is not matched to a same-named place on another continent.
+        country_codes = (current_app.config.get("LOCATIONIQ_COUNTRY_CODES") or "ug").strip()
+        results = cls._search(address, country_codes)
+        if (not isinstance(results, list) or not results) and country_codes:
+            results = cls._search(address)
         if not isinstance(results, list) or not results:
             raise LocationIQNoResultsError(f"No location found for “{address}”.")
 
@@ -95,16 +121,29 @@ class LocationService:
         target = cls.geocode(destination)
         coordinates = f"{origin['lng']},{origin['lat']};{target['lng']},{target['lat']}"
         encoded_coordinates = quote(coordinates, safe=";,.-")
-        result = cls._get_json(
-            f"{cls.BASE_URL}/directions/driving/{encoded_coordinates}",
-            {
-                "key": api_key,
-                "overview": "full",
-                "geometries": "geojson",
-                "alternatives": "false",
-            },
-            label="directions",
-        )
+        result = None
+        for overview in ("full", "simplified"):
+            try:
+                result = cls._get_json(
+                    f"{cls.BASE_URL}/directions/driving/{encoded_coordinates}",
+                    {
+                        "key": api_key,
+                        "overview": overview,
+                        "geometries": "geojson",
+                        "alternatives": "false",
+                    },
+                    label=f"directions ({overview})",
+                )
+                break
+            except LocationIQRequestError as error:
+                if error.provider_code == "TooBig" and overview == "full":
+                    continue
+                if error.provider_code in ("TooBig", "NoRoute", "NoSegment"):
+                    raise LocationIQNoResultsError(
+                        "No driving route could be found between these places. They may be too far apart "
+                        "or in different countries. Add the town or country to each place name and try again."
+                    ) from error
+                raise
         try:
             route = result["routes"][0]
             geometry = route["geometry"]
