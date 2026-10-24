@@ -235,6 +235,7 @@ CREATE TABLE IF NOT EXISTS rides (
     final_fare_ugx INTEGER,
     payment_method TEXT NOT NULL DEFAULT 'CASH' CHECK(payment_method IN ('CASH', 'MTN_MOMO', 'AIRTEL_MONEY', 'CARD')),
     payment_status TEXT NOT NULL DEFAULT 'UNPAID' CHECK(payment_status IN ('UNPAID', 'PENDING', 'PAID')),
+    driver_response_status TEXT NOT NULL DEFAULT 'ACCEPTED' CHECK(driver_response_status IN ('PENDING', 'ACCEPTED', 'DECLINED')),
     status TEXT NOT NULL DEFAULT 'REQUESTED' CHECK(status IN (
         'REQUESTED',
         'SEARCHING_FOR_DRIVER',

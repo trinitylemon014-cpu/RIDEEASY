@@ -89,6 +89,59 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
+  const driverOfferWatcher = document.getElementById("driver-offer-watcher");
+  if (driverOfferWatcher) {
+    const seenOfferIds = new Set();
+
+    function showDriverOffer(offer) {
+      const toast = document.createElement("div");
+      toast.className = "alert alert-info";
+      toast.setAttribute("role", "alert");
+      toast.style.cssText = "position:fixed;right:1rem;top:1rem;z-index:1100;max-width:min(24rem,calc(100vw - 2rem));box-shadow:var(--shadow-lg);";
+      const message = document.createElement("span");
+      message.textContent = `New trip offer: ${offer.pickup_address} to ${offer.destination_address}.`;
+      const link = document.createElement("a");
+      link.href = "/driver/requests";
+      link.className = "btn btn-primary btn-sm";
+      link.textContent = "Review";
+      link.style.marginLeft = "0.75rem";
+      toast.append(message, link);
+      document.body.appendChild(toast);
+      window.setTimeout(() => toast.remove(), 12000);
+
+      if ("Notification" in window && Notification.permission === "granted") {
+        new Notification("RideEasy trip offer", {
+          body: `${offer.pickup_address} to ${offer.destination_address}`,
+          icon: "/static/icons/rideeasy-icon.svg"
+        });
+      }
+    }
+
+    async function checkDriverOffers() {
+      if (document.hidden) return;
+      try {
+        const response = await fetch(driverOfferWatcher.dataset.offersUrl, {
+          headers: { "Accept": "application/json" },
+          cache: "no-store"
+        });
+        if (!response.ok) return;
+        const result = await response.json();
+        if (!result.success || !Array.isArray(result.offers)) return;
+
+        result.offers.forEach((offer) => {
+          if (seenOfferIds.has(offer.id)) return;
+          seenOfferIds.add(offer.id);
+          showDriverOffer(offer);
+        });
+      } catch (error) {
+        console.warn("Unable to check RideEasy trip offers.", error);
+      }
+    }
+
+    checkDriverOffers();
+    window.setInterval(checkDriverOffers, 8000);
+  }
+
   // 3. Ugandan Landmark Coordinates & Fare Estimator Logic
   const UGANDA_LANDMARKS = [
     { name: "Entebbe International Airport (EBB)", lat: 0.0424, lng: 32.4435 },
@@ -558,8 +611,13 @@ document.addEventListener("DOMContentLoaded", () => {
           .then((res) => res.json())
           .then((data) => {
             if (data.success && data.ride) {
-              const statusEl = document.getElementById("live-status-text");
-              if (statusEl && statusEl.textContent !== data.ride.status) {
+              const driverChanged = rideTrackingBox.dataset.driverId !== (data.ride.driver_id || "");
+              const responseChanged = rideTrackingBox.dataset.driverResponseStatus !== data.ride.driver_response_status;
+              if (
+                rideTrackingBox.dataset.status !== data.ride.status ||
+                driverChanged ||
+                responseChanged
+              ) {
                 // Status changed, reload to sync UI timeline
                 window.location.reload();
               }

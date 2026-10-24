@@ -402,29 +402,17 @@ def book_ride():
             discount_ugx = min(estimated_fare, int(selected_voucher["discount_ugx"] or 0))
         final_fare = estimated_fare - discount_ugx
 
-        # Find available online verified driver
-        available_driver = db.fetchone(
-            """SELECT d.user_id, u.full_name, v.plate_number, v.make, v.model
-            FROM driver_profiles d
-            JOIN users u ON d.user_id = u.id
-            JOIN vehicles v ON v.driver_id = u.id
-            WHERE d.is_online = 1 AND d.verification_status = 'APPROVED'
-            LIMIT 1"""
-        )
-
         ride_id = f"ride_{uuid.uuid4().hex[:10]}"
-        driver_id = available_driver["user_id"] if available_driver else None
-        status = "DRIVER_ASSIGNED" if driver_id else "SEARCHING_FOR_DRIVER"
 
         ride_insert = (
             """INSERT INTO rides 
             (id, passenger_id, driver_id, category, pickup_address, pickup_lat, pickup_lng, 
-             destination_address, destination_lat, destination_lng, estimated_distance_km, 
-             estimated_fare_ugx, final_fare_ugx, payment_method, payment_status, status, is_airport_ride, related_journey_id) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'UNPAID', ?, ?, ?)""",
-            (ride_id, user["id"], driver_id, category, pickup_address, p_coords["lat"], p_coords["lng"],
+             destination_address, destination_lat, destination_lng, estimated_distance_km,
+             estimated_fare_ugx, final_fare_ugx, payment_method, payment_status, status, is_airport_ride, related_journey_id)
+            VALUES (?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'UNPAID', 'SEARCHING_FOR_DRIVER', ?, ?)""",
+            (ride_id, user["id"], category, pickup_address, p_coords["lat"], p_coords["lng"],
              destination_address, d_coords["lat"], d_coords["lng"], distance_km,
-             estimated_fare, final_fare, payment_method, status, is_airport, related_journey_id)
+             estimated_fare, final_fare, payment_method, is_airport, related_journey_id)
         )
         if selected_voucher:
             db.execute_transaction([
@@ -441,17 +429,10 @@ def book_ride():
         if related_journey_id:
             db.execute("UPDATE confirmed_journeys SET airport_ride_booked = 1 WHERE id = ?", (related_journey_id,))
 
-        # In-App Notification: Notify passenger when driver is assigned
-        if driver_id and available_driver:
-            NotificationService.create_notification(
-                user_id=user["id"],
-                title="Driver Assigned",
-                message=f"{available_driver['full_name']} ({available_driver['plate_number']} {available_driver['make']} {available_driver['model']}) has been assigned to your ride #{ride_id[:8].upper()} and is en route.",
-                notif_type="DRIVER_ASSIGNED",
-                related_entity_id=ride_id
-            )
+        from app.services.ride_dispatch_service import RideDispatchService
+        RideDispatchService.dispatch_ride(ride_id)
 
-        flash(f"Ride requested successfully! Assigned reference: #{ride_id[:8].upper()}", "success")
+        flash(f"Ride requested successfully! Reference: #{ride_id[:8].upper()}", "success")
         return redirect(url_for("passenger.ride_detail", ride_id=ride_id))
 
     # Pre-filled params from Airport link or Repeat Ride link

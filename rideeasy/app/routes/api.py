@@ -84,7 +84,8 @@ def calculate_route():
 def ride_status(ride_id):
     db = get_db()
     ride = db.fetchone(
-        """SELECT r.id, r.status, r.estimated_fare_ugx, r.final_fare_ugx, r.payment_status,
+        """SELECT r.id, r.status, r.driver_id, r.driver_response_status,
+                  r.estimated_fare_ugx, r.final_fare_ugx, r.payment_status,
                   u.full_name as driver_name, u.phone as driver_phone,
                   v.plate_number, v.make, v.model, v.color
         FROM rides r

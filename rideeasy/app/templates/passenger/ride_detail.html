@@ -15,18 +15,23 @@
 
       <div>
         <span class="status-indicator">
-          <span class="status-dot"></span> {{ ride.status.replace('_', ' ') }}
+          <span class="status-dot"></span>
+          {% if ride.status == 'DRIVER_ASSIGNED' and ride.driver_response_status == 'PENDING' %}
+            Waiting for driver response
+          {% else %}
+            {{ ride.status.replace('_', ' ') }}
+          {% endif %}
         </span>
       </div>
     </div>
 
     <!-- Live Status Tracker Hook for JS Polling -->
-    <div id="live-ride-tracker" data-ride-id="{{ ride.id }}" class="card" style="margin-bottom: 1.5rem;">
+    <div id="live-ride-tracker" data-ride-id="{{ ride.id }}" data-status="{{ ride.status }}" data-driver-id="{{ ride.driver_id or '' }}" data-driver-response-status="{{ ride.driver_response_status }}" class="card" style="margin-bottom: 1.5rem;">
       <!-- Lifecycle Status Timeline -->
       <div class="status-timeline">
         {% set steps = [
           ('REQUESTED', 'Requested'),
-          ('DRIVER_ASSIGNED', 'Assigned'),
+          ('DRIVER_ASSIGNED', 'Driver confirmation' if ride.driver_response_status == 'PENDING' else 'Assigned'),
           ('DRIVER_ARRIVING', 'Arriving'),
           ('DRIVER_ARRIVED', 'Arrived'),
           ('TRIP_STARTED', 'In Transit'),
@@ -56,9 +61,27 @@
           <div>
             <div style="font-size: 0.75rem; text-transform: uppercase; font-weight: 700; color: var(--color-medium-grey);">Current Stage</div>
             <div id="live-status-text" style="font-size: 1.25rem; font-weight: 800; color: var(--color-black);">
-              {{ ride.status.replace('_', ' ') }}
+              {% if ride.status == 'DRIVER_ASSIGNED' and ride.driver_response_status == 'PENDING' %}
+                Waiting for driver response
+              {% elif ride.status == 'SEARCHING_FOR_DRIVER' %}
+                Finding an available driver
+              {% else %}
+                {{ ride.status.replace('_', ' ') }}
+              {% endif %}
             </div>
           </div>
+
+          {% if ride.status == 'DRIVER_ASSIGNED' and ride.driver_response_status == 'PENDING' %}
+            <div class="card" style="margin-bottom: 1.5rem;">
+              <strong>Waiting for driver confirmation</strong>
+              <p>The driver has been notified. Live trip updates will begin after they accept.</p>
+            </div>
+          {% elif ride.status == 'SEARCHING_FOR_DRIVER' %}
+            <div class="card" style="margin-bottom: 1.5rem;">
+              <strong>Finding your driver</strong>
+              <p>Your request is being offered to an available online driver. This page will update when one responds.</p>
+            </div>
+          {% endif %}
 
           <div>
             {% if ride.status in ('REQUESTED', 'SEARCHING_FOR_DRIVER') and not ride.driver_id %}
@@ -98,7 +121,9 @@
     <!-- Assigned Driver & Vehicle Card -->
     {% if ride.driver_name %}
     <div class="card" style="margin-bottom: 1.5rem;">
-      <div class="card-title" style="margin-bottom: 1rem;">Assigned Driver & Vehicle</div>
+      <div class="card-title" style="margin-bottom: 1rem;">
+        {% if ride.driver_response_status == 'PENDING' %}Proposed Driver & Vehicle{% else %}Assigned Driver & Vehicle{% endif %}
+      </div>
       <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
         <div style="display: flex; gap: 1rem; align-items: center;">
           <div style="width: 48px; height: 48px; border-radius: var(--radius-sm); border: 1px solid var(--color-light-grey); display: flex; align-items: center; justify-content: center; background-color: var(--color-off-white);">

@@ -312,6 +312,10 @@
     </div>
   </dialog>
 
+  {% if current_user and current_user.role == 'DRIVER' %}
+    <div id="driver-offer-watcher" data-offers-url="{{ url_for('driver.api_pending_offers') }}" hidden></div>
+  {% endif %}
+
   <div class="ai-support-widget no-print" id="ai-support-widget">
       <section class="ai-support-panel" id="ai-support-panel" aria-labelledby="ai-support-title" hidden>
         <header class="ai-support-header">

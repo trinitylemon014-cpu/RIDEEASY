@@ -39,14 +39,27 @@
           <tbody>
             {% for ride in pending_rides %}
               <tr>
-                <td><strong>{{ ride.passenger_name }}</strong><div class="text-subtle">{{ ride.passenger_phone }}</div></td>
+                <td>
+                  <strong>{{ ride.passenger_name }}</strong>
+                  <div class="text-subtle">{{ ride.passenger_phone }}</div>
+                  {% if ride.driver_id == user.id %}
+                    <div class="status-indicator" style="margin-top: 0.35rem;">Assigned to you · response needed</div>
+                  {% endif %}
+                </td>
                 <td><strong>{{ ride.pickup_address }}</strong><div class="text-subtle">To: {{ ride.destination_address }}</div></td>
                 <td>{{ ride.estimated_distance_km }} km</td>
                 <td><strong>{{ ride.estimated_fare_ugx | ugx }}</strong></td>
                 <td>
-                  <form method="POST" action="/driver/rides/{{ ride.id }}/accept">
-                    <button type="submit" class="btn btn-primary btn-sm">Accept ride</button>
-                  </form>
+                  <div style="display: flex; gap: 0.4rem; flex-wrap: wrap;">
+                    <form method="POST" action="/driver/rides/{{ ride.id }}/accept">
+                      <button type="submit" class="btn btn-primary btn-sm">Accept trip</button>
+                    </form>
+                    {% if ride.driver_id == user.id and ride.driver_response_status == 'PENDING' %}
+                      <form method="POST" action="/driver/rides/{{ ride.id }}/decline">
+                        <button type="submit" class="btn btn-secondary btn-sm">Decline</button>
+                      </form>
+                    {% endif %}
+                  </div>
                 </td>
               </tr>
             {% endfor %}

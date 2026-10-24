@@ -1,7 +1,13 @@
 # External API Integrations Specification
 **RideEasy Platform — Emtrixz Technology Company**
 
-## 1. Paystack ride payments
+## 1. Ride dispatch and driver acceptance
+- New ride requests are offered to one approved driver who is online, has a registered vehicle, and has no active trip. Drivers receive an in-app notification and an on-page offer alert while signed in.
+- The offer remains pending until the assigned driver accepts or declines. Ride status updates and the passenger's live status tracker begin only after acceptance.
+- A decline or going offline releases pending offers, notifies the passenger, and tries another eligible online driver. If no eligible driver is online, the request remains in `SEARCHING_FOR_DRIVER`.
+- Acceptance and dispatch recheck online/active-trip eligibility in the database update so a driver who goes offline or already has an active trip cannot accept another assignment. The passenger page polls for the driver's response; driver trip-progress controls are available only after acceptance. This is status tracking, not GPS location streaming.
+
+## 2. Paystack ride payments
 - Passenger checkout is initialized server-side at `POST /payments/paystack/checkout/<ride_id>` after a ride is completed.
 - The provider's return URL and signed `POST /payments/paystack/webhook` are both verified against Paystack's transaction verification API. A browser redirect or submitted status is never treated as proof of payment.
 - Required deployment settings: `PAYSTACK_SECRET_KEY`, `PAYSTACK_CALLBACK_URL` (public HTTPS URL ending in `/payments/paystack/callback`), and `SECRET_KEY`.
@@ -15,7 +21,7 @@
 - Successful settlement awards exactly 100 passenger points once. A 5,000-point redemption creates a 25% voucher for one ride selected at booking.
 - Webhook processing is idempotent and uses transactional database writes. Configure Turso with a transactional `libsql://`, `ws://`, or `wss://` URL; the HTTP-only `https://` client is not sufficient for payment settlement.
 
-## 2. EgoSMS payment notifications
+## 3. EgoSMS payment notifications
 - The payment flow records an SMS delivery attempt for the admin, driver, and passenger. Failures and unconfigured delivery are visible on the admin payments page and can be retried there.
 - Set `EGOSMS_API_URL` and `EGOSMS_API_KEY` in the deployment secret store. The configured endpoint must accept `POST` JSON `{"to": "<phone>", "message": "<text>"}` with an `Authorization: Bearer <key>` header and return a successful 2xx response.
 - EgoSMS account credentials and a provider endpoint were not present in this repository. Confirm the account's actual API contract and configure an adapter/endpoint matching the contract before expecting SMS delivery.
@@ -23,7 +29,7 @@
 
 ---
 
-## 3. Map & Location Services (LocationIQ)
+## 4. Map & Location Services (LocationIQ)
 - The authenticated Route Map workspace is available to passengers, drivers, schools, and administrators at `/map`.
 - Geocoding and driving directions are requested server-side from LocationIQ. Configure `LOCATIONIQ_API_KEY` in the deployment secret store; the credential is never included in browser HTML or JavaScript.
 - The route page renders the returned road geometry with Leaflet and OpenStreetMap tiles. Route distance is the provider's driving distance, not the legacy straight-line fare estimate.
@@ -34,7 +40,7 @@
 
 ---
 
-## 4. Aviation GDS & Partner Travel Agencies
+## 5. Aviation GDS & Partner Travel Agencies
 - **Architecture**: Rather than claiming unauthorized direct ticket issuance, RideEasy dispatches flight requests to certified IATA partner travel agencies (such as Nile Equatorial Travel Ltd).
 - **Partner Handshake**:
   1. Agency receives passenger flight request in their dashboard.

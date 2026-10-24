@@ -146,12 +146,17 @@ class Database:
 
         for table, column, definition in (
             ("rewards_redemptions", "discount_percent", "INTEGER NOT NULL DEFAULT 0 CHECK(discount_percent BETWEEN 0 AND 100)"),
-            ("rewards_redemptions", "ride_id", "TEXT")
+            ("rewards_redemptions", "ride_id", "TEXT"),
+            ("rides", "driver_response_status", "TEXT NOT NULL DEFAULT 'ACCEPTED' CHECK(driver_response_status IN ('PENDING', 'ACCEPTED', 'DECLINED'))")
         ):
             columns = self.fetchall(f"PRAGMA table_info({table})")
             if not any(item["name"] == column for item in columns):
                 self.execute(f"ALTER TABLE {table} ADD COLUMN {column} {definition}")
 
+        self.execute(
+            "CREATE INDEX IF NOT EXISTS idx_rides_dispatch_offer "
+            "ON rides(driver_id, status, driver_response_status)"
+        )
         logger.info("Database schema initialized successfully.")
 
 # Singleton accessor
