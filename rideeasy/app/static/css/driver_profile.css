@@ -1,0 +1,138 @@
+/* Driver work profile page + dashboard completion prompt */
+
+.profile-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 0 1rem;
+}
+
+.profile-section-title {
+  margin: 0 0 0.25rem;
+  color: var(--color-black);
+  font-size: 1rem;
+  font-weight: 800;
+}
+
+.profile-section-sub {
+  margin: 0 0 1.1rem;
+  color: var(--color-medium-grey);
+  font-size: 0.8125rem;
+}
+
+.field-hint {
+  margin-top: 0.3rem;
+  color: var(--color-medium-grey);
+  font-size: 0.75rem;
+}
+
+.form-error {
+  margin-top: 0.3rem;
+  color: var(--color-danger);
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+
+.form-control[aria-invalid="true"],
+.form-select[aria-invalid="true"] {
+  border-color: var(--color-danger);
+  background-color: var(--color-danger-bg);
+}
+
+.form-control[readonly] {
+  color: var(--color-medium-grey);
+  cursor: not-allowed;
+}
+
+/* Completion checklist */
+.completion-bar {
+  height: 8px;
+  margin: 0.75rem 0 0.9rem;
+  border-radius: 999px;
+  background: var(--color-light-grey);
+  overflow: hidden;
+}
+
+.completion-bar > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--blue-600);
+  transition: width 0.3s ease;
+}
+
+.completion-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 0.35rem 1rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.8125rem;
+}
+
+.completion-list li {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  color: var(--color-medium-grey);
+}
+
+.completion-list li.is-done {
+  color: var(--color-near-black);
+}
+
+.completion-list li::before {
+  content: "";
+  flex: 0 0 auto;
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--color-light-grey);
+  border-radius: 50%;
+}
+
+.completion-list li.is-done::before {
+  border-color: var(--blue-600);
+  background: var(--blue-600) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M4 8.5l2.5 2.5L12 5.5' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / 100% no-repeat;
+}
+
+/* Photo strip on the profile page */
+.profile-photos {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.6rem;
+  margin: 0.9rem 0;
+}
+
+.profile-photo {
+  aspect-ratio: 4 / 3;
+  border: 1px dashed var(--color-light-grey);
+  border-radius: var(--radius-sm);
+  background: var(--color-off-white);
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-medium-grey);
+  font-size: 0.75rem;
+  text-align: center;
+}
+
+.profile-photo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.profile-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+@media (max-width: 520px) {
+  .profile-photos {
+    gap: 0.4rem;
+  }
+}
