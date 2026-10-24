@@ -192,10 +192,6 @@
     <a href="/about" class="nav-link">About</a>
     <a href="/contact" class="nav-link">Contact</a>
     <hr style="border: 0; border-top: 1px solid var(--color-light-grey); margin: 0.5rem 0;">
-    <button type="button" class="btn btn-secondary btn-block app-install-button" data-install-app>
-      <svg class="icon icon-sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0 0 4-4m-4 4-4-4"/><path d="M5 14v5a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-5"/></svg>
-      Add RideEasy to this device
-    </button>
     {% if current_user %}
       <div style="font-size: 0.8125rem; color: var(--color-dark-grey); margin-bottom: 0.5rem;">
         Signed in as <strong>{{ current_user.full_name }}</strong> ({{ current_user.role }})

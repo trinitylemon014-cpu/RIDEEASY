@@ -4,7 +4,8 @@ import json
 def test_install_shortcut_button_and_manifest_assets_are_available(client):
     page = client.get("/")
     assert page.status_code == 200
-    assert page.data.count(b'data-install-app') == 2
+    assert page.data.count(b'data-install-app') == 1
+    assert b'<button type="button" class="btn btn-secondary btn-sm app-install-button" data-install-app' in page.data
     assert b'id="app-install-help"' in page.data
     assert b'<link rel="manifest" href="/static/manifest.json">' in page.data
 

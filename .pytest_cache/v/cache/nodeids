@@ -15,6 +15,8 @@
   "rideeasy/tests/test_profile_cancellation_notifications.py::test_in_app_notification_system",
   "rideeasy/tests/test_profile_cancellation_notifications.py::test_profile_view_and_update",
   "rideeasy/tests/test_profile_cancellation_notifications.py::test_ride_cancellation_workflow",
+  "rideeasy/tests/test_pwa_install.py::test_install_controls_and_instruction_styles_are_served",
+  "rideeasy/tests/test_pwa_install.py::test_install_shortcut_button_and_manifest_assets_are_available",
   "rideeasy/tests/test_rides.py::test_ai_customer_care_api",
   "rideeasy/tests/test_rides.py::test_api_fare_estimation",
   "rideeasy/tests/test_rides.py::test_dashboard_search_filtering",
