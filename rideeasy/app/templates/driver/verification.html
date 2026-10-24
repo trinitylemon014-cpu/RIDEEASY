@@ -27,20 +27,23 @@
       <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
         <div>
           <div class="text-subtle">Driving Permit Number</div>
-          <div style="font-weight: 700;">{{ profile.license_number }}</div>
+          <div style="font-weight: 700;">{{ permit_display or 'Not provided' }}</div>
         </div>
         <div>
           <div class="text-subtle">National Identification (NIN)</div>
-          <div style="font-weight: 700;">{{ profile.national_id_nin }}</div>
+          <div style="font-weight: 700;">{{ nin_masked }}</div>
+        </div>
+        <div>
+          <div class="text-subtle">Age</div>
+          <div>{{ age ~ ' years' if age is not none else 'Not provided' }}</div>
         </div>
         <div>
           <div class="text-subtle">Commercial Experience</div>
           <div>{{ profile.years_experience }} Years Verified Driving</div>
         </div>
-        <div>
-          <div class="text-subtle">Background Check</div>
-          <div>Interpol / Police Clearance On File</div>
-        </div>
+      </div>
+      <div style="margin-top: 1.25rem;">
+        <a href="/driver/profile" class="btn btn-secondary btn-sm">Update my details</a>
       </div>
     </div>
 
@@ -69,7 +72,7 @@
           </div>
         </div>
       {% else %}
-        <p style="color: var(--color-medium-grey);">No vehicle currently assigned.</p>
+        <p style="color: var(--color-medium-grey);">No vehicle registered yet. <a href="/driver/profile" style="text-decoration: underline;">Add your vehicle details</a>.</p>
       {% endif %}
     </div>
   </div>
