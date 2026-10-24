@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "macros/user_identity.html" import identity %}
 
 {% block title %}Payments & Payout Ledger — RideEasy Admin{% endblock %}
 
@@ -87,8 +88,8 @@
           {% for entry in ledger %}
           <tr>
             <td>{{ entry.payment_date }}</td>
-            <td>{{ entry.payer_name or entry.passenger_name }}</td>
-            <td>#{{ entry.ride_id[:8].upper() }}<br><span class="text-subtle">{{ entry.driver_name or 'No driver' }}</span></td>
+            <td>{{ identity(entry.passenger_avatar_url, entry.payer_name or entry.passenger_name, 32) }}</td>
+            <td>#{{ entry.ride_id[:8].upper() }}<br><span class="text-subtle">{{ identity(entry.driver_avatar_url, entry.driver_name, 28) if entry.driver_name else 'No driver' }}</span></td>
             <td>{{ entry.recipient_name }}<br><span class="text-subtle">{{ entry.recipient_phone }} · {{ entry.recipient_role }}</span></td>
             <td>{{ entry.amount_ugx | ugx }}</td>
             <td>{{ entry.payout_status }}</td>

@@ -527,7 +527,8 @@ def trips():
     user = AuthService.get_current_user()
     db = get_db()
     trips_list = db.fetchall(
-        """SELECT r.*, u.full_name as passenger_name, u.phone as passenger_phone
+        """SELECT r.*, u.full_name as passenger_name, u.phone as passenger_phone,
+                  u.avatar_url as passenger_avatar_url
         FROM rides r
         JOIN users u ON r.passenger_id = u.id
         WHERE r.driver_id = ? AND r.status = 'COMPLETED'

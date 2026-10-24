@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "macros/user_identity.html" import identity %}
 
 {% block title %}Driver Trip History — RideEasy{% endblock %}
 
@@ -40,7 +41,7 @@
                 <td>#{{ t.id[:8].upper() }}</td>
                 <td class="text-subtle">{{ t.created_at[:16] }}</td>
                 <td>
-                  <strong>{{ t.passenger_name }}</strong>
+                  <strong>{{ identity(t.passenger_avatar_url, t.passenger_name, 34) }}</strong>
                   <div class="text-subtle">{{ t.passenger_phone }}</div>
                 </td>
                 <td>{{ t.pickup_address }} → {{ t.destination_address }}</td>

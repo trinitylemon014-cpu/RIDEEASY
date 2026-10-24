@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "macros/user_identity.html" import identity %}
 
 {% block title %}Trip Tracker #{{ ride.id[:8].upper() }} — RideEasy{% endblock %}
 
@@ -143,11 +144,8 @@
       </div>
       <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
         <div style="display: flex; gap: 1rem; align-items: center;">
-          <div style="width: 48px; height: 48px; border-radius: var(--radius-sm); border: 1px solid var(--color-light-grey); display: flex; align-items: center; justify-content: center; background-color: var(--color-off-white);">
-            <svg class="icon icon-lg" viewBox="0 0 24 24"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-          </div>
           <div>
-            <div style="font-size: 1.125rem; font-weight: 700; color: var(--color-black);">{{ ride.driver_name }}</div>
+            <div style="font-size: 1.125rem; font-weight: 700; color: var(--color-black);">{{ identity(ride.driver_avatar_url, ride.driver_name, 48) }}</div>
             <div class="metadata-row">
               <span>Rating: {{ ride.driver_rating or '5.0' }} / 5.0</span>
               <span class="metadata-separator">·</span>
@@ -164,6 +162,26 @@
             {{ ride.color }} {{ ride.make }} {{ ride.model }}
           </div>
         </div>
+        {% set uploaded_car_photos = car_photos | selectattr('has_photo') | list %}
+        {% if uploaded_car_photos %}
+          <div style="border-top: 1px solid var(--color-light-grey); margin-top: 1rem; padding-top: 1rem;">
+            <div class="card-title" style="font-size: 1rem; margin-bottom: 0.75rem;">Your driver's vehicle</div>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 0.75rem;">
+              {% for photo in uploaded_car_photos %}
+                <figure style="margin: 0; overflow: hidden; border: 1px solid var(--color-light-grey); border-radius: var(--radius-md); background: var(--color-off-white);">
+                  <img
+                    src="{{ url_for('vehicle_photos.serve', vehicle_id=ride.vehicle_id, slot=photo.slot) }}?v={{ photo.version }}"
+                    alt="{{ photo.label }} view of your driver's {{ ride.color }} {{ ride.make }} {{ ride.model }}"
+                    loading="lazy"
+                    style="display: block; width: 100%; aspect-ratio: 16 / 10; object-fit: cover;"
+                  >
+                  <figcaption style="padding: 0.5rem 0.65rem; font-size: 0.8125rem; font-weight: 650;">{{ photo.label }} view</figcaption>
+                </figure>
+              {% endfor %}
+            </div>
+            <p class="text-subtle" style="margin: 0.65rem 0 0;">These verified vehicle photos help you identify the car at pickup.</p>
+          </div>
+        {% endif %}
       </div>
     </div>
     {% endif %}

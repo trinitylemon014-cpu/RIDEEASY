@@ -13,7 +13,9 @@ class AuthService:
             return None
         db = get_db()
         return db.fetchone(
-            "SELECT id, email, role, full_name, phone, is_active, is_verified, avatar_url, created_at FROM users WHERE id = ?",
+            """SELECT id, email, role, full_name, phone, is_active, is_verified,
+                      avatar_url, avatar_cloudinary_public_id, created_at
+               FROM users WHERE id = ?""",
             (user_id,)
         )
 

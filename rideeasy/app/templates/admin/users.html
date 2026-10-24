@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "macros/user_identity.html" import identity %}
 
 {% block title %}User Management — RideEasy Admin{% endblock %}
 
@@ -41,7 +42,7 @@
             <tr>
               <td><code>#{{ u.id[:8].upper() }}</code></td>
               <td>
-                <strong>{{ u.full_name }}</strong>
+                <strong>{{ identity(u.avatar_url, u.full_name, 36) }}</strong>
                 <div class="text-subtle">{{ u.email }}</div>
               </td>
               <td>

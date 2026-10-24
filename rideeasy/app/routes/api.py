@@ -191,6 +191,7 @@ def ride_status(ride_id):
                   r.estimated_distance_km, r.estimated_duration_minutes,
                   r.estimated_fare_ugx, r.final_fare_ugx, r.payment_status,
                   u.full_name as driver_name, u.phone as driver_phone,
+                  u.avatar_url as driver_avatar_url,
                   v.plate_number, v.make, v.model, v.color
         FROM rides r
         LEFT JOIN users u ON r.driver_id = u.id

@@ -1,7 +1,13 @@
 # External API Integrations Specification
 **RideEasy Platform — Emtrixz Technology Company**
 
-## 1. Ride dispatch and driver acceptance
+## 1. Cloudinary profile and vehicle images
+- Set `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, and `CLOUDINARY_API_SECRET` in the deployment secret store. Uploads are signed server-to-server; secrets are never sent to the browser.
+- Profile avatars and driver vehicle photos are validated, re-encoded as JPEG, resized, and stripped of EXIF metadata before upload. Cloudinary asset IDs and URLs are persisted in the database.
+- Passenger vehicle photos are delivered through the authenticated RideEasy route, which requires the passenger to have a matched ride with that driver. Existing database-stored vehicle photos remain readable until drivers replace them.
+- Do not enable public client-side uploads or expose the Cloudinary API secret in front-end configuration.
+
+## 2. Ride dispatch and driver acceptance
 - New ride requests are offered to one approved driver who is online, has an active verified vehicle, and has no active trip. Drivers receive an in-app notification and an on-page offer alert while signed in. Passenger booking forms include a per-request idempotency key, so retries of the same form submission return the original ride instead of creating a duplicate.
 - The offer remains pending until the assigned driver accepts, declines, or the offer expires. Set `DRIVER_RIDE_OFFER_TIMEOUT_SECONDS` to an integer from 1 to 300 (default `45`). Offer status, assigned driver, and expiry are persisted in `ride_driver_offers`; drivers already offered that ride are not offered it again.
 - Expiration is processed during dispatch, driver-offer polling, and authorized ride-status polling. This uses the existing polling infrastructure and does not require a separate worker; if all clients stop polling, expiry processing resumes when the next relevant request arrives.
@@ -12,7 +18,7 @@
 - Passengers may cancel before the driver marks the trip started, including after a driver accepts. Cancellation changes the ride state atomically, restores any unused ride voucher, and creates an in-app notification for the assigned driver; both passenger and driver views update to the cancelled state. Online cancellation is unavailable after trip start.
 - `GET /api/ride-status/<ride_id>` requires sign-in and only returns ride details to the passenger, assigned driver, or admin. The endpoint supports polling and is not a substitute for GPS location streaming.
 
-## 2. Paystack ride payments
+## 3. Paystack ride payments
 - Passenger checkout is initialized server-side at `POST /payments/paystack/checkout/<ride_id>` after a ride is completed.
 - The provider's return URL and signed `POST /payments/paystack/webhook` are both verified against Paystack's transaction verification API. A browser redirect or submitted status is never treated as proof of payment.
 - Required deployment settings: `PAYSTACK_SECRET_KEY`, `PAYSTACK_CALLBACK_URL` (public HTTPS URL ending in `/payments/paystack/callback`), and `SECRET_KEY`.
@@ -34,7 +40,7 @@
 
 ---
 
-## 4. Map & Location Services (LocationIQ)
+## 5. Map & Location Services (LocationIQ)
 - The authenticated Route Map workspace is available to passengers, drivers, schools, and administrators at `/map`.
 - Geocoding and driving directions are requested server-side from LocationIQ. Configure `LOCATIONIQ_API_KEY` in the deployment secret store; the credential is never included in browser HTML or JavaScript.
 - The route page renders the returned road geometry with Leaflet and OpenStreetMap tiles. Route distance is the provider's driving distance, not the legacy straight-line fare estimate.
@@ -47,7 +53,7 @@
 
 ---
 
-## 5. Aviation GDS & Partner Travel Agencies
+## 6. Aviation GDS & Partner Travel Agencies
 - **Architecture**: Rather than claiming unauthorized direct ticket issuance, RideEasy dispatches flight requests to certified IATA partner travel agencies (such as Nile Equatorial Travel Ltd).
 - **Partner Handshake**:
   1. Agency receives passenger flight request in their dashboard.

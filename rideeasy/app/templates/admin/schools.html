@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "macros/user_identity.html" import identity %}
 
 {% block title %}School Transport Allocations — RideEasy Admin{% endblock %}
 
@@ -58,7 +59,7 @@
                 </td>
                 <td>
                   {% if r.assigned_driver_name %}
-                    <strong>{{ r.assigned_driver_name }}</strong>
+                    <strong>{{ identity(r.assigned_driver_avatar_url, r.assigned_driver_name, 32) }}</strong>
                     <div class="text-subtle">Plate: {{ r.assigned_vehicle_plate }}</div>
                   {% else %}
                     <span class="text-subtle">None Assigned</span>

@@ -613,6 +613,7 @@ def rides_list():
     rides = db.fetchall(
         """SELECT r.*, u.full_name as driver_name, u.phone as driver_phone,
                   u.avatar_url as driver_avatar_url,
+                  u.avatar_url as driver_avatar_url,
                   v.plate_number, v.make, v.model, rr.rating as user_rating, rr.review as user_review
         FROM rides r
         LEFT JOIN users u ON r.driver_id = u.id
@@ -860,7 +861,7 @@ def receipt(ride_id):
     driver = None
     if ride["driver_id"]:
         driver = db.fetchone(
-            """SELECT u.full_name, u.avatar_url, v.plate_number, v.make, v.model 
+            """SELECT u.full_name, u.avatar_url, v.plate_number, v.make, v.model
             FROM users u LEFT JOIN vehicles v ON v.driver_id = u.id 
             WHERE u.id = ?""",
             (ride["driver_id"],)

@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "macros/user_identity.html" import identity %}
 
 {% block title %}Driver Console — RideEasy{% endblock %}
 
@@ -204,7 +205,7 @@
     <div class="card-header">
       <div>
         <div class="card-title">Active Assigned Journey #{{ active_ride.id[:8].upper() }}</div>
-        <div class="card-subtitle">Passenger: {{ active_ride.passenger_name }} · Tel: {{ active_ride.passenger_phone }}</div>
+        <div class="card-subtitle">{{ identity(active_ride.passenger_avatar_url, active_ride.passenger_name, 36) }} · Tel: {{ active_ride.passenger_phone }}</div>
       </div>
       <span class="status-indicator">
         <span class="status-dot"></span> {{ active_ride.status.replace('_', ' ') }}
@@ -291,7 +292,7 @@
               <tr data-driver-offer-id="{{ r.id }}">
                 <td>#{{ r.id[:8].upper() }}</td>
                 <td>
-                  <strong>{{ r.passenger_name }}</strong>
+                  <strong>{{ identity(r.passenger_avatar_url, r.passenger_name, 34) }}</strong>
                 </td>
                 <td>
                   <div style="font-weight: 600;">{{ r.destination_address }}</div>
@@ -353,7 +354,7 @@
             {% for t in trips %}
               <tr>
                 <td>#{{ t.id[:8].upper() }}</td>
-                <td>{{ t.passenger_name }}</td>
+                <td>{{ identity(t.passenger_avatar_url, t.passenger_name, 32) }}</td>
                 <td>{{ t.pickup_address }} → {{ t.destination_address }}</td>
                 <td>{{ t.estimated_distance_km }} km</td>
                 <td style="font-weight: 700;">{{ t.final_fare_ugx or t.estimated_fare_ugx | ugx }}</td>

@@ -43,8 +43,18 @@ PAYSTACK_AMOUNT_MULTIPLIER=1
 EGOSMS_API_URL=<configured-EgoSMS-compatible-endpoint>
 EGOSMS_API_KEY=<SMS-provider-key>
 LOCATIONIQ_API_KEY=<LocationIQ-server-key>
+CLOUDINARY_CLOUD_NAME=<Cloudinary-cloud-name>
+CLOUDINARY_API_KEY=<Cloudinary-api-key>
+CLOUDINARY_API_SECRET=<Cloudinary-api-secret>
 DRIVER_RIDE_OFFER_TIMEOUT_SECONDS=45
 ```
+
+Profile pictures and driver vehicle photos are resized, re-encoded, and stripped of
+EXIF/location metadata before upload to Cloudinary. Configure the three Cloudinary
+secrets above in the deployment secret store. New photo uploads fail visibly when
+Cloudinary is not configured; existing profile URLs and legacy database-stored vehicle
+photos remain available. Vehicle images are served through the authenticated RideEasy
+photo route, which checks that the passenger is matched to the driver.
 
 Register `https://rideeasy.ug/payments/paystack/webhook` in the Paystack dashboard. Confirm Uganda, UGX, the merchant's supported payment channels, and the currency amount units with Paystack before live transactions. The application records manual payout credits; it does not transfer funds to mobile numbers automatically. EgoSMS is not considered active until its real API contract and credentials are configured.
 

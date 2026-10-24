@@ -1,8 +1,8 @@
 """Car photos that drivers upload so passengers can recognise the exact car arriving.
 
-Images are validated and re-encoded with Pillow (this also removes EXIF data such as
-GPS coordinates), resized, and stored base64-encoded in the database so they work with
-Turso and on hosts that have no persistent disk.
+Images are validated and re-encoded with Pillow (removing EXIF data such as GPS
+coordinates), resized, and stored in Cloudinary. Existing database-stored photos remain
+readable during migration.
 """
 import base64
 import io

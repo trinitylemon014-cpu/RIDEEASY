@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "macros/user_identity.html" import identity %}
 
 {% block title %}System Audit Logs — RideEasy Admin{% endblock %}
 
@@ -36,7 +37,7 @@
               <tr>
                 <td class="text-subtle">{{ l.created_at }}</td>
                 <td>
-                  <strong>{{ l.user_name or 'System Kernel' }}</strong>
+                  {{ identity(l.user_avatar_url, l.user_name, 32) if l.user_name else 'System Kernel' }}
                   <div class="text-subtle">{{ l.role or 'CORE' }}</div>
                 </td>
                 <td><code>{{ l.action }}</code></td>

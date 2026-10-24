@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "macros/user_identity.html" import avatar, identity %}
 
 {% block title %}Passenger Overview — RideEasy{% endblock %}
 
@@ -11,7 +12,7 @@
         <span class="metadata-separator">·</span>
         <span>Account #{{ user.id[:8].upper() }}</span>
       </div>
-      <h2>Welcome, {{ user.full_name }}</h2>
+      <h2 style="display: flex; align-items: center; gap: 0.75rem;">{{ avatar(user.avatar_url, user.full_name, 44) }} Welcome, {{ user.full_name }}</h2>
     </div>
     <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
       <a href="/passenger/book-ride" class="btn btn-primary">Book a Ride</a>
@@ -79,7 +80,7 @@
               <tr>
                 <td>#{{ ride.id[:8].upper() }}<div class="text-subtle">{{ ride.created_at[:10] }}</div></td>
                 <td>{{ ride.pickup_address }} → {{ ride.destination_address }}</td>
-                <td>{{ ride.driver_name or 'Awaiting driver' }}</td>
+                <td>{{ identity(ride.driver_avatar_url, ride.driver_name, 32) if ride.driver_name else 'Awaiting driver' }}</td>
                 <td><span class="status-indicator"><span class="status-dot"></span>{{ ride.status.replace('_', ' ') }}</span></td>
                 <td><a href="/passenger/rides/{{ ride.id }}" class="btn btn-secondary btn-sm">Details</a></td>
               </tr>

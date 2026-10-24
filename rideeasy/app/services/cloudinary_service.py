@@ -61,6 +61,8 @@ class CloudinaryService:
         except (requests.RequestException, ValueError) as error:
             logger.warning("Cloudinary image upload failed: %s", error)
             raise CloudinaryError("The image could not be saved to cloud storage. Please try again.") from error
+        if not isinstance(result, dict):
+            raise CloudinaryError("Cloud image storage returned an invalid upload response.")
         if not result.get("public_id") or not result.get("secure_url"):
             raise CloudinaryError("Cloud image storage returned an incomplete upload response.")
         return {"public_id": result["public_id"], "secure_url": result["secure_url"]}
@@ -87,6 +89,8 @@ class CloudinaryService:
         except (requests.RequestException, ValueError) as error:
             logger.warning("Cloudinary asset cleanup failed for %s: %s", public_id, error)
             raise CloudinaryError("The old cloud image could not be removed.") from error
+        if not isinstance(result, dict):
+            raise CloudinaryError("Cloud image storage returned an invalid cleanup response.")
         if result.get("result") not in {"ok", "not found"}:
             raise CloudinaryError("Cloud image storage did not confirm asset removal.")
 
