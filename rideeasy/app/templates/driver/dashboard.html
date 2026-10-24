@@ -38,7 +38,26 @@
     </a>
     <a href="/driver/active-ride" class="btn btn-secondary btn-sm">Track Live Ride</a>
     <a href="/driver/trips" class="btn btn-secondary btn-sm">Completed Rides</a>
+    <a href="/driver/profile" class="btn btn-secondary btn-sm">My Profile</a>
+    <a href="/driver/vehicle-photos" class="btn btn-secondary btn-sm">Car Photos</a>
   </div>
+
+  {% if completion and not completion.complete %}
+  <!-- Work-profile prompt: shown until every step is done -->
+  <link rel="stylesheet" href="/static/css/driver_profile.css">
+  <div class="card" style="margin-bottom: 1.5rem; border-left: 4px solid var(--color-accent);">
+    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem;">
+      <div>
+        <div class="card-title">Finish your work profile</div>
+        <div class="card-subtitle">Still to do: {{ completion.missing | join(', ') }}.</div>
+      </div>
+      <a href="/driver/profile" class="btn btn-primary btn-sm">Complete profile</a>
+    </div>
+    <div class="completion-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ completion.percent }}" aria-label="Profile completion" style="margin-bottom: 0;">
+      <span style="width: {{ completion.percent }}%;"></span>
+    </div>
+  </div>
+  {% endif %}
 
   <!-- Operational Statistics Grid -->
   <div class="stats-grid">
