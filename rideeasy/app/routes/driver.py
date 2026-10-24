@@ -1,10 +1,13 @@
-from datetime import datetime, timedelta
-from flask import Blueprint, render_template, request, redirect, url_for, flash, session, abort, jsonify
+import secrets
+import uuid
+from datetime import date, datetime, timedelta
+from flask import Blueprint, current_app, render_template, request, redirect, url_for, flash, session, abort, jsonify
 from app.repositories.database import get_db
 from app.services.auth_service import login_required, role_required, AuthService
 from app.services.ride_dispatch_service import RideDispatchService
 from app.services.notification_service import NotificationService
 from app.services.vehicle_photo_service import VehiclePhotoService
+from app.services import driver_profile_service as profile_rules
 
 driver_bp = Blueprint("driver", __name__, url_prefix="/driver")
 
@@ -13,6 +16,11 @@ driver_bp = Blueprint("driver", __name__, url_prefix="/driver")
 @role_required("DRIVER", "ADMIN")
 def before_request():
     pass
+
+def _csrf_ok():
+    token = request.form.get("csrf_token", "")
+    expected = session.get("payment_csrf_token", "")
+    return bool(token and expected and secrets.compare_digest(token, expected))
 
 def get_driver_earnings_summary(driver_id, db):
     """
@@ -111,6 +119,7 @@ def dashboard():
 
     earnings_summary = get_driver_earnings_summary(user["id"], db)
     photo_count = VehiclePhotoService.count_photos(vehicle["id"]) if vehicle else 0
+    completion = profile_rules.completeness(profile, vehicle, photo_count)
     pending_rides = []
     active_ride = None
     if profile and profile["is_online"] and profile["verification_status"] == "APPROVED":
@@ -145,6 +154,7 @@ def dashboard():
         total_earnings=total_earnings["total"],
         earnings_summary=earnings_summary,
         photo_count=photo_count,
+        completion=completion,
         pending_rides=pending_rides,
         active_ride=active_ride,
         show_dispatch_sections=True
@@ -537,6 +547,172 @@ def trips():
     )
     return render_template("driver/trips.html", user=user, trips=trips_list)
 
+def _profile_form_values(profile, vehicle):
+    """Starting values for the work-profile form, hiding registration placeholders."""
+    profile = profile or {}
+    vehicle = vehicle or {}
+    return {
+        "date_of_birth": profile.get("date_of_birth") or "",
+        "years_experience": "" if not profile.get("date_of_birth") else profile.get("years_experience", ""),
+        "license_number": profile_rules.display_value(profile.get("license_number")),
+        "national_id_nin": profile_rules.display_value(profile.get("national_id_nin")),
+        "category": vehicle.get("category", ""),
+        "make": vehicle.get("make", ""),
+        "model": vehicle.get("model", ""),
+        "year": vehicle.get("year", ""),
+        "color": vehicle.get("color", ""),
+        "plate_number": vehicle.get("plate_number", ""),
+        "capacity": vehicle.get("capacity", ""),
+    }
+
+def _years_ago(day, years):
+    """The same calendar day `years` ago (29 Feb becomes 28 Feb in non-leap years)."""
+    try:
+        return day.replace(year=day.year - years)
+    except ValueError:
+        return day.replace(year=day.year - years, day=28)
+
+def _render_profile_form(user, profile, vehicle, form, errors, status=200):
+    photos = VehiclePhotoService.photo_status(vehicle["id"]) if vehicle else []
+    photo_count = sum(1 for p in photos if p["has_photo"])
+    today = date.today()
+    return render_template(
+        "driver/profile.html",
+        user=user,
+        profile=profile,
+        vehicle=vehicle,
+        form=form,
+        errors=errors,
+        photos=photos,
+        photo_count=photo_count,
+        completion=profile_rules.completeness(profile, vehicle, photo_count),
+        categories=profile_rules.VEHICLE_CATEGORIES,
+        age=profile_rules.age_from_dob(profile.get("date_of_birth")) if profile else None,
+        dob_min=_years_ago(today, profile_rules.MAX_DRIVER_AGE).isoformat(),
+        dob_max=_years_ago(today, profile_rules.MIN_DRIVER_AGE).isoformat(),
+        year_max=today.year + 1,
+    ), status
+
+@driver_bp.route("/profile", methods=["GET", "POST"])
+def profile():
+    """Driver work profile: identity, licence, experience and vehicle details."""
+    user = AuthService.get_current_user()
+    if user["role"] != "DRIVER":
+        abort(403)
+    db = get_db()
+    profile_row = db.fetchone("SELECT * FROM driver_profiles WHERE user_id = ?", (user["id"],))
+    vehicle = db.fetchone("SELECT * FROM vehicles WHERE driver_id = ?", (user["id"],))
+
+    if request.method == "GET":
+        return _render_profile_form(user, profile_row, vehicle, _profile_form_values(profile_row, vehicle), {})
+
+    if not _csrf_ok():
+        flash("Your session expired. Reload the page and try again.", "error")
+        return redirect(url_for("driver.profile"))
+
+    clean, errors = profile_rules.validate_profile(request.form)
+    if not errors:
+        taken = db.fetchone(
+            "SELECT 1 AS taken FROM vehicles WHERE plate_number = ? AND (driver_id IS NULL OR driver_id != ?)",
+            (clean["plate_number"], user["id"])
+        )
+        if taken:
+            errors["plate_number"] = "This number plate is already registered to another driver."
+    if errors:
+        flash("Please fix the highlighted fields and save again.", "error")
+        # Keep what the driver typed (sensitive values stay in the form, never in logs).
+        form = {key: request.form.get(key, "") for key in _profile_form_values(None, None)}
+        return _render_profile_form(user, profile_row, vehicle, form, errors, 400)
+
+    needs_review = bool(
+        profile_row
+        and profile_row["verification_status"] == "APPROVED"
+        and profile_rules.sensitive_fields_changed(profile_row, vehicle, clean)
+    )
+
+    operations = []
+    if profile_row:
+        sets = "license_number = ?, national_id_nin = ?, years_experience = ?, date_of_birth = ?"
+        if needs_review:
+            sets += ", verification_status = 'PENDING', is_online = 0"
+        operations.append((
+            f"UPDATE driver_profiles SET {sets} WHERE user_id = ?",
+            (clean["license_number"], clean["national_id_nin"], clean["years_experience"],
+             clean["date_of_birth"], user["id"]),
+            1
+        ))
+    else:
+        operations.append((
+            """INSERT INTO driver_profiles
+               (user_id, license_number, national_id_nin, years_experience, date_of_birth, verification_status)
+               VALUES (?, ?, ?, ?, ?, 'PENDING')""",
+            (user["id"], clean["license_number"], clean["national_id_nin"],
+             clean["years_experience"], clean["date_of_birth"]),
+            1
+        ))
+    vehicle_values = (clean["make"], clean["model"], clean["year"], clean["color"],
+                      clean["plate_number"], clean["category"], clean["capacity"])
+    if vehicle:
+        operations.append((
+            """UPDATE vehicles SET make = ?, model = ?, year = ?, color = ?,
+                      plate_number = ?, category = ?, capacity = ?
+               WHERE id = ? AND driver_id = ?""",
+            vehicle_values + (vehicle["id"], user["id"]),
+            1
+        ))
+    else:
+        operations.append((
+            """INSERT INTO vehicles
+               (id, driver_id, make, model, year, color, plate_number, category, capacity)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (f"veh_{uuid.uuid4().hex[:10]}", user["id"]) + vehicle_values,
+            1
+        ))
+    if needs_review:
+        operations.append((
+            "UPDATE users SET is_verified = 0, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+            (user["id"],),
+            1
+        ))
+    # The audit entry records that the profile changed, never the ID numbers themselves.
+    operations.append((
+        "INSERT INTO audit_logs (id, user_id, action, resource_type, resource_id, details) VALUES (?, ?, ?, ?, ?, ?)",
+        (f"aud_{uuid.uuid4().hex[:8]}", user["id"], "DRIVER_PROFILE_UPDATED", "DRIVER_PROFILE", user["id"],
+         "Work profile updated; sent back for admin review" if needs_review else "Work profile updated"),
+        1
+    ))
+
+    try:
+        db.execute_transaction(operations)
+    except Exception:
+        current_app.logger.exception("Driver profile save failed for %s", user["id"])
+        still_taken = db.fetchone(
+            "SELECT 1 AS taken FROM vehicles WHERE plate_number = ? AND (driver_id IS NULL OR driver_id != ?)",
+            (clean["plate_number"], user["id"])
+        )
+        if still_taken:
+            flash("This number plate is already registered to another driver.", "error")
+        else:
+            flash("We could not save your profile. Please try again.", "error")
+        form = {key: request.form.get(key, "") for key in _profile_form_values(None, None)}
+        return _render_profile_form(
+            user, profile_row, vehicle, form,
+            {"plate_number": "This number plate is already registered to another driver."} if still_taken else {},
+            400 if still_taken else 500
+        )
+
+    if needs_review:
+        flash("Profile saved. Because your ID, permit or number plate changed, an admin must approve it "
+              "again before you can go online.", "warning")
+    elif not profile_row or profile_row["verification_status"] == "PENDING":
+        flash("Profile saved. RideEasy will review your details. Next, add photos of your car.", "success")
+    else:
+        flash("Profile saved.", "success")
+    # A driver who has just registered a car for the first time goes straight to the photos step.
+    if not vehicle:
+        return redirect(url_for("vehicle_photos.manage"))
+    return redirect(url_for("driver.profile"))
+
 @driver_bp.route("/verification")
 def verification():
     user = AuthService.get_current_user()
@@ -544,4 +720,9 @@ def verification():
     profile = db.fetchone("SELECT * FROM driver_profiles WHERE user_id = ?", (user["id"],))
     vehicle = db.fetchone("SELECT * FROM vehicles WHERE driver_id = ?", (user["id"],))
     documents = db.fetchall("SELECT * FROM driver_documents WHERE driver_id = ?", (user["id"],))
-    return render_template("driver/verification.html", user=user, profile=profile, vehicle=vehicle, documents=documents)
+    return render_template(
+        "driver/verification.html", user=user, profile=profile, vehicle=vehicle, documents=documents,
+        permit_display=profile_rules.display_value(profile["license_number"]) if profile else "",
+        nin_masked=profile_rules.mask_identifier(profile["national_id_nin"]) if profile else "Not provided",
+        age=profile_rules.age_from_dob(profile.get("date_of_birth")) if profile else None,
+    )
