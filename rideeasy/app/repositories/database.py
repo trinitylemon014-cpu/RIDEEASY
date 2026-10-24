@@ -50,6 +50,16 @@ def split_sql_statements(script: str) -> List[str]:
     return statements
 
 
+def _invalidate_request_cache() -> None:
+    """Drop per-request cached rows (e.g. the current user) after any write."""
+    try:
+        from flask import g, has_request_context
+        if has_request_context():
+            g.pop("_current_user", None)
+    except Exception:
+        pass
+
+
 class Database:
     """
     Unified Database abstraction layer supporting:
@@ -114,8 +124,15 @@ class Database:
 
     @property
     def supports_transactions(self) -> bool:
-        """Interactive transactions need the WebSocket transport (or local SQLite)."""
-        return not self.is_turso or self._connect_url.startswith(("ws://", "wss://"))
+        """
+        True when execute_transaction() is atomic.
+
+        Local SQLite uses a real transaction, the WebSocket transport uses an
+        interactive transaction, and the HTTP transport uses a single atomic
+        batch (BEGIN ... COMMIT with automatic ROLLBACK), with row-count
+        preconditions enforced by guard statements. All three qualify.
+        """
+        return True
 
     def _get_sqlite_conn(self) -> sqlite3.Connection:
         conn = sqlite3.connect(self.local_path, timeout=10.0, check_same_thread=False)
@@ -125,6 +142,7 @@ class Database:
 
     def execute(self, query: str, params: tuple = ()) -> int:
         """Executes INSERT/UPDATE/DELETE query and returns rowcount or 1."""
+        _invalidate_request_cache()
         if self.is_turso and self._libsql_client:
             rs = self._libsql_client.execute(query, list(params))
             return rs.rows_affected if hasattr(rs, "rows_affected") else 1
@@ -170,8 +188,9 @@ class Database:
 
     def execute_transaction(self, operations: List[tuple]) -> List[int]:
         """Run a sequence of parameterized statements atomically."""
+        _invalidate_request_cache()
         if self.is_turso and self._libsql_client:
-            if not self.supports_transactions:
+            if self._connect_url.startswith(("http://", "https://")):
                 return self._execute_batch_transaction(operations)
 
             transaction = self._libsql_client.transaction()
