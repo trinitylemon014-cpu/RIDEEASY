@@ -65,6 +65,7 @@ def create_app(config_class=Config):
     from app.routes.api import api_bp
     from app.routes.payments import payments_bp
     from app.routes.maps import maps_bp
+    from app.routes.vehicle_photos import vehicle_photos_bp
 
     app.register_blueprint(main_bp)
     app.register_blueprint(auth_bp, url_prefix="/auth")
@@ -77,6 +78,7 @@ def create_app(config_class=Config):
     app.register_blueprint(api_bp)
     app.register_blueprint(payments_bp)
     app.register_blueprint(maps_bp)
+    app.register_blueprint(vehicle_photos_bp)
 
     # Error Handlers
     @app.errorhandler(403)
