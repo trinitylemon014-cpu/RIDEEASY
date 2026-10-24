@@ -100,7 +100,7 @@ def test_production_seed_removes_demo_accounts_and_creates_configured_admin(tmp_
     ("database_url", "expected_message"),
     [
         ("", "TURSO_DATABASE_URL"),
-        ("https://example.turso.io", "must use libsql://"),
+        ("http://example.turso.io", "must use libsql://"),
     ],
 )
 def test_production_requires_transactional_turso_configuration(database_url, expected_message):
