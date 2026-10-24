@@ -1,3 +1,4 @@
+import secrets
 import uuid
 from datetime import datetime, timedelta
 from flask import Blueprint, current_app, render_template, request, redirect, url_for, flash, session, jsonify, abort
@@ -352,10 +353,14 @@ def book_ride():
     )
 
     def render_booking_form():
+        submission_key = request.form.get("submission_key", "")
+        if len(submission_key) != 32 or not all(char.isalnum() or char in "_-" for char in submission_key):
+            submission_key = secrets.token_urlsafe(24)
         return render_template(
             "passenger/book_ride.html",
             user=user,
             saved_routes=saved_routes,
+            submission_key=submission_key,
             pre_pickup=request.form.get("pickup_address", request.args.get("pickup", "")),
             pre_destination=request.form.get("destination_address", request.args.get("destination", "")),
             pre_category=request.form.get("category", request.args.get("category", "ECONOMY")).upper(),
@@ -365,6 +370,16 @@ def book_ride():
         )
 
     if request.method == "POST":
+        submission_key = request.form.get("submission_key", "")
+        if len(submission_key) != 32 or not all(char.isalnum() or char in "_-" for char in submission_key):
+            submission_key = secrets.token_urlsafe(24)
+        previous_request = db.fetchone(
+            "SELECT id FROM rides WHERE passenger_id = ? AND submission_key = ?",
+            (user["id"], submission_key)
+        )
+        if previous_request:
+            return redirect(url_for("passenger.ride_detail", ride_id=previous_request["id"]))
+
         pickup_address = request.form.get("pickup_address", "").strip()
         destination_address = request.form.get("destination_address", "").strip()
         category = request.form.get("category", "ECONOMY").upper()
@@ -438,31 +453,58 @@ def book_ride():
 
         ride_insert = (
             """INSERT INTO rides 
-            (id, passenger_id, driver_id, category, pickup_address, pickup_lat, pickup_lng, 
-             destination_address, destination_lat, destination_lng, estimated_distance_km,
+            (id, passenger_id, submission_key, driver_id, category, pickup_address, pickup_lat, pickup_lng,
+             destination_address, destination_lat, destination_lng, estimated_distance_km, estimated_duration_minutes,
              estimated_fare_ugx, final_fare_ugx, payment_method, payment_status, status, is_airport_ride, related_journey_id)
-            VALUES (?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'UNPAID', 'SEARCHING_FOR_DRIVER', ?, ?)""",
-            (ride_id, user["id"], category, pickup_address, p_coords["lat"], p_coords["lng"],
-             destination_address, d_coords["lat"], d_coords["lng"], distance_km,
+            VALUES (?, ?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'UNPAID', 'SEARCHING_FOR_DRIVER', ?, ?)
+            ON CONFLICT(passenger_id, submission_key) DO NOTHING""",
+            (ride_id, user["id"], submission_key, category, pickup_address, p_coords["lat"], p_coords["lng"],
+             destination_address, d_coords["lat"], d_coords["lng"], distance_km, route["duration_minutes"],
              estimated_fare, final_fare, payment_method, is_airport, related_journey_id)
         )
         if selected_voucher:
-            db.execute_transaction([
-                ride_insert,
-                (
-                    """UPDATE rewards_redemptions SET status = 'USED', ride_id = ?
-                       WHERE id = ? AND passenger_id = ? AND status = 'ACTIVE' AND ride_id IS NULL""",
-                    (ride_id, selected_voucher["id"], user["id"]), 1
+            try:
+                db.execute_transaction([
+                    (*ride_insert, 1),
+                    (
+                        """UPDATE rewards_redemptions SET status = 'USED', ride_id = ?
+                           WHERE id = ? AND passenger_id = ? AND status = 'ACTIVE' AND ride_id IS NULL""",
+                        (ride_id, selected_voucher["id"], user["id"]), 1
+                    )
+                ])
+            except RuntimeError:
+                previous_request = db.fetchone(
+                    "SELECT id FROM rides WHERE passenger_id = ? AND submission_key = ?",
+                    (user["id"], submission_key)
                 )
-            ])
+                if previous_request:
+                    return redirect(url_for("passenger.ride_detail", ride_id=previous_request["id"]))
+                voucher_available = db.fetchone(
+                    """SELECT id FROM rewards_redemptions
+                       WHERE id = ? AND passenger_id = ? AND status = 'ACTIVE'
+                         AND ride_id IS NULL""",
+                    (selected_voucher["id"], user["id"])
+                )
+                if not voucher_available:
+                    flash("That reward voucher has already been used. Please select another voucher.", "error")
+                    return render_booking_form()
+                raise
         else:
             db.execute(*ride_insert)
+            ride_for_key = db.fetchone(
+                "SELECT id FROM rides WHERE passenger_id = ? AND submission_key = ?",
+                (user["id"], submission_key)
+            )
+            if not ride_for_key:
+                raise RuntimeError("Ride request was not persisted.")
+            ride_id = ride_for_key["id"]
 
         if related_journey_id:
             db.execute("UPDATE confirmed_journeys SET airport_ride_booked = 1 WHERE id = ?", (related_journey_id,))
 
         from app.services.ride_dispatch_service import RideDispatchService
-        RideDispatchService.dispatch_ride(ride_id)
+        if not RideDispatchService.dispatch_ride(ride_id):
+            RideDispatchService.notify_passenger_no_driver(ride_id)
 
         flash(f"Ride requested successfully! Reference: #{ride_id[:8].upper()}", "success")
         return redirect(url_for("passenger.ride_detail", ride_id=ride_id))
@@ -478,6 +520,7 @@ def book_ride():
         "passenger/book_ride.html",
         user=user,
         saved_routes=saved_routes,
+        submission_key=secrets.token_urlsafe(24),
         pre_pickup=pre_pickup,
         pre_destination=pre_destination,
         pre_category=pre_category,
@@ -683,28 +726,44 @@ def cancel_ride(ride_id):
         custom_notes = request.form.get("custom_notes", "").strip()
         full_reason = f"{reason} — {custom_notes}" if custom_notes else reason
 
-        updated = db.execute(
-            """UPDATE rides
-               SET status = 'CANCELLED', cancellation_reason = ?,
-                   cancelled_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
-               WHERE id = ? AND passenger_id = ?
-                 AND status NOT IN ('TRIP_STARTED', 'TRIP_COMPLETED', 'COMPLETED', 'CANCELLED')""",
-            (full_reason, ride_id, user["id"])
-        )
-        if updated != 1:
-            flash("This ride changed and can no longer be cancelled online.", "warning")
-            return redirect(url_for("passenger.ride_detail", ride_id=ride_id))
-
-        db.execute(
-            "UPDATE rewards_redemptions SET status = 'ACTIVE', ride_id = NULL WHERE ride_id = ? AND status = 'USED'",
-            (ride_id,)
-        )
-
-        # Audit log entry
-        db.execute(
-            "INSERT INTO audit_logs (id, user_id, action, resource_type, resource_id, details) VALUES (?, ?, ?, ?, ?, ?)",
-            (f"aud_{uuid.uuid4().hex[:8]}", user["id"], "PASSENGER_CANCELLED_RIDE", "RIDE", ride_id, f"Reason: {full_reason}")
-        )
+        try:
+            db.execute_transaction([
+                (
+                    """UPDATE rides
+                       SET status = 'CANCELLED', cancellation_reason = ?,
+                           cancelled_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+                       WHERE id = ? AND passenger_id = ?
+                         AND status NOT IN ('TRIP_STARTED', 'TRIP_COMPLETED', 'COMPLETED', 'CANCELLED')""",
+                    (full_reason, ride_id, user["id"]),
+                    1
+                ),
+                (
+                    """UPDATE ride_driver_offers SET status = 'CANCELLED',
+                              responded_at = CURRENT_TIMESTAMP
+                       WHERE ride_id = ? AND status = 'PENDING'""",
+                    (ride_id,)
+                ),
+                (
+                    """UPDATE rewards_redemptions SET status = 'ACTIVE', ride_id = NULL
+                       WHERE ride_id = ? AND status = 'USED'""",
+                    (ride_id,)
+                ),
+                (
+                    """INSERT INTO audit_logs
+                       (id, user_id, action, resource_type, resource_id, details)
+                       VALUES (?, ?, ?, ?, ?, ?)""",
+                    (
+                        f"aud_{uuid.uuid4().hex[:8]}", user["id"],
+                        "PASSENGER_CANCELLED_RIDE", "RIDE", ride_id, f"Reason: {full_reason}"
+                    )
+                ),
+            ])
+        except RuntimeError:
+            current_ride = db.fetchone("SELECT status FROM rides WHERE id = ?", (ride_id,))
+            if current_ride and current_ride["status"] in ("TRIP_STARTED", "TRIP_COMPLETED", "COMPLETED", "CANCELLED"):
+                flash("This ride changed and can no longer be cancelled online.", "warning")
+                return redirect(url_for("passenger.ride_detail", ride_id=ride_id))
+            raise
 
         # In-app notification to passenger
         NotificationService.create_notification(

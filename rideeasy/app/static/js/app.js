@@ -132,6 +132,24 @@ document.addEventListener("DOMContentLoaded", () => {
     window.setInterval(checkDriverOffers, 8000);
   }
 
+  const rideBookingForm = document.getElementById("ride-booking-form");
+  if (rideBookingForm) {
+    let bookingSubmitting = false;
+    rideBookingForm.addEventListener("submit", (event) => {
+      if (bookingSubmitting) {
+        event.preventDefault();
+        return;
+      }
+      bookingSubmitting = true;
+      const submitButton = event.submitter;
+      if (submitButton) {
+        submitButton.disabled = true;
+        submitButton.textContent = "Submitting ride request…";
+        submitButton.setAttribute("aria-busy", "true");
+      }
+    });
+  }
+
   // 3. LocationIQ-backed fare estimate and location suggestions
   const fareDisplay = document.getElementById("estimated-fare-display");
   const distDisplay = document.getElementById("estimated-distance-display");
@@ -597,26 +615,39 @@ document.addEventListener("DOMContentLoaded", () => {
   const rideTrackingBox = document.getElementById("live-ride-tracker");
   if (rideTrackingBox) {
     const rideId = rideTrackingBox.getAttribute("data-ride-id");
+    const connectionStatus = document.getElementById("passenger-ride-connection-status");
+    let passengerPollActive = false;
     if (rideId) {
-      setInterval(() => {
-        fetch(`/api/ride-status/${rideId}`)
-          .then((res) => res.json())
-          .then((data) => {
-            if (data.success && data.ride) {
-              const driverChanged = rideTrackingBox.dataset.driverId !== (data.ride.driver_id || "");
-              const responseChanged = rideTrackingBox.dataset.driverResponseStatus !== data.ride.driver_response_status;
-              if (
-                rideTrackingBox.dataset.status !== data.ride.status ||
-                driverChanged ||
-                responseChanged
-              ) {
-                // Status changed, reload to sync UI timeline
-                window.location.reload();
-              }
-            }
-          })
-          .catch(() => {});
-      }, 5000);
+      const pollPassengerRide = async () => {
+        if (passengerPollActive || document.hidden) return;
+        passengerPollActive = true;
+        try {
+          const response = await fetch(`/api/ride-status/${encodeURIComponent(rideId)}`, {
+            headers: { Accept: "application/json" },
+            cache: "no-store",
+          });
+          if (!response.ok) throw new Error("Ride status request failed.");
+          const data = await response.json();
+          if (!data.success || !data.ride) throw new Error("Ride status response was invalid.");
+          if (connectionStatus) connectionStatus.hidden = true;
+          const driverChanged = rideTrackingBox.dataset.driverId !== (data.ride.driver_id || "");
+          const responseChanged = rideTrackingBox.dataset.driverResponseStatus !== data.ride.driver_response_status;
+          if (
+            rideTrackingBox.dataset.status !== data.ride.status ||
+            driverChanged ||
+            responseChanged
+          ) {
+            window.location.reload();
+          }
+        } catch (error) {
+          if (connectionStatus) connectionStatus.hidden = false;
+          console.warn("Unable to refresh the passenger ride status.", error);
+        } finally {
+          passengerPollActive = false;
+        }
+      };
+      pollPassengerRide();
+      window.setInterval(pollPassengerRide, 5000);
     }
   }
 
@@ -626,17 +657,21 @@ document.addEventListener("DOMContentLoaded", () => {
     const statusLabel = document.getElementById("driver-live-ride-status");
     const controls = document.getElementById("driver-live-ride-controls");
     const cancelledAlert = document.getElementById("driver-ride-cancelled-alert");
+    const connectionStatus = document.getElementById("driver-ride-connection-status");
     let stopped = false;
+    let driverPollActive = false;
     const pollDriverRide = async () => {
-      if (stopped || document.hidden || !rideId) return;
+      if (stopped || driverPollActive || document.hidden || !rideId) return;
+      driverPollActive = true;
       try {
         const response = await fetch(`/api/ride-status/${encodeURIComponent(rideId)}`, {
           headers: { Accept: "application/json" },
           cache: "no-store",
         });
-        if (!response.ok) return;
+        if (!response.ok) throw new Error("Ride status request failed.");
         const result = await response.json();
-        if (!result.success || !result.ride) return;
+        if (!result.success || !result.ride) throw new Error("Ride status response was invalid.");
+        if (connectionStatus) connectionStatus.hidden = true;
         const ride = result.ride;
         if (ride.status === "CANCELLED") {
           stopped = true;
@@ -654,7 +689,10 @@ document.addEventListener("DOMContentLoaded", () => {
           window.location.reload();
         }
       } catch (error) {
+        if (connectionStatus) connectionStatus.hidden = false;
         console.warn("Unable to refresh the live ride status.", error);
+      } finally {
+        driverPollActive = false;
       }
     };
     pollDriverRide();

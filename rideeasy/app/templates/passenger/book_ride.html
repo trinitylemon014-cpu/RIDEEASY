@@ -75,6 +75,7 @@
     </div>
 
     <form id="ride-booking-form" method="POST" action="/passenger/book-ride" class="card">
+      <input type="hidden" name="submission_key" value="{{ submission_key }}">
       <input type="hidden" name="is_airport_ride" value="{{ is_airport }}">
       <input type="hidden" name="related_journey_id" value="{{ journey_id }}">
 

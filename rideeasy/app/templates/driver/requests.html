@@ -41,14 +41,22 @@
               <tr {% if ride.driver_id == user.id and ride.driver_response_status == 'PENDING' %}data-driver-offer-id="{{ ride.id }}"{% endif %}>
                 <td>
                   <strong>{{ ride.passenger_name }}</strong>
-                  <div class="text-subtle">{{ ride.passenger_phone }}</div>
                   {% if ride.driver_id == user.id %}
                     <div class="status-indicator" style="margin-top: 0.35rem;">Assigned to you · response needed</div>
                   {% endif %}
                 </td>
                 <td><strong>{{ ride.pickup_address }}</strong><div class="text-subtle">To: {{ ride.destination_address }}</div></td>
-                <td>{{ ride.estimated_distance_km }} km</td>
-                <td><strong>{{ ride.estimated_fare_ugx | ugx }}</strong></td>
+                <td>
+                  {{ ride.estimated_distance_km }} km
+                  {% if ride.estimated_duration_minutes %}
+                    <div class="text-subtle">About {{ ride.estimated_duration_minutes | round | int }} min</div>
+                  {% endif %}
+                </td>
+                <td>
+                  <strong>{{ (ride.final_fare_ugx or ride.estimated_fare_ugx) | ugx }}</strong>
+                  <div class="text-subtle">Est. driver share: {{ ((ride.final_fare_ugx or ride.estimated_fare_ugx) * 80 // 100) | ugx }}</div>
+                  <div class="text-subtle">Respond by {{ ride.expires_at }} UTC</div>
+                </td>
                 <td>
                   <div style="display: flex; gap: 0.4rem; flex-wrap: wrap;">
                     <form method="POST" action="/driver/rides/{{ ride.id }}/accept">

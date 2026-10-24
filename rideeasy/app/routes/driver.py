@@ -115,11 +115,14 @@ def dashboard():
     active_ride = None
     if profile and profile["is_online"] and profile["verification_status"] == "APPROVED":
         pending_rides = db.fetchall(
-            """SELECT r.*, u.full_name AS passenger_name, u.phone AS passenger_phone
+            """SELECT r.*, u.full_name AS passenger_name,
+                      o.expires_at
                FROM rides r
                JOIN users u ON u.id = r.passenger_id
+               JOIN ride_driver_offers o ON o.ride_id = r.id AND o.driver_id = r.driver_id
                WHERE r.driver_id = ? AND r.status = 'DRIVER_ASSIGNED'
-                 AND r.driver_response_status = 'PENDING'
+                 AND r.driver_response_status = 'PENDING' AND o.status = 'PENDING'
+                 AND o.expires_at > CURRENT_TIMESTAMP
                ORDER BY r.created_at ASC""",
             (user["id"],)
         )
@@ -194,7 +197,13 @@ def toggle_online():
                    WHERE driver_id = ? AND status = 'DRIVER_ASSIGNED'
                      AND driver_response_status = 'PENDING'""",
                 (user["id"],)
-            )
+            ),
+            (
+                """UPDATE ride_driver_offers
+                   SET status = 'CANCELLED', responded_at = CURRENT_TIMESTAMP
+                   WHERE driver_id = ? AND status = 'PENDING'""",
+                (user["id"],)
+            ),
         ])
         for pending_ride in pending_rides:
             still_unassigned = db.fetchone(
@@ -207,9 +216,10 @@ def toggle_online():
             RideDispatchService.notify_passenger_driver_declined(
                 pending_ride["id"], pending_ride["passenger_id"], user["full_name"]
             )
-            RideDispatchService.dispatch_ride(
+            if not RideDispatchService.dispatch_ride(
                 pending_ride["id"], excluded_driver_ids={user["id"]}
-            )
+            ):
+                RideDispatchService.notify_passenger_no_driver(pending_ride["id"])
         msg = "You are now OFFLINE. Pending trip offers were returned for reassignment."
     flash(msg, "info")
     return redirect(url_for("driver.dashboard"))
@@ -217,18 +227,22 @@ def toggle_online():
 @driver_bp.route("/requests")
 def requests_list():
     user = AuthService.get_current_user()
+    RideDispatchService.expire_stale_offers()
     db = get_db()
     profile = db.fetchone("SELECT * FROM driver_profiles WHERE user_id = ?", (user["id"],))
     pending_rides = []
     if profile and profile["is_online"] and profile["verification_status"] == "APPROVED":
         pending_rides = db.fetchall(
-            """SELECT r.*, u.full_name as passenger_name, u.phone as passenger_phone
+            """SELECT r.*, u.full_name as passenger_name,
+                      o.expires_at
             FROM rides r
             JOIN users u ON r.passenger_id = u.id
+            JOIN ride_driver_offers o ON o.ride_id = r.id AND o.driver_id = r.driver_id
             WHERE (
                 (r.status = 'DRIVER_ASSIGNED' AND r.driver_id = ?
                     AND r.driver_response_status = 'PENDING')
             )
+              AND o.status = 'PENDING' AND o.expires_at > CURRENT_TIMESTAMP
             ORDER BY r.created_at ASC""",
             (user["id"],)
         )
@@ -242,12 +256,22 @@ def requests_list():
 @driver_bp.route("/api/pending-offers")
 def api_pending_offers():
     user = AuthService.get_current_user()
+    RideDispatchService.expire_stale_offers()
     offers = get_db().fetchall(
-        """SELECT id, pickup_address, destination_address
-           FROM rides
-           WHERE driver_id = ? AND status = 'DRIVER_ASSIGNED'
-             AND driver_response_status = 'PENDING'
-           ORDER BY created_at DESC""",
+        """SELECT r.id, r.pickup_address, r.destination_address, r.category,
+                  r.estimated_distance_km, r.final_fare_ugx, r.estimated_fare_ugx,
+                  o.expires_at
+           FROM rides r
+           JOIN ride_driver_offers o ON o.ride_id = r.id AND o.driver_id = r.driver_id
+           WHERE r.driver_id = ? AND r.status = 'DRIVER_ASSIGNED'
+             AND r.driver_response_status = 'PENDING' AND o.status = 'PENDING'
+             AND o.expires_at > CURRENT_TIMESTAMP
+             AND EXISTS (
+               SELECT 1 FROM driver_profiles d
+               WHERE d.user_id = r.driver_id AND d.is_online = 1
+                 AND d.verification_status = 'APPROVED'
+             )
+           ORDER BY r.created_at DESC""",
         (user["id"],)
     )
     return jsonify({"success": True, "offers": offers})
@@ -270,34 +294,91 @@ def active_ride():
 def accept_ride(ride_id):
     user = AuthService.get_current_user()
     db = get_db()
+    RideDispatchService.expire_stale_offers(ride_id)
 
     profile = db.fetchone("SELECT * FROM driver_profiles WHERE user_id = ?", (user["id"],))
     if not profile or not profile["is_online"] or profile["verification_status"] != "APPROVED":
         flash("Only approved drivers who are online can accept trips.", "error")
         return redirect(url_for("driver.requests_list"))
 
-    updated = db.execute_transaction([
-        (
-            """UPDATE rides
-               SET driver_id = ?, status = 'DRIVER_ASSIGNED',
-                   driver_response_status = 'ACCEPTED', updated_at = CURRENT_TIMESTAMP
-               WHERE id = ? AND driver_id = ? AND status = 'DRIVER_ASSIGNED'
-                 AND driver_response_status = 'PENDING'
-                 AND EXISTS (
-                   SELECT 1 FROM driver_profiles d
-                   WHERE d.user_id = ? AND d.is_online = 1 AND d.verification_status = 'APPROVED'
-                 )
-                 AND EXISTS (
-                   SELECT 1 FROM users u WHERE u.id = ? AND u.is_active = 1
-                 )
+    try:
+        updated = db.execute_transaction([
+            (
+                """UPDATE rides
+                   SET driver_id = ?, status = 'DRIVER_ASSIGNED',
+                       driver_response_status = 'ACCEPTED', updated_at = CURRENT_TIMESTAMP
+                   WHERE id = ? AND driver_id = ? AND status = 'DRIVER_ASSIGNED'
+                     AND driver_response_status = 'PENDING'
+                     AND EXISTS (
+                       SELECT 1 FROM ride_driver_offers o
+                       WHERE o.ride_id = rides.id AND o.driver_id = ?
+                         AND o.status = 'PENDING' AND o.expires_at > CURRENT_TIMESTAMP
+                     )
+                     AND EXISTS (
+                       SELECT 1 FROM driver_profiles d
+                       WHERE d.user_id = ? AND d.is_online = 1
+                         AND d.verification_status = 'APPROVED'
+                     )
+                     AND EXISTS (
+                       SELECT 1 FROM users u WHERE u.id = ? AND u.is_active = 1
+                     )
+                     AND EXISTS (
+                       SELECT 1 FROM vehicles v
+                       WHERE v.driver_id = ? AND v.is_active = 1 AND v.is_verified = 1
+                     )
+                     AND NOT EXISTS (
+                       SELECT 1 FROM rides active
+                       WHERE active.driver_id = ? AND active.id != ?
+                         AND active.status NOT IN ('COMPLETED', 'CANCELLED')
+                     )""",
+                (
+                    user["id"], ride_id, user["id"], user["id"], user["id"], user["id"],
+                    user["id"], user["id"], ride_id
+                ),
+                1
+            ),
+            (
+                """UPDATE ride_driver_offers
+                   SET status = 'ACCEPTED', responded_at = CURRENT_TIMESTAMP
+                   WHERE ride_id = ? AND driver_id = ? AND status = 'PENDING'
+                     AND expires_at > CURRENT_TIMESTAMP""",
+                (ride_id, user["id"]),
+                1
+            )
+        ])[0]
+    except RuntimeError:
+        current_offer = db.fetchone(
+            "SELECT status FROM ride_driver_offers WHERE ride_id = ? AND driver_id = ?",
+            (ride_id, user["id"])
+        )
+        still_pending = db.fetchone(
+            """SELECT 1 AS pending FROM ride_driver_offers
+               WHERE ride_id = ? AND driver_id = ? AND status = 'PENDING'
+                 AND expires_at > CURRENT_TIMESTAMP""",
+            (ride_id, user["id"])
+        )
+        if not current_offer or not still_pending:
+            flash("This trip offer expired or was already handled.", "warning")
+            return redirect(url_for("driver.requests_list"))
+        eligible = db.fetchone(
+            """SELECT 1 AS eligible
+               FROM driver_profiles d
+               JOIN users u ON u.id = d.user_id
+               JOIN vehicles v ON v.driver_id = d.user_id
+               WHERE d.user_id = ? AND d.is_online = 1
+                 AND d.verification_status = 'APPROVED' AND u.is_active = 1
+                 AND v.is_active = 1 AND v.is_verified = 1
                  AND NOT EXISTS (
                    SELECT 1 FROM rides active
-                   WHERE active.driver_id = ? AND active.id != ?
+                   WHERE active.driver_id = d.user_id AND active.id != ?
                      AND active.status NOT IN ('COMPLETED', 'CANCELLED')
                  )""",
-            (user["id"], ride_id, user["id"], user["id"], user["id"], user["id"], ride_id)
+            (user["id"], ride_id)
         )
-    ])[0]
+        if not eligible:
+            flash("You are no longer eligible to accept this trip. Check your online status and active rides.", "warning")
+            return redirect(url_for("driver.requests_list"))
+        raise
     if updated != 1:
         flash("This trip is no longer available, or you already have an active trip.", "warning")
         return redirect(url_for("driver.requests_list"))
@@ -324,36 +405,44 @@ def accept_ride(ride_id):
 def decline_ride(ride_id):
     user = AuthService.get_current_user()
     db = get_db()
+    RideDispatchService.expire_stale_offers(ride_id)
     profile = db.fetchone("SELECT * FROM driver_profiles WHERE user_id = ?", (user["id"],))
     if not profile or not profile["is_online"] or profile["verification_status"] != "APPROVED":
         flash("Only approved online drivers can respond to trip offers.", "error")
         return redirect(url_for("driver.requests_list"))
 
     ride = db.fetchone(
-        "SELECT passenger_id FROM rides WHERE id = ? AND driver_id = ? AND status = 'DRIVER_ASSIGNED' AND driver_response_status = 'PENDING'",
+        """SELECT passenger_id FROM rides
+           WHERE id = ? AND driver_id = ? AND status = 'DRIVER_ASSIGNED'
+             AND driver_response_status = 'PENDING'""",
         (ride_id, user["id"])
     )
     if not ride:
         flash("This trip offer is no longer awaiting your response.", "warning")
         return redirect(url_for("driver.requests_list"))
 
-    updated = db.execute_transaction([
-        (
-            """UPDATE rides SET driver_id = NULL, status = 'SEARCHING_FOR_DRIVER',
-                      driver_response_status = 'DECLINED', updated_at = CURRENT_TIMESTAMP
-               WHERE id = ? AND driver_id = ? AND status = 'DRIVER_ASSIGNED'
-                 AND driver_response_status = 'PENDING'""",
-            (ride_id, user["id"]), 1
+    try:
+        declined = RideDispatchService.decline_offer(ride_id, user["id"])
+    except RuntimeError:
+        current_offer = db.fetchone(
+            """SELECT 1 AS pending FROM ride_driver_offers
+               WHERE ride_id = ? AND driver_id = ? AND status = 'PENDING'
+                 AND expires_at > CURRENT_TIMESTAMP""",
+            (ride_id, user["id"])
         )
-    ])[0]
-    if updated != 1:
+        if not current_offer:
+            declined = False
+        else:
+            raise
+    if not declined:
         flash("This trip offer is no longer available.", "warning")
         return redirect(url_for("driver.requests_list"))
 
     RideDispatchService.notify_passenger_driver_declined(
         ride_id, ride["passenger_id"], user["full_name"]
     )
-    RideDispatchService.dispatch_ride(ride_id, excluded_driver_ids={user["id"]})
+    if not RideDispatchService.dispatch_ride(ride_id):
+        RideDispatchService.notify_passenger_no_driver(ride_id)
     flash("You declined the trip. RideEasy will seek another available driver.", "info")
     return redirect(url_for("driver.requests_list"))
 
@@ -371,7 +460,11 @@ def update_ride_status(ride_id):
         "TRIP_COMPLETED": "COMPLETED"
     }
 
-    ride = db.fetchone("SELECT * FROM rides WHERE id = ? AND driver_id = ?", (ride_id, user["id"]))
+    ride = db.fetchone(
+        """SELECT * FROM rides
+           WHERE id = ? AND driver_id = ? AND driver_response_status = 'ACCEPTED'""",
+        (ride_id, user["id"])
+    )
     if not ride:
         abort(404)
 
@@ -380,21 +473,48 @@ def update_ride_status(ride_id):
         flash(f"Invalid status transition from {ride['status']} to {new_status}.", "error")
         return redirect(url_for("driver.active_ride"))
 
+    transition = (
+        """UPDATE rides SET status = ?, updated_at = CURRENT_TIMESTAMP
+           WHERE id = ? AND driver_id = ? AND status = ?
+             AND driver_response_status = 'ACCEPTED'""",
+        (new_status, ride_id, user["id"], ride["status"]),
+        1
+    )
     if new_status == "COMPLETED":
-        db.execute(
-            "UPDATE rides SET status = 'COMPLETED', updated_at = CURRENT_TIMESTAMP WHERE id = ?",
-            (ride_id,)
-        )
-        db.execute(
-            "UPDATE driver_profiles SET total_trips = total_trips + 1 WHERE user_id = ?",
-            (user["id"],)
-        )
+        try:
+            db.execute_transaction([
+                transition,
+                ("UPDATE driver_profiles SET total_trips = total_trips + 1 WHERE user_id = ?", (user["id"],), 1),
+            ])
+        except RuntimeError:
+            current_ride = db.fetchone("SELECT status FROM rides WHERE id = ?", (ride_id,))
+            if current_ride and current_ride["status"] in ("CANCELLED", "COMPLETED"):
+                flash("This ride has already changed and cannot be completed again.", "warning")
+                return redirect(url_for("driver.active_ride"))
+            raise
         flash("Trip completed. Passenger payment remains pending until verified by Paystack.", "success")
         return redirect(url_for("driver.trips"))
     else:
-        db.execute(
-            "UPDATE rides SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
-            (new_status, ride_id)
+        try:
+            db.execute_transaction([transition])
+        except RuntimeError:
+            current_ride = db.fetchone("SELECT status FROM rides WHERE id = ?", (ride_id,))
+            if not current_ride or current_ride["status"] == ride["status"]:
+                raise
+            flash("This ride changed before the status update could be saved.", "warning")
+            return redirect(url_for("driver.active_ride"))
+        passenger_title = {
+            "DRIVER_ARRIVING": "Driver is heading to pickup",
+            "DRIVER_ARRIVED": "Driver arrived at pickup",
+            "TRIP_STARTED": "Your ride has started",
+            "TRIP_COMPLETED": "Your trip is complete",
+        }[new_status]
+        NotificationService.create_notification(
+            user_id=ride["passenger_id"],
+            title=passenger_title,
+            message=f"Ride #{ride_id[:8].upper()} status: {new_status.replace('_', ' ').lower()}.",
+            notif_type="DRIVER_ASSIGNED",
+            related_entity_id=ride_id
         )
         flash(f"Trip status updated to {new_status.replace('_', ' ').title()}.", "info")
 

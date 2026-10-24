@@ -31,10 +31,16 @@
         The passenger cancelled this ride. Stop trip updates and return to your requests.
         <a href="/driver/requests" class="btn btn-secondary btn-sm">View requests</a>
       </div>
+      <div id="driver-ride-connection-status" class="text-subtle" role="status" aria-live="polite" hidden>
+        Live updates paused. Reconnecting…
+      </div>
       <div class="stats-grid" style="margin-bottom: 1.5rem;">
         <div class="stat-card"><div class="stat-label">Pickup</div><div style="font-weight: 700;">{{ ride.pickup_address }}</div></div>
         <div class="stat-card"><div class="stat-label">Destination</div><div style="font-weight: 700;">{{ ride.destination_address }}</div></div>
         <div class="stat-card"><div class="stat-label">Distance</div><div class="stat-value">{{ ride.estimated_distance_km }} km</div></div>
+        {% if ride.estimated_duration_minutes %}
+          <div class="stat-card"><div class="stat-label">Est. journey time</div><div class="stat-value">{{ ride.estimated_duration_minutes | round | int }} min</div></div>
+        {% endif %}
         <div class="stat-card"><div class="stat-label">Estimated fare</div><div class="stat-value" style="font-size: 1rem;">{{ ride.final_fare_ugx or ride.estimated_fare_ugx | ugx }}</div></div>
       </div>
       <a class="btn btn-secondary btn-sm" href="/map?pickup={{ ride.pickup_address | urlencode }}&destination={{ ride.destination_address | urlencode }}">View route on map</a>

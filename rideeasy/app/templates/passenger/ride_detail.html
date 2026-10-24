@@ -27,6 +27,9 @@
 
     <!-- Live Status Tracker Hook for JS Polling -->
     <div id="live-ride-tracker" data-ride-id="{{ ride.id }}" data-status="{{ ride.status }}" data-driver-id="{{ ride.driver_id or '' }}" data-driver-response-status="{{ ride.driver_response_status }}" class="card" style="margin-bottom: 1.5rem;">
+      <div id="passenger-ride-connection-status" class="text-subtle" role="status" aria-live="polite" hidden>
+        Live updates paused. Reconnecting…
+      </div>
       <!-- Lifecycle Status Timeline -->
       <div class="status-timeline">
         {% set steps = [
@@ -177,11 +180,17 @@
           <div class="text-subtle">Destination</div>
           <div style="font-weight: 600; font-size: 0.9375rem;">{{ ride.destination_address }}</div>
         </div>
-        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem; border-top: 1px solid var(--color-light-grey); padding-top: 0.875rem;">
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 1rem; border-top: 1px solid var(--color-light-grey); padding-top: 0.875rem;">
           <div>
             <div class="text-subtle">Distance</div>
             <div style="font-weight: 700;">{{ ride.estimated_distance_km }} km</div>
           </div>
+          {% if ride.estimated_duration_minutes %}
+          <div>
+            <div class="text-subtle">Estimated time</div>
+            <div style="font-weight: 700;">{{ ride.estimated_duration_minutes | round | int }} min</div>
+          </div>
+          {% endif %}
           <div>
             <div class="text-subtle">Category</div>
             <div style="font-weight: 700;">{{ ride.category }}</div>

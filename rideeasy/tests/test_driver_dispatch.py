@@ -95,6 +95,7 @@ def test_driver_acceptance_starts_live_trip_state(client, app, db, isolated_disp
 
     offer_response = client.get("/driver/api/pending-offers")
     assert offer_response.get_json()["offers"][0]["id"] == ride_id
+    assert offer_response.get_json()["offers"][0]["expires_at"]
     assert b"do not have a live ride assigned" in client.get("/driver/active-ride").data
     dashboard = client.get("/driver/dashboard")
     assert b"1 pending trip request" in dashboard.data
@@ -115,6 +116,14 @@ def test_driver_acceptance_starts_live_trip_state(client, app, db, isolated_disp
     assert ride["driver_id"] == driver_id
     assert ride["status"] == "DRIVER_ASSIGNED"
     assert ride["driver_response_status"] == "ACCEPTED"
+    duplicate_accept = client.post(f"/driver/rides/{ride_id}/accept")
+    assert duplicate_accept.status_code == 302
+    assert db.fetchone(
+        """SELECT COUNT(*) AS count FROM notifications
+           WHERE user_id = 'usr_pass_01' AND related_entity_id = ?
+             AND title = 'Driver accepted your ride'""",
+        (ride_id,)
+    )["count"] == 1
     assert b"Live trip updates are now active" in db.fetchone(
         "SELECT message FROM notifications WHERE user_id = 'usr_pass_01' AND related_entity_id = ? ORDER BY rowid DESC LIMIT 1",
         (ride_id,)
@@ -184,7 +193,113 @@ def test_declining_reassigns_to_another_online_driver_and_notifies_passenger(
         (ride_id,)
     )
     assert any(row["title"] == "Driver unavailable" for row in messages)
-    assert any("looking for another available driver" in row["message"] for row in messages)
+    assert any("continuing to search" in row["message"] for row in messages)
+
+
+def test_expired_offers_move_to_an_untried_driver_then_remain_searching(
+    client, app, db, isolated_dispatch_drivers
+):
+    first_id = isolated_dispatch_drivers(uuid.uuid4().hex[:6], online=True, rating=5.0)
+    second_id = isolated_dispatch_drivers(uuid.uuid4().hex[:6], online=True, rating=4.0)
+    ride_id = _create_dispatch_ride(db)
+    with app.app_context():
+        assert RideDispatchService.dispatch_ride(ride_id) == first_id
+    db.execute(
+        """UPDATE ride_driver_offers SET expires_at = datetime(CURRENT_TIMESTAMP, '-1 second')
+           WHERE ride_id = ? AND driver_id = ?""",
+        (ride_id, first_id)
+    )
+
+    with client.session_transaction() as browser_session:
+        browser_session["user_id"] = second_id
+        browser_session["user_role"] = "DRIVER"
+    assert client.get(f"/api/ride-status/{ride_id}").status_code == 404
+    assert db.fetchone(
+        "SELECT status FROM ride_driver_offers WHERE ride_id = ? AND driver_id = ?",
+        (ride_id, first_id)
+    )["status"] == "PENDING"
+
+    with client.session_transaction() as browser_session:
+        browser_session["user_id"] = first_id
+        browser_session["user_role"] = "DRIVER"
+    assert client.get("/driver/api/pending-offers").get_json()["offers"] == []
+    ride = db.fetchone(
+        "SELECT driver_id, status, driver_response_status FROM rides WHERE id = ?",
+        (ride_id,)
+    )
+    assert ride == {
+        "driver_id": second_id,
+        "status": "DRIVER_ASSIGNED",
+        "driver_response_status": "PENDING",
+    }
+    assert db.fetchone(
+        "SELECT status FROM ride_driver_offers WHERE ride_id = ? AND driver_id = ?",
+        (ride_id, first_id)
+    )["status"] == "EXPIRED"
+    expired_accept = client.post(f"/driver/rides/{ride_id}/accept")
+    assert expired_accept.status_code == 302
+    assert db.fetchone(
+        "SELECT driver_id FROM rides WHERE id = ?",
+        (ride_id,)
+    )["driver_id"] == second_id
+
+    db.execute(
+        """UPDATE ride_driver_offers SET expires_at = datetime(CURRENT_TIMESTAMP, '-1 second')
+           WHERE ride_id = ? AND driver_id = ?""",
+        (ride_id, second_id)
+    )
+    with client.session_transaction() as browser_session:
+        browser_session["user_id"] = "usr_pass_01"
+        browser_session["user_role"] = "PASSENGER"
+    status = client.get(f"/api/ride-status/{ride_id}").get_json()["ride"]
+    assert status["status"] == "SEARCHING_FOR_DRIVER"
+    assert status["driver_id"] is None
+    assert RideDispatchService.dispatch_ride(ride_id) is None
+    assert db.fetchone(
+        """SELECT COUNT(*) AS count FROM ride_driver_offers
+           WHERE ride_id = ? AND status = 'PENDING'""",
+        (ride_id,)
+    )["count"] == 0
+    assert db.fetchone(
+        """SELECT COUNT(*) AS count FROM notifications
+           WHERE user_id = 'usr_pass_01' AND related_entity_id = ?
+             AND title = 'Still searching for a driver'""",
+        (ride_id,)
+    )["count"] == 1
+
+
+def test_driver_trip_status_requires_acceptance_and_advances_atomically(
+    client, app, db, isolated_dispatch_drivers
+):
+    driver_id = isolated_dispatch_drivers(uuid.uuid4().hex[:6], online=True)
+    ride_id = _create_dispatch_ride(db)
+    with app.app_context():
+        assert RideDispatchService.dispatch_ride(ride_id) == driver_id
+    with client.session_transaction() as browser_session:
+        browser_session["user_id"] = driver_id
+        browser_session["user_role"] = "DRIVER"
+
+    client.post(f"/driver/rides/{ride_id}/status", data={"status": "TRIP_STARTED"})
+    assert db.fetchone("SELECT status FROM rides WHERE id = ?", (ride_id,))["status"] == "DRIVER_ASSIGNED"
+
+    client.post(f"/driver/rides/{ride_id}/accept")
+    for new_status in ("DRIVER_ARRIVING", "DRIVER_ARRIVED", "TRIP_STARTED", "TRIP_COMPLETED", "COMPLETED"):
+        response = client.post(
+            f"/driver/rides/{ride_id}/status",
+            data={"status": new_status},
+        )
+        assert response.status_code == 302
+        assert db.fetchone("SELECT status FROM rides WHERE id = ?", (ride_id,))["status"] == new_status
+
+    total_trips = db.fetchone(
+        "SELECT total_trips FROM driver_profiles WHERE user_id = ?",
+        (driver_id,)
+    )["total_trips"]
+    client.post(f"/driver/rides/{ride_id}/status", data={"status": "COMPLETED"})
+    assert db.fetchone(
+        "SELECT total_trips FROM driver_profiles WHERE user_id = ?",
+        (driver_id,)
+    )["total_trips"] == total_trips
 
 
 def test_no_online_driver_leaves_ride_searching(db, app, isolated_dispatch_drivers):

@@ -45,6 +45,7 @@ class Config:
     EGOSMS_API_URL = os.getenv("EGOSMS_API_URL", "").strip()
     EGOSMS_API_KEY = os.getenv("EGOSMS_API_KEY", "").strip()
     LOCATIONIQ_API_KEY = os.getenv("LOCATIONIQ_API_KEY", "").strip()
+    DRIVER_RIDE_OFFER_TIMEOUT_SECONDS = int(os.getenv("DRIVER_RIDE_OFFER_TIMEOUT_SECONDS", "45"))
 
     # Airport Settings (Uganda Entry Hub)
     PRIMARY_AIRPORT = {

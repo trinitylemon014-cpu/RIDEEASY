@@ -147,7 +147,9 @@ class Database:
         for table, column, definition in (
             ("rewards_redemptions", "discount_percent", "INTEGER NOT NULL DEFAULT 0 CHECK(discount_percent BETWEEN 0 AND 100)"),
             ("rewards_redemptions", "ride_id", "TEXT"),
-            ("rides", "driver_response_status", "TEXT NOT NULL DEFAULT 'ACCEPTED' CHECK(driver_response_status IN ('PENDING', 'ACCEPTED', 'DECLINED'))")
+            ("rides", "driver_response_status", "TEXT NOT NULL DEFAULT 'ACCEPTED' CHECK(driver_response_status IN ('PENDING', 'ACCEPTED', 'DECLINED'))"),
+            ("rides", "submission_key", "TEXT"),
+            ("rides", "estimated_duration_minutes", "REAL")
         ):
             columns = self.fetchall(f"PRAGMA table_info({table})")
             if not any(item["name"] == column for item in columns):
@@ -156,6 +158,19 @@ class Database:
         self.execute(
             "CREATE INDEX IF NOT EXISTS idx_rides_dispatch_offer "
             "ON rides(driver_id, status, driver_response_status)"
+        )
+        self.execute(
+            "CREATE UNIQUE INDEX IF NOT EXISTS idx_rides_passenger_submission_key "
+            "ON rides(passenger_id, submission_key)"
+        )
+        self.execute(
+            """INSERT OR IGNORE INTO ride_driver_offers
+               (ride_id, driver_id, status, expires_at)
+               SELECT id, driver_id, 'PENDING', datetime(CURRENT_TIMESTAMP, ?)
+               FROM rides
+               WHERE driver_id IS NOT NULL AND status = 'DRIVER_ASSIGNED'
+                 AND driver_response_status = 'PENDING'""",
+            (f"+{min(300, max(1, Config.DRIVER_RIDE_OFFER_TIMEOUT_SECONDS))} seconds",)
         )
         logger.info("Database schema initialized successfully.")
 

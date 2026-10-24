@@ -235,6 +235,7 @@ CREATE TABLE IF NOT EXISTS journey_reminders (
 CREATE TABLE IF NOT EXISTS rides (
     id TEXT PRIMARY KEY,
     passenger_id TEXT NOT NULL,
+    submission_key TEXT,
     driver_id TEXT,
     category TEXT NOT NULL CHECK(category IN ('BODA', 'ECONOMY', 'COMFORT', 'PREMIUM')),
     pickup_address TEXT NOT NULL,
@@ -244,6 +245,7 @@ CREATE TABLE IF NOT EXISTS rides (
     destination_lat REAL NOT NULL,
     destination_lng REAL NOT NULL,
     estimated_distance_km REAL NOT NULL,
+    estimated_duration_minutes REAL,
     estimated_fare_ugx INTEGER NOT NULL,
     final_fare_ugx INTEGER,
     payment_method TEXT NOT NULL DEFAULT 'CASH' CHECK(payment_method IN ('CASH', 'MTN_MOMO', 'AIRTEL_MONEY', 'CARD')),
@@ -270,6 +272,18 @@ CREATE TABLE IF NOT EXISTS rides (
     FOREIGN KEY (passenger_id) REFERENCES users(id) ON DELETE CASCADE,
     FOREIGN KEY (driver_id) REFERENCES users(id),
     FOREIGN KEY (related_journey_id) REFERENCES confirmed_journeys(id)
+);
+
+CREATE TABLE IF NOT EXISTS ride_driver_offers (
+    ride_id TEXT NOT NULL,
+    driver_id TEXT NOT NULL,
+    status TEXT NOT NULL CHECK(status IN ('PENDING', 'ACCEPTED', 'DECLINED', 'EXPIRED', 'CANCELLED')),
+    offered_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    expires_at TIMESTAMP NOT NULL,
+    responded_at TIMESTAMP,
+    PRIMARY KEY (ride_id, driver_id),
+    FOREIGN KEY (ride_id) REFERENCES rides(id) ON DELETE CASCADE,
+    FOREIGN KEY (driver_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
 -- Paystack charges are pending until a signed callback or return URL is verified server-side.
@@ -420,6 +434,8 @@ CREATE INDEX IF NOT EXISTS idx_users_role ON users(role);
 CREATE INDEX IF NOT EXISTS idx_rides_passenger ON rides(passenger_id);
 CREATE INDEX IF NOT EXISTS idx_rides_driver ON rides(driver_id);
 CREATE INDEX IF NOT EXISTS idx_rides_status ON rides(status);
+CREATE INDEX IF NOT EXISTS idx_ride_driver_offers_expiration
+    ON ride_driver_offers(status, expires_at);
 CREATE INDEX IF NOT EXISTS idx_flight_requests_passenger ON flight_requests(passenger_id);
 CREATE INDEX IF NOT EXISTS idx_flight_requests_company ON flight_requests(assigned_company_id);
 CREATE INDEX IF NOT EXISTS idx_school_requests_school ON school_transport_requests(school_id);

@@ -42,6 +42,8 @@ PAYSTACK_CURRENCY=UGX
 PAYSTACK_AMOUNT_MULTIPLIER=1
 EGOSMS_API_URL=<configured-EgoSMS-compatible-endpoint>
 EGOSMS_API_KEY=<SMS-provider-key>
+LOCATIONIQ_API_KEY=<LocationIQ-server-key>
+DRIVER_RIDE_OFFER_TIMEOUT_SECONDS=45
 ```
 
 Register `https://rideeasy.ug/payments/paystack/webhook` in the Paystack dashboard. Confirm Uganda, UGX, the merchant's supported payment channels, and the currency amount units with Paystack before live transactions. The application records manual payout credits; it does not transfer funds to mobile numbers automatically. EgoSMS is not considered active until its real API contract and credentials are configured.

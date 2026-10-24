@@ -1,3 +1,5 @@
+import re
+
 from app.services.pricing_service import PricingService
 
 def test_fare_calculation_formula():
@@ -87,11 +89,50 @@ def test_booking_recalculates_route_on_server_and_ignores_submitted_fare(client,
     assert response.status_code == 302
     assert routes == [("A real pickup", "A real destination", {})]
     ride = db.fetchone(
-        "SELECT estimated_distance_km, estimated_fare_ugx FROM rides WHERE pickup_address = ?",
+        """SELECT estimated_distance_km, estimated_duration_minutes, estimated_fare_ugx
+           FROM rides WHERE pickup_address = ?""",
         ("A real pickup",),
     )
     assert ride["estimated_distance_km"] == 12.4
+    assert ride["estimated_duration_minutes"] == 35
     assert ride["estimated_fare_ugx"] == PricingService.calculate_fare("ECONOMY", 12.4, 35)
+
+
+def test_retried_booking_submission_returns_existing_ride(client, db, monkeypatch):
+    client.get("/auth/demo/passenger", follow_redirects=True)
+    route_calls = []
+
+    def fake_route(*args, **kwargs):
+        route_calls.append(args)
+        return {
+            "start": {"lat": 0.31, "lng": 32.58, "label": "Route origin, Uganda"},
+            "destination": {"lat": 0.32, "lng": 32.59, "label": "Route destination, Uganda"},
+            "distance_km": 12.4,
+            "duration_minutes": 35,
+        }
+
+    monkeypatch.setattr("app.routes.passenger.LocationService.get_route", fake_route)
+    booking_page = client.get("/passenger/book-ride")
+    token = re.search(rb'name="submission_key" value="([A-Za-z0-9_-]{32})"', booking_page.data)
+    assert token
+    data = {
+        "submission_key": token.group(1).decode(),
+        "pickup_address": "A real pickup",
+        "destination_address": "A real destination",
+        "category": "ECONOMY",
+        "payment_method": "MTN_MOMO",
+    }
+
+    first_response = client.post("/passenger/book-ride", data=data)
+    second_response = client.post("/passenger/book-ride", data=data)
+
+    assert first_response.status_code == second_response.status_code == 302
+    assert first_response.location == second_response.location
+    assert len(route_calls) == 1
+    assert db.fetchone(
+        "SELECT COUNT(*) AS count FROM rides WHERE submission_key = ?",
+        (data["submission_key"],)
+    )["count"] == 1
 
 
 def test_fare_estimate_requires_locationiq_configuration(client, app, monkeypatch):

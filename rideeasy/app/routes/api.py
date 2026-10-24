@@ -186,16 +186,18 @@ def calculate_route():
 @role_required("PASSENGER", "DRIVER", "ADMIN")
 def ride_status(ride_id):
     db = get_db()
-    ride = db.fetchone(
-        """SELECT r.id, r.passenger_id, r.status, r.driver_id, r.driver_response_status,
+    ride_query = """SELECT r.id, r.passenger_id, r.status, r.driver_id, r.driver_response_status,
                   r.cancellation_reason,
+                  r.estimated_distance_km, r.estimated_duration_minutes,
                   r.estimated_fare_ugx, r.final_fare_ugx, r.payment_status,
                   u.full_name as driver_name, u.phone as driver_phone,
                   v.plate_number, v.make, v.model, v.color
         FROM rides r
         LEFT JOIN users u ON r.driver_id = u.id
         LEFT JOIN vehicles v ON v.driver_id = u.id
-        WHERE r.id = ?""",
+        WHERE r.id = ?"""
+    ride = db.fetchone(
+        ride_query,
         (ride_id,)
     )
     if not ride:
@@ -204,6 +206,14 @@ def ride_status(ride_id):
     if user["role"] != "ADMIN" and user["id"] not in {
         ride["passenger_id"], ride["driver_id"]
     }:
+        return jsonify({"error": "Ride not found"}), 404
+    from app.services.ride_dispatch_service import RideDispatchService
+    RideDispatchService.expire_stale_offers(ride_id)
+    ride = db.fetchone(ride_query, (ride_id,))
+    if not ride or (
+        user["role"] != "ADMIN"
+        and user["id"] not in {ride["passenger_id"], ride["driver_id"]}
+    ):
         return jsonify({"error": "Ride not found"}), 404
     return jsonify({
         "success": True,
