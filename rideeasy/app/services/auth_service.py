@@ -1,5 +1,5 @@
 from functools import wraps
-from flask import session, redirect, url_for, flash, abort, request
+from flask import session, redirect, url_for, flash, abort, request, g, has_request_context
 from werkzeug.security import generate_password_hash, check_password_hash
 from app.repositories.database import get_db
 
@@ -11,13 +11,23 @@ class AuthService:
         user_id = session.get("user_id")
         if not user_id:
             return None
+        # Cached for the current request only (every page asks for the user several
+        # times, and each lookup is a network round trip to the remote database).
+        # Database.execute()/execute_transaction() clear this cache after any write.
+        if has_request_context():
+            cached = g.get("_current_user")
+            if cached is not None and cached.get("id") == user_id:
+                return dict(cached)
         db = get_db()
-        return db.fetchone(
+        user = db.fetchone(
             """SELECT id, email, role, full_name, phone, is_active, is_verified,
                       avatar_url, avatar_cloudinary_public_id, created_at
                FROM users WHERE id = ?""",
             (user_id,)
         )
+        if user is not None and has_request_context():
+            g._current_user = dict(user)
+        return user
 
     @staticmethod
     def authenticate(email: str, password: str):
