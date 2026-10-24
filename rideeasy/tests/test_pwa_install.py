@@ -4,9 +4,9 @@ import json
 def test_install_shortcut_button_and_manifest_assets_are_available(client):
     page = client.get("/")
     assert page.status_code == 200
-    assert page.data.count(b'data-install-app') == 1
-    assert b'<button type="button" class="btn btn-secondary btn-sm app-install-button" data-install-app' in page.data
-    assert b'id="app-install-help"' in page.data
+    assert page.data.count(b'data-add-shortcut') == 1
+    assert b'Create a RideEasy shortcut' in page.data
+    assert b'id="shortcut-help"' in page.data
     assert b'<link rel="manifest" href="/static/manifest.json">' in page.data
 
     manifest_response = client.get("/static/manifest.json")
@@ -21,13 +21,21 @@ def test_install_shortcut_button_and_manifest_assets_are_available(client):
     assert b"<svg" in icon_response.data
 
 
-def test_install_controls_and_instruction_styles_are_served(client):
+def test_shortcut_control_and_instruction_styles_are_served(client):
     javascript = client.get("/static/js/app.js")
     assert javascript.status_code == 200
-    assert b"beforeinstallprompt" in javascript.data
+    assert b"data-add-shortcut" in javascript.data
+    assert b"beforeinstallprompt" not in javascript.data
     assert b"Add to Home Screen" in javascript.data
 
     stylesheet = client.get("/static/css/components.css")
     assert stylesheet.status_code == 200
-    assert b".app-install-button" in stylesheet.data
-    assert b".app-install-dialog" in stylesheet.data
+    assert b".app-shortcut-button" in stylesheet.data
+    assert b".shortcut-dialog" in stylesheet.data
+
+
+def test_mobile_navigation_hides_secondary_actions_but_keeps_shortcut_accessible(client):
+    response = client.get("/static/css/responsive.css")
+    assert response.status_code == 200
+    assert b".nav-actions > :not(.app-shortcut-button):not(.mobile-menu-btn)" in response.data
+    assert b".nav-actions > .app-shortcut-button" in response.data

@@ -1,5 +1,7 @@
 import math
+import threading
 import time
+from collections import OrderedDict
 from urllib.parse import quote
 
 import requests
@@ -22,6 +24,14 @@ class LocationIQNoResultsError(Exception):
 
 class LocationService:
     BASE_URL = "https://us1.locationiq.com/v1"
+    AUTOCOMPLETE_URL = "https://api.locationiq.com/v1/autocomplete"
+    AUTOCOMPLETE_MIN_CHARS = 3
+    AUTOCOMPLETE_LIMIT = 6
+    AUTOCOMPLETE_CACHE_TTL = 10 * 60
+    AUTOCOMPLETE_CACHE_MAX_ITEMS = 500
+
+    _autocomplete_cache = OrderedDict()
+    _autocomplete_lock = threading.Lock()
 
     @staticmethod
     def _api_key():
@@ -38,7 +48,7 @@ class LocationService:
         for attempt in range(3):
             try:
                 response = requests.get(url, params=params, timeout=(3.05, 10))
-                if response.status_code == 429 and attempt < 2:
+                if getattr(response, "status_code", None) == 429 and attempt < 2:
                     time.sleep(1.1)
                     continue
                 response.raise_for_status()
@@ -66,6 +76,94 @@ class LocationService:
                 ) from error
         raise LocationIQRequestError("The location service is temporarily unavailable.") from last_error
 
+    @staticmethod
+    def _country_codes():
+        return (current_app.config.get("LOCATIONIQ_COUNTRY_CODES") or "ug").strip()
+
+    @staticmethod
+    def parse_point(value):
+        """Validate a {lat, lng, label} point chosen from the suggestion list.
+        Returns a clean dict, or None if it is missing or invalid."""
+        if not isinstance(value, dict):
+            return None
+        try:
+            lat = float(value.get("lat"))
+            lng = float(value.get("lng"))
+        except (TypeError, ValueError):
+            return None
+        if not math.isfinite(lat) or not math.isfinite(lng) or not -90 <= lat <= 90 or not -180 <= lng <= 180:
+            return None
+        label = value.get("label")
+        label = label.strip()[:300] if isinstance(label, str) else ""
+        return {"lat": lat, "lng": lng, "label": label}
+
+    @classmethod
+    def autocomplete(cls, query):
+        """Return place suggestions for a partially typed query (Uganda first)."""
+        query = " ".join((query or "").split())[:200]
+        if len(query) < cls.AUTOCOMPLETE_MIN_CHARS:
+            return []
+
+        country_codes = cls._country_codes()
+        cache_key = (query.casefold(), country_codes)
+        now = time.time()
+        with cls._autocomplete_lock:
+            cached = cls._autocomplete_cache.get(cache_key)
+            if cached and cached[0] > now:
+                cls._autocomplete_cache.move_to_end(cache_key)
+                return cached[1]
+
+        params = {
+            "key": cls._api_key(),
+            "q": query,
+            "limit": cls.AUTOCOMPLETE_LIMIT,
+            "dedupe": 1,
+            "accept-language": "en",
+        }
+        if country_codes:
+            params["countrycodes"] = country_codes
+
+        try:
+            results = cls._get_json(cls.AUTOCOMPLETE_URL, params, label=f"autocomplete '{query[:30]}'")
+        except LocationIQRequestError as error:
+            if error.provider_code and "unable to geocode" in str(error.provider_code).lower():
+                results = []
+            else:
+                raise
+
+        suggestions = []
+        for item in results if isinstance(results, list) else []:
+            if not isinstance(item, dict):
+                continue
+            try:
+                lat = float(item["lat"])
+                lng = float(item["lon"])
+            except (KeyError, TypeError, ValueError):
+                continue
+            if not math.isfinite(lat) or not math.isfinite(lng) or not -90 <= lat <= 90 or not -180 <= lng <= 180:
+                continue
+            label = str(item.get("display_name") or "").strip()
+            if not label:
+                continue
+            title = str(item.get("display_place") or "").strip() or label.split(",")[0].strip()
+            subtitle = str(item.get("display_address") or "").strip()
+            if not subtitle and "," in label:
+                subtitle = label.split(",", 1)[1].strip()
+            suggestions.append({
+                "label": label[:300],
+                "title": title[:120],
+                "subtitle": subtitle[:200],
+                "lat": lat,
+                "lng": lng,
+            })
+
+        with cls._autocomplete_lock:
+            cls._autocomplete_cache[cache_key] = (now + cls.AUTOCOMPLETE_CACHE_TTL, suggestions)
+            cls._autocomplete_cache.move_to_end(cache_key)
+            while len(cls._autocomplete_cache) > cls.AUTOCOMPLETE_CACHE_MAX_ITEMS:
+                cls._autocomplete_cache.popitem(last=False)
+        return suggestions
+
     @classmethod
     def _search(cls, address, country_codes=None):
         params = {
@@ -91,7 +189,7 @@ class LocationService:
     def geocode(cls, address):
         # Prefer results inside the countries RideEasy serves (default: Uganda) so a
         # place name is not matched to a same-named place on another continent.
-        country_codes = (current_app.config.get("LOCATIONIQ_COUNTRY_CODES") or "ug").strip()
+        country_codes = cls._country_codes()
         results = cls._search(address, country_codes)
         if (not isinstance(results, list) or not results) and country_codes:
             results = cls._search(address)
@@ -115,10 +213,19 @@ class LocationService:
         }
 
     @classmethod
-    def get_route(cls, start, destination):
+    def _resolved_point(cls, point, text):
+        point = cls.parse_point(point)
+        if point is None:
+            return None
+        return {"label": point["label"] or text, "lat": point["lat"], "lng": point["lng"]}
+
+    @classmethod
+    def get_route(cls, start, destination, start_point=None, destination_point=None):
         api_key = cls._api_key()
-        origin = cls.geocode(start)
-        target = cls.geocode(destination)
+        # Places picked from the suggestion list already carry coordinates, so skip
+        # geocoding them (fewer provider calls and no risk of matching a different place).
+        origin = cls._resolved_point(start_point, start) or cls.geocode(start)
+        target = cls._resolved_point(destination_point, destination) or cls.geocode(destination)
         coordinates = f"{origin['lng']},{origin['lat']};{target['lng']},{target['lat']}"
         encoded_coordinates = quote(coordinates, safe=";,.-")
         result = None

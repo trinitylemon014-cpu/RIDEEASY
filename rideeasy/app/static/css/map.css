@@ -333,3 +333,63 @@
     min-height: 360px;
   }
 }
+
+/* Place suggestions (type-ahead) */
+.route-planner-page .route-controls .form-group {
+  position: relative;
+}
+
+.route-suggestions {
+  position: absolute;
+  z-index: 30;
+  top: calc(100% - 0.1rem);
+  right: 0;
+  left: 0;
+  max-height: 290px;
+  margin: 0;
+  padding: 0.3rem;
+  overflow-y: auto;
+  list-style: none;
+  border: 1px solid var(--route-border);
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: 0 12px 28px rgb(15 23 42 / 16%);
+}
+
+.route-suggestions[hidden] {
+  display: none;
+}
+
+.route-suggestion {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  padding: 0.55rem 0.7rem;
+  border-radius: 7px;
+  cursor: pointer;
+}
+
+.route-suggestion.is-active,
+.route-suggestion:hover {
+  background: #f1f5f9;
+}
+
+.route-suggestion-title {
+  color: var(--route-ink);
+  font-size: 0.86rem;
+  font-weight: 700;
+}
+
+.route-suggestion-subtitle {
+  overflow: hidden;
+  color: var(--route-muted);
+  font-size: 0.74rem;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Keep Leaflet's internal z-indexes below the suggestion list. */
+#route-map {
+  isolation: isolate;
+}

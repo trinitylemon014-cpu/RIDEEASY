@@ -72,7 +72,7 @@
   gap: 0.75rem;
 }
 
-.app-install-button {
+.app-shortcut-button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -81,11 +81,11 @@
   cursor: pointer;
 }
 
-.app-install-button[hidden] {
+.app-shortcut-button[hidden] {
   display: none;
 }
 
-.app-install-dialog {
+.shortcut-dialog {
   width: min(28rem, calc(100vw - 2rem));
   margin: auto;
   padding: 0;
@@ -96,26 +96,26 @@
   box-shadow: var(--shadow-lg);
 }
 
-.app-install-dialog::backdrop {
+.shortcut-dialog::backdrop {
   background: rgba(12, 74, 110, 0.52);
 }
 
-.app-install-dialog-content {
+.shortcut-dialog-content {
   display: grid;
   gap: 0.9rem;
   padding: 1.5rem;
 }
 
-.app-install-dialog-content h2 {
+.shortcut-dialog-content h2 {
   margin: 0;
   font-size: 1.25rem;
 }
 
-.app-install-dialog-content p {
+.shortcut-dialog-content p {
   line-height: 1.55;
 }
 
-.app-install-dialog-content .btn {
+.shortcut-dialog-content .btn {
   justify-self: end;
 }
 

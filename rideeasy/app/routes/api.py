@@ -1,4 +1,7 @@
-from flask import Blueprint, current_app, jsonify, request
+import time
+from collections import defaultdict, deque
+
+from flask import Blueprint, current_app, jsonify, request, session
 from app.repositories.database import get_db
 from app.services.pricing_service import MapService, PricingService
 from app.services.auth_service import login_required, role_required
@@ -10,6 +13,22 @@ from app.services.location_service import (
 )
 
 api_bp = Blueprint("api", __name__, url_prefix="/api")
+
+# Light per-user throttle for the suggestion endpoint (LocationIQ plans are rate limited).
+AUTOCOMPLETE_MAX_PER_MINUTE = 45
+_autocomplete_hits = defaultdict(deque)
+
+
+def _autocomplete_rate_limited():
+    who = session.get("user_id") or request.remote_addr or "anonymous"
+    now = time.monotonic()
+    hits = _autocomplete_hits[who]
+    while hits and now - hits[0] > 60:
+        hits.popleft()
+    if len(hits) >= AUTOCOMPLETE_MAX_PER_MINUTE:
+        return True
+    hits.append(now)
+    return False
 
 @api_bp.route("/estimate-fare", methods=["POST"])
 def estimate_fare():
@@ -44,6 +63,25 @@ def estimate_fare():
 def landmarks():
     return jsonify({"landmarks": MapService.LANDMARKS})
 
+@api_bp.route("/places/autocomplete")
+@login_required
+@role_required("PASSENGER", "DRIVER", "SCHOOL", "ADMIN")
+def places_autocomplete():
+    """Place suggestions while the user types (Uganda first). Key stays server-side."""
+    query = request.args.get("q", "")
+    if not isinstance(query, str) or len(query.strip()) < LocationService.AUTOCOMPLETE_MIN_CHARS:
+        return jsonify({"success": True, "suggestions": []})
+    if _autocomplete_rate_limited():
+        return jsonify({"success": False, "error": "Too many searches. Please slow down.", "suggestions": []}), 429
+    try:
+        suggestions = LocationService.autocomplete(query)
+    except LocationIQConfigurationError:
+        return jsonify({"success": False, "error": "Place search is not configured.", "suggestions": []}), 503
+    except LocationIQRequestError:
+        return jsonify({"success": False, "error": "Place search is unavailable.", "suggestions": []}), 502
+    return jsonify({"success": True, "suggestions": suggestions})
+
+
 @api_bp.route("/route", methods=["POST"])
 @login_required
 @role_required("PASSENGER", "DRIVER", "SCHOOL", "ADMIN")
@@ -66,7 +104,12 @@ def calculate_route():
         return jsonify({"success": False, "error": "Choose two different locations."}), 400
 
     try:
-        route = LocationService.get_route(start, destination)
+        route = LocationService.get_route(
+            start,
+            destination,
+            start_point=data.get("start_point"),
+            destination_point=data.get("destination_point"),
+        )
     except LocationIQConfigurationError:
         return jsonify({
             "success": False,

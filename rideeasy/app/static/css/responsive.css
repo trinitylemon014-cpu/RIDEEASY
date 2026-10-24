@@ -38,6 +38,14 @@
     display: none;
   }
 
+  .nav-actions > :not(.app-shortcut-button):not(.mobile-menu-btn) {
+    display: none;
+  }
+
+  .nav-actions {
+    gap: 0.65rem;
+  }
+
   .mobile-menu-btn {
     display: block;
   }
@@ -104,17 +112,20 @@
 }
 
 @media (max-width: 480px) {
-  .nav-actions > .app-install-button {
-    padding: 0.35rem 0.5rem;
+  .nav-actions > .app-shortcut-button {
+    width: 2.5rem;
+    min-width: 2.5rem;
+    height: 2.5rem;
+    padding: 0.35rem;
     font-size: 0.7rem;
   }
 
-  .nav-actions > .app-install-button .icon {
+  .nav-actions > .app-shortcut-button .icon {
     width: 1rem;
     height: 1rem;
   }
 
-  .nav-actions > .app-install-button span {
+  .nav-actions > .app-shortcut-button span {
     display: none;
   }
 

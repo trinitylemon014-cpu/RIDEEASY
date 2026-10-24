@@ -55,9 +55,9 @@
         </nav>
 
         <div class="nav-actions">
-          <button type="button" class="btn btn-secondary btn-sm app-install-button" data-install-app aria-label="Add RideEasy to your device">
+          <button type="button" class="btn btn-secondary btn-sm app-shortcut-button" data-add-shortcut title="Create a RideEasy shortcut" aria-label="Create a RideEasy shortcut">
             <svg class="icon icon-sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0 0 4-4m-4 4-4-4"/><path d="M5 14v5a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-5"/></svg>
-            <span>Add app</span>
+            <span>Add shortcut</span>
           </button>
           {% if current_user %}
             <!-- In-App Notification Bell & Quick Dropdown -->
@@ -299,12 +299,12 @@
     </div>
   </footer>
 
-  <dialog class="app-install-dialog" id="app-install-help" aria-labelledby="app-install-title">
-    <div class="app-install-dialog-content">
-      <h2 id="app-install-title">Add RideEasy to your device</h2>
-      <p id="app-install-instructions">Use your browser's install option to add RideEasy to your home screen or apps.</p>
-      <p class="text-subtle">The shortcut opens RideEasy in your browser or app window. Your account remains protected by the usual sign-in and session rules.</p>
-      <button type="button" class="btn btn-primary" id="app-install-help-close">Got it</button>
+  <dialog class="shortcut-dialog" id="shortcut-help" aria-labelledby="shortcut-title">
+    <div class="shortcut-dialog-content">
+      <h2 id="shortcut-title">Create a RideEasy shortcut</h2>
+      <p id="shortcut-instructions">Use your browser's shortcut or bookmark option to save RideEasy for quick access.</p>
+      <p class="text-subtle">This saves a link to RideEasy; it does not install a separate app. Your usual sign-in and session rules still apply.</p>
+      <button type="button" class="btn btn-primary" id="shortcut-help-close">Got it</button>
     </div>
   </dialog>
 
