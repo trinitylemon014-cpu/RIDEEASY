@@ -7,12 +7,12 @@
   border: none;
   padding: 0.5rem;
   cursor: pointer;
-  color: var(--sky-700);
+  color: var(--blue-700);
   border-radius: var(--radius-sm);
 }
 
 .mobile-menu-btn:hover {
-  background-color: var(--sky-50);
+  background-color: var(--blue-50);
 }
 
 .mobile-nav-drawer {
@@ -66,13 +66,13 @@
   .mobile-nav-drawer .nav-link {
     font-size: 1.125rem;
     padding: 0.75rem 0;
-    border-bottom: 1px solid var(--sky-100);
+    border-bottom: 1px solid var(--blue-100);
   }
 
   .mobile-nav-drawer .nav-link:hover,
   .mobile-nav-drawer .nav-link.active {
-    color: var(--sky-700);
-    border-bottom-color: var(--sky-300);
+    color: var(--blue-700);
+    border-bottom-color: var(--blue-300);
   }
 
   .navbar {
@@ -116,5 +116,12 @@
   
   .status-timeline::before {
     display: none;
+  }
+}
+
+@media (max-width: 768px) {
+  .brand-tagline {
+    letter-spacing: 0.14em;
+    font-size: 0.5625rem;
   }
 }

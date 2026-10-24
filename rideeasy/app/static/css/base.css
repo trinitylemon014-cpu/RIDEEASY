@@ -1,68 +1,70 @@
 /* RideEasy Design System - MOVE. TRAVEL. ARRIVE.
-   Executive Palette: Sky Blue · White · Yellow
+   Taxi-app look: cobalt/steel blue · white rounded cards · amber accent
    Emtrixz Technology Company - Uganda & East Africa
 
    Token note: the legacy --color-* names are kept (templates and app.js
-   reference them inline) but now map to the sky-blue brand palette:
-     --color-black       -> deep sky ink (headings, strong text, solid badges)
-     --color-light-grey  -> blue-tinted hairline borders
-     --color-off-white   -> pale sky page / panel tint
+   reference them inline) and now map to the blue palette:
+     --color-black       -> deep navy-blue ink (headings, solid badges)
+     --color-light-grey  -> soft blue-grey hairline borders
+     --color-off-white   -> light app-background grey
 */
 
 :root {
-  /* Sky blue scale */
-  --sky-50:  #F0F9FF;
-  --sky-100: #E0F2FE;
-  --sky-200: #BAE6FD;
-  --sky-300: #7DD3FC;
-  --sky-400: #38BDF8;
-  --sky-500: #0EA5E9;
-  --sky-600: #0284C7;
-  --sky-700: #0369A1;
-  --sky-800: #075985;
-  --sky-900: #0C4A6E;
+  /* Blue scale (sampled from the reference taxi-app design) */
+  --blue-50:  #F3F8FD;
+  --blue-100: #EAF3FC;
+  --blue-200: #D3E4F5;
+  --blue-300: #A7C6E4;
+  --blue-400: #6FA2D2;
+  --blue-500: #4883BC;
+  --blue-600: #3070AB;
+  --blue-700: #2167A8;
+  --blue-800: #1B4F82;
+  --blue-900: #163A5F;
 
-  /* Yellow scale */
-  --yellow-50:  #FEFCE8;
-  --yellow-100: #FEF9C3;
-  --yellow-200: #FEF08A;
-  --yellow-300: #FDE047;
-  --yellow-400: #FACC15;
-  --yellow-500: #EAB308;
-  --yellow-600: #CA8A04;
-  --yellow-700: #A16207;
+  /* Amber / yellow scale */
+  --yellow-50:  #FFF9E8;
+  --yellow-100: #FEF0C7;
+  --yellow-200: #FDE29A;
+  --yellow-300: #FBD064;
+  --yellow-400: #F6B81F;
+  --yellow-500: #E2A00F;
+  --yellow-600: #B97F00;
+  --yellow-700: #8A5F00;
 
   /* Semantic roles */
-  --color-primary:       var(--sky-700);
-  --color-primary-hover: var(--sky-800);
+  --color-primary:       var(--blue-700);
+  --color-primary-hover: var(--blue-800);
   --color-accent:        var(--yellow-400);
   --color-accent-hover:  var(--yellow-500);
   --color-danger:        #B42318;
   --color-danger-bg:     #FEF3F2;
 
-  /* Legacy tokens (remapped to the new palette) */
-  --color-black: var(--sky-900);
-  --color-near-black: #0F2D44;
-  --color-charcoal: var(--sky-800);
+  /* Legacy tokens (remapped) */
+  --color-black: var(--blue-900);
+  --color-near-black: #14283D;
+  --color-charcoal: var(--blue-800);
   --color-white: #FFFFFF;
-  --color-off-white: #F4F9FD;
-  --color-light-grey: #D5E5F2;
-  --color-medium-grey: #5F7A90;
-  --color-dark-grey: #38546B;
-  --color-subtle-border: #DCE9F4;
+  --color-off-white: #F2F5F8;
+  --color-light-grey: #DDE6EF;
+  --color-medium-grey: #66798D;
+  --color-dark-grey: #3D5167;
+  --color-subtle-border: #E6EDF4;
 
   --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 
-  --radius-sm: 6px;
-  --radius-md: 10px;
-  --radius-lg: 14px;
+  /* App-style rounded corners */
+  --radius-sm: 10px;
+  --radius-md: 16px;
+  --radius-lg: 24px;
+  --radius-pill: 999px;
 
-  --shadow-sm: 0 1px 2px rgba(12, 74, 110, 0.06);
-  --shadow-md: 0 6px 16px rgba(12, 74, 110, 0.10);
-  --shadow-lg: 0 14px 32px rgba(12, 74, 110, 0.16);
+  --shadow-sm: 0 1px 3px rgba(22, 58, 95, 0.07);
+  --shadow-md: 0 8px 22px rgba(22, 58, 95, 0.10);
+  --shadow-lg: 0 18px 40px rgba(22, 58, 95, 0.18);
 
-  --focus-ring: 0 0 0 3px rgba(14, 165, 233, 0.28);
+  --focus-ring: 0 0 0 3px rgba(72, 131, 188, 0.30);
 
   --max-width: 1200px;
 }
@@ -100,18 +102,18 @@ a {
 
 ::selection {
   background-color: var(--yellow-200);
-  color: var(--sky-900);
+  color: var(--blue-900);
 }
 
 :focus-visible {
-  outline: 3px solid var(--sky-300);
+  outline: 3px solid var(--blue-300);
   outline-offset: 2px;
 }
 
 /* Typography Hierarchy */
 h1, h2, h3, h4, h5, h6 {
   font-weight: 700;
-  color: var(--sky-900);
+  color: var(--blue-900);
   letter-spacing: -0.02em;
   line-height: 1.25;
 }
@@ -132,7 +134,7 @@ p {
 }
 
 .text-black {
-  color: var(--sky-900);
+  color: var(--blue-900);
 }
 
 .font-bold {
@@ -153,7 +155,7 @@ p {
 }
 
 .metadata-separator {
-  color: var(--sky-300);
+  color: var(--blue-300);
   user-select: none;
 }
 
@@ -173,12 +175,38 @@ p {
 }
 
 /* Hero band (index + any page that opts in with class="hero").
+   Reference layout: light grey panel on the left, cobalt blue panel on the
+   right separated by a diagonal edge, with phone UI cards on the blue side.
    The attribute selector styles the existing inline-styled hero without
-   touching the template. */
+   touching the template. The phone illustration is an inline SVG (see
+   hero-phones.svg note in the stylesheet footer). */
 .hero,
 main > section[style*="padding: 4rem 0"] {
-  background: linear-gradient(180deg, var(--sky-50) 0%, #FFFFFF 100%) !important;
-  border-bottom: 3px solid var(--yellow-400) !important;
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(112deg, #F0F1F2 0%, #F0F1F2 55%, var(--blue-500) 55.1%, var(--blue-600) 100%) !important;
+  border-bottom: none !important;
+  padding: 4.5rem 0 5rem 0 !important;
+}
+
+main > section[style*="padding: 4rem 0"] > .container {
+  position: relative;
+  z-index: 2;
+}
+
+main > section[style*="padding: 4rem 0"] div[style*="max-width: 760px"] {
+  max-width: 560px !important;
+}
+
+main > section[style*="padding: 4rem 0"] h1 {
+  color: var(--blue-700);
+  font-weight: 800;
+}
+
+/* Logo images in the templates are a black square; present them like an app icon */
+img[alt*="Logo"] {
+  border-radius: 14px;
+  box-shadow: var(--shadow-md);
 }
 
 /* Professional Buttons */
@@ -189,9 +217,9 @@ main > section[style*="padding: 4rem 0"] {
   gap: 0.5rem;
   padding: 0.625rem 1.25rem;
   font-size: 0.875rem;
-  font-weight: 600;
-  letter-spacing: 0.01em;
-  border-radius: var(--radius-sm);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  border-radius: 12px;
   transition: background-color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease, transform 0.1s ease;
   cursor: pointer;
   border: 1px solid transparent;
@@ -217,20 +245,20 @@ main > section[style*="padding: 4rem 0"] {
 
 .btn-secondary {
   background-color: var(--color-white);
-  color: var(--sky-800);
-  border-color: var(--sky-200);
+  color: var(--blue-800);
+  border-color: var(--blue-200);
 }
 
 .btn-secondary:hover {
-  background-color: var(--sky-50);
-  border-color: var(--sky-500);
-  color: var(--sky-900);
+  background-color: var(--blue-50);
+  border-color: var(--blue-500);
+  color: var(--blue-900);
 }
 
 /* Yellow call-to-action (use for the single most important action on a page) */
 .btn-accent {
   background-color: var(--color-accent);
-  color: var(--sky-900);
+  color: var(--blue-900);
   border-color: var(--yellow-500);
   box-shadow: var(--shadow-sm);
 }
@@ -286,7 +314,7 @@ main > section[style*="padding: 4rem 0"] {
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  color: var(--sky-800);
+  color: var(--blue-800);
   margin-bottom: 0.375rem;
 }
 
@@ -296,9 +324,9 @@ main > section[style*="padding: 4rem 0"] {
   font-size: 0.9375rem;
   font-family: inherit;
   color: var(--color-near-black);
-  background-color: var(--color-white);
-  border: 1px solid var(--sky-200);
-  border-radius: var(--radius-sm);
+  background-color: #F5F8FB;
+  border: 1px solid var(--color-light-grey);
+  border-radius: 12px;
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
   min-height: 44px;
 }
@@ -308,12 +336,13 @@ main > section[style*="padding: 4rem 0"] {
 }
 
 .form-control:hover, .form-select:hover, textarea:hover {
-  border-color: var(--sky-300);
+  border-color: var(--blue-300);
 }
 
 .form-control:focus, .form-select:focus, textarea:focus {
   outline: none;
-  border-color: var(--sky-500);
+  background-color: var(--color-white);
+  border-color: var(--blue-500);
   box-shadow: var(--focus-ring);
 }
 
@@ -322,22 +351,28 @@ main > section[style*="padding: 4rem 0"] {
   margin-bottom: 1.5rem;
 }
 
+/* No messages -> no gap, so heroes sit flush under the navigation bar */
+.flash-container:not(:has(.alert)) {
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
 .alert {
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 0.875rem 1.25rem;
-  border-radius: var(--radius-sm);
+  border-radius: 12px;
   margin-bottom: 0.75rem;
   font-size: 0.875rem;
-  border: 1px solid var(--sky-200);
+  border: 1px solid var(--blue-200);
   background-color: var(--color-white);
-  color: var(--sky-900);
+  color: var(--blue-900);
 }
 
 .alert-success {
-  border-left: 4px solid var(--sky-500);
-  background-color: var(--sky-50);
+  border-left: 4px solid var(--blue-500);
+  background-color: var(--blue-50);
 }
 
 .alert-error {
@@ -348,13 +383,52 @@ main > section[style*="padding: 4rem 0"] {
 }
 
 .alert-info {
-  border-left: 4px solid var(--sky-400);
-  background-color: var(--sky-50);
+  border-left: 4px solid var(--blue-400);
+  background-color: var(--blue-50);
 }
 
 .alert-warning {
-  border-left: 4px solid var(--yellow-400);
-  border-color: var(--yellow-200);
-  background-color: var(--yellow-50);
-  color: #713F12;
+  border-color: var(--yellow-500);
+  background-color: var(--yellow-400);
+  color: #3A2A00;
+  font-weight: 600;
+}
+
+/* ---- Hero phone illustration (right side of the diagonal hero) ---- */
+.hero::after,
+main > section[style*="padding: 4rem 0"]::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  right: max(1.25rem, calc((100% - var(--max-width)) / 2 + 1.25rem));
+  width: 440px;
+  height: 520px;
+  transform: translateY(-50%);
+  background: url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 420 500%22 font-family=%22Arial, Helvetica, sans-serif%22%3E%0A%3Cdefs%3E%0A%3Cfilter id=%22sh%22 x=%22-20%25%22 y=%22-20%25%22 width=%22140%25%22 height=%22140%25%22%3E%3CfeDropShadow dx=%220%22 dy=%2210%22 stdDeviation=%2210%22 flood-color=%22%230F2A47%22 flood-opacity=%220.28%22/%3E%3C/filter%3E%0A%3CclipPath id=%22m%22%3E%3Crect x=%22223%22 y=%2262%22 width=%22171%22 height=%22150%22/%3E%3C/clipPath%3E%0A%3C/defs%3E%0A%3C!-- left phone: splash --%3E%0A%3Cg filter=%22url(%23sh)%22%3E%0A%3Crect x=%2214%22 y=%22118%22 width=%22178%22 height=%22372%22 rx=%2234%22 fill=%22%23FFFFFF%22/%3E%0A%3C/g%3E%0A%3Crect x=%2222%22 y=%22126%22 width=%22162%22 height=%22356%22 rx=%2227%22 fill=%22%232167A8%22/%3E%0A%3Crect x=%2276%22 y=%22132%22 width=%2254%22 height=%2213%22 rx=%226.5%22 fill=%22%23FFFFFF%22/%3E%0A%3Ctext x=%22103%22 y=%22292%22 text-anchor=%22middle%22 font-size=%2225%22 font-weight=%22800%22 fill=%22%23FFFFFF%22 letter-spacing=%22-1%22%3ERideEasy%3C/text%3E%0A%3Ctext x=%22103%22 y=%22311%22 text-anchor=%22middle%22 font-size=%227.5%22 font-weight=%22700%22 fill=%22%23BFD7EE%22 letter-spacing=%222.2%22%3EMOVE. TRAVEL. ARRIVE.%3C/text%3E%0A%3Cg fill=%22%23FFFFFF%22 opacity=%220.14%22%3E%0A%3Crect x=%2234%22 y=%22420%22 width=%2216%22 height=%2262%22/%3E%3Crect x=%2254%22 y=%22398%22 width=%2220%22 height=%2284%22/%3E%3Crect x=%2278%22 y=%22432%22 width=%2214%22 height=%2250%22/%3E%0A%3Crect x=%2296%22 y=%22408%22 width=%2222%22 height=%2274%22/%3E%3Crect x=%22122%22 y=%22428%22 width=%2216%22 height=%2254%22/%3E%3Crect x=%22142%22 y=%22404%22 width=%2224%22 height=%2278%22/%3E%0A%3Crect x=%22168%22 y=%22440%22 width=%2212%22 height=%2242%22/%3E%0A%3C/g%3E%0A%3C!-- right phone: choose vehicle --%3E%0A%3Cg filter=%22url(%23sh)%22%3E%0A%3Crect x=%22214%22 y=%2230%22 width=%22190%22 height=%22450%22 rx=%2234%22 fill=%22%23FFFFFF%22/%3E%0A%3C/g%3E%0A%3Crect x=%22223%22 y=%2239%22 width=%22172%22 height=%22432%22 rx=%2227%22 fill=%22%23FFFFFF%22/%3E%0A%3Crect x=%22268%22 y=%2245%22 width=%2260%22 height=%2213%22 rx=%226.5%22 fill=%22%23EEF1F4%22/%3E%0A%3C!-- map --%3E%0A%3Cg clip-path=%22url(%23m)%22%3E%0A%3Crect x=%22223%22 y=%2262%22 width=%22171%22 height=%22150%22 fill=%22%23EDF0F3%22/%3E%0A%3Cg stroke=%22%23FFFFFF%22 stroke-width=%226%22 fill=%22none%22%3E%3Cpath d=%22M223 120 L394 100%22/%3E%3Cpath d=%22M270 62 L250 212%22/%3E%3Cpath d=%22M340 62 L350 212%22/%3E%3C/g%3E%0A%3Cg stroke=%22%23DCE3EA%22 stroke-width=%222%22 fill=%22none%22%3E%3Cpath d=%22M223 160 L394 150%22/%3E%3Cpath d=%22M300 62 L296 212%22/%3E%3C/g%3E%0A%3Crect x=%22352%22 y=%22170%22 width=%2230%22 height=%2224%22 fill=%22%23CFE8D6%22/%3E%0A%3Cpath d=%22M252 150 C268 120 282 168 304 138 S346 118 362 104%22 stroke=%22%232167A8%22 stroke-width=%224%22 fill=%22none%22 stroke-linecap=%22round%22/%3E%0A%3C/g%3E%0A%3Ccircle cx=%22252%22 cy=%22150%22 r=%226%22 fill=%22%232167A8%22 stroke=%22%23FFFFFF%22 stroke-width=%222%22/%3E%0A%3Cpath d=%22M362 90 a9 9 0 0 1 9 9 c0 8 -9 17 -9 17 s-9 -9 -9 -17 a9 9 0 0 1 9 -9z%22 fill=%22%231B2B3F%22/%3E%0A%3Ccircle cx=%22362%22 cy=%2299%22 r=%223%22 fill=%22%23FFFFFF%22/%3E%0A%3Cg fill=%22%23FFFFFF%22 stroke=%22%231B2B3F%22 stroke-width=%221.2%22%3E%3Crect x=%22280%22 y=%2284%22 width=%229%22 height=%2215%22 rx=%223%22 transform=%22rotate(30 284 91)%22/%3E%3Crect x=%22318%22 y=%22150%22 width=%229%22 height=%2215%22 rx=%223%22 transform=%22rotate(-20 322 157)%22/%3E%3Crect x=%22240%22 y=%22100%22 width=%229%22 height=%2215%22 rx=%223%22 transform=%22rotate(60 244 107)%22/%3E%3C/g%3E%0A%3C!-- route card --%3E%0A%3Crect x=%22230%22 y=%2266%22 width=%22158%22 height=%2238%22 rx=%229%22 fill=%22%23FFFFFF%22 filter=%22url(%23sh)%22/%3E%0A%3Ccircle cx=%22241%22 cy=%2278%22 r=%222.6%22 fill=%22%232E9E5B%22/%3E%3Crect x=%22250%22 y=%2275%22 width=%2282%22 height=%225%22 rx=%222.5%22 fill=%22%23C5CFDA%22/%3E%0A%3Ccircle cx=%22241%22 cy=%2293%22 r=%222.6%22 fill=%22%23D64545%22/%3E%3Crect x=%22250%22 y=%2290%22 width=%2268%22 height=%225%22 rx=%222.5%22 fill=%22%23C5CFDA%22/%3E%0A%3C!-- bottom sheet --%3E%0A%3Crect x=%22223%22 y=%22200%22 width=%22172%22 height=%22271%22 rx=%2222%22 fill=%22%23FFFFFF%22/%3E%0A%3Crect x=%22296%22 y=%22205%22 width=%2226%22 height=%223%22 rx=%221.5%22 fill=%22%23D9E1E9%22/%3E%0A%3Ctext x=%22234%22 y=%22228%22 font-size=%228%22 font-weight=%22800%22 fill=%22%23163A5F%22 letter-spacing=%220.6%22%3ECHOOSE VEHICLE%3C/text%3E%0A%3Crect x=%22351%22 y=%22217%22 width=%2215%22 height=%2215%22 rx=%224%22 fill=%22%23163A5F%22/%3E%3Crect x=%22370%22 y=%22217%22 width=%2215%22 height=%2215%22 rx=%224%22 fill=%22%23163A5F%22/%3E%0A%3Crect x=%22234%22 y=%22240%22 width=%2246%22 height=%2215%22 rx=%227.5%22 fill=%22%23FFFFFF%22 stroke=%22%23CFD9E3%22/%3E%3Crect x=%22284%22 y=%22240%22 width=%2246%22 height=%2215%22 rx=%227.5%22 fill=%22%23FFFFFF%22 stroke=%22%23E4EAF0%22/%3E%3Crect x=%22334%22 y=%22240%22 width=%2246%22 height=%2215%22 rx=%227.5%22 fill=%22%23FFFFFF%22 stroke=%22%23E4EAF0%22/%3E%0A%3C!-- selected ride --%3E%0A%3Crect x=%22232%22 y=%22264%22 width=%22156%22 height=%2258%22 rx=%2210%22 fill=%22%23EAF3FC%22 stroke=%22%232167A8%22 stroke-width=%221.4%22/%3E%0A%3Ctext x=%22243%22 y=%22283%22 font-size=%229%22 font-weight=%22800%22 fill=%22%23163A5F%22%3ERideEasy Go%3C/text%3E%0A%3Ctext x=%22243%22 y=%22296%22 font-size=%227%22 fill=%22%2366798D%22%3E4 seats %C2%B7 3 min%3C/text%3E%0A%3Ctext x=%22243%22 y=%22311%22 font-size=%229%22 font-weight=%22800%22 fill=%22%232167A8%22%3EUGX 12,500%3C/text%3E%0A%3Cg transform=%22translate(330 282)%22%3E%3Cpath d=%22M0 22 L6 8 Q8 4 14 4 H34 Q40 4 44 9 L52 14 Q56 16 56 22 V28 H0z%22 fill=%22%232167A8%22/%3E%3Cpath d=%22M12 8 H26 V15 H8z M29 8 H36 L44 15 H29z%22 fill=%22%23EAF3FC%22/%3E%3Ccircle cx=%2214%22 cy=%2229%22 r=%225.5%22 fill=%22%23163A5F%22/%3E%3Ccircle cx=%2243%22 cy=%2229%22 r=%225.5%22 fill=%22%23163A5F%22/%3E%3C/g%3E%0A%3C!-- second ride --%3E%0A%3Crect x=%22232%22 y=%22330%22 width=%22156%22 height=%2250%22 rx=%2210%22 fill=%22%23FFFFFF%22 stroke=%22%23E4EAF0%22/%3E%0A%3Ctext x=%22243%22 y=%22349%22 font-size=%229%22 font-weight=%22800%22 fill=%22%23163A5F%22%3EComfort Sedan%3C/text%3E%0A%3Ctext x=%22243%22 y=%22362%22 font-size=%227%22 fill=%22%2366798D%22%3E4 seats %C2%B7 5 min%3C/text%3E%0A%3Ctext x=%22243%22 y=%22374%22 font-size=%229%22 font-weight=%22800%22 fill=%22%232167A8%22%3EUGX 15,800%3C/text%3E%0A%3Cg transform=%22translate(330 346) scale(0.85)%22%3E%3Cpath d=%22M0 22 L6 8 Q8 4 14 4 H34 Q40 4 44 9 L52 14 Q56 16 56 22 V28 H0z%22 fill=%22%238FB4DA%22/%3E%3Ccircle cx=%2214%22 cy=%2229%22 r=%225.5%22 fill=%22%23163A5F%22/%3E%3Ccircle cx=%2243%22 cy=%2229%22 r=%225.5%22 fill=%22%23163A5F%22/%3E%3C/g%3E%0A%3C!-- amber banner --%3E%0A%3Crect x=%22232%22 y=%22388%22 width=%22156%22 height=%2217%22 rx=%225%22 fill=%22%23F6B81F%22/%3E%0A%3Ctext x=%22242%22 y=%22399.5%22 font-size=%226.8%22 font-weight=%22800%22 fill=%22%233A2A00%22%3EInsure your rides on every trip%3C/text%3E%0A%3C!-- cta --%3E%0A%3Ctext x=%22238%22 y=%22433%22 font-size=%228%22 font-weight=%22800%22 fill=%22%23163A5F%22%3ECash payment %E2%80%BA%3C/text%3E%0A%3Crect x=%22296%22 y=%22418%22 width=%2292%22 height=%2224%22 rx=%227%22 fill=%22%232167A8%22/%3E%0A%3Ctext x=%22342%22 y=%22434%22 text-anchor=%22middle%22 font-size=%228.5%22 font-weight=%22800%22 fill=%22%23FFFFFF%22 letter-spacing=%220.8%22%3EBOOK NOW%3C/text%3E%0A%3Crect x=%22283%22 y=%22458%22 width=%2246%22 height=%223%22 rx=%221.5%22 fill=%22%23163A5F%22/%3E%0A%3C/svg%3E") no-repeat center / contain;
+  pointer-events: none;
+  z-index: 1;
+}
+
+@media (max-width: 1100px) {
+  .hero::after,
+  main > section[style*="padding: 4rem 0"]::after {
+    width: 360px;
+    height: 430px;
+    right: 0.5rem;
+  }
+}
+
+@media (max-width: 900px) {
+  .hero,
+  main > section[style*="padding: 4rem 0"] {
+    background: linear-gradient(180deg, #F0F1F2 0%, #F0F1F2 100%) !important;
+    padding: 3rem 0 3.5rem 0 !important;
+  }
+  .hero::after,
+  main > section[style*="padding: 4rem 0"]::after {
+    display: none;
+  }
+  main > section[style*="padding: 4rem 0"] div[style*="max-width: 760px"] {
+    max-width: 100% !important;
+  }
 }
