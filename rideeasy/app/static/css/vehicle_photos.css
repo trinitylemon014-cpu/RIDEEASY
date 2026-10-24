@@ -1,0 +1,330 @@
+/* Car photos: driver upload page + passenger "Spot your car" card */
+
+/* ---------- Passenger: Spot your car ---------- */
+.spot-card {
+  margin-bottom: 1.5rem;
+  border: 2px solid var(--color-black);
+}
+
+.spot-summary {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.9rem;
+  margin: 1rem 0;
+  padding: 0.9rem;
+  border: 1px solid var(--color-light-grey);
+  border-radius: var(--radius-sm);
+  background: var(--color-off-white);
+}
+
+.spot-swatch {
+  flex: 0 0 auto;
+  width: 34px;
+  height: 34px;
+  border: 3px solid #fff;
+  border-radius: 50%;
+  box-shadow: 0 0 0 1px var(--color-light-grey), 0 2px 6px rgb(15 23 42 / 18%);
+}
+
+.spot-car-name {
+  color: var(--color-black);
+  font-size: 1.05rem;
+  font-weight: 800;
+  line-height: 1.25;
+}
+
+.spot-car-sub {
+  color: var(--color-medium-grey);
+  font-size: 0.75rem;
+}
+
+.spot-plate {
+  margin-left: auto;
+  padding: 0.35rem 0.8rem;
+  border: 2px solid var(--color-black);
+  border-radius: 6px;
+  background: #fff;
+  color: var(--color-black);
+  font-size: 1.25rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  white-space: nowrap;
+}
+
+.spot-gallery {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.6rem;
+}
+
+.spot-photo {
+  position: relative;
+  display: block;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--color-light-grey);
+  border-radius: var(--radius-sm);
+  background: var(--color-off-white);
+  cursor: zoom-in;
+  aspect-ratio: 4 / 3;
+}
+
+.spot-photo img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.spot-photo-label {
+  position: absolute;
+  left: 0.4rem;
+  bottom: 0.4rem;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  background: rgb(15 23 42 / 78%);
+  color: #fff;
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
+.spot-hint {
+  margin: 0.5rem 0 0;
+  color: var(--color-medium-grey);
+  font-size: 0.75rem;
+}
+
+.spot-empty {
+  padding: 1rem;
+  border: 1px dashed var(--color-light-grey);
+  border-radius: var(--radius-sm);
+  color: var(--color-medium-grey);
+  font-size: 0.85rem;
+}
+
+.spot-tips {
+  margin: 1rem 0 0;
+  padding-left: 1.1rem;
+  color: var(--color-dark-grey);
+  font-size: 0.85rem;
+  line-height: 1.6;
+}
+
+#spot-lightbox {
+  width: min(92vw, 900px);
+  max-height: 92vh;
+  padding: 0;
+  overflow: hidden;
+  border: 0;
+  border-radius: 12px;
+  background: #0f172a;
+}
+
+#spot-lightbox::backdrop {
+  background: rgb(15 23 42 / 72%);
+}
+
+#spot-lightbox img {
+  display: block;
+  width: 100%;
+  max-height: 80vh;
+  object-fit: contain;
+}
+
+.spot-lightbox-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.6rem 0.9rem;
+  color: #fff;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.spot-lightbox-close {
+  padding: 0.3rem 0.8rem;
+  border: 1px solid rgb(255 255 255 / 40%);
+  border-radius: 999px;
+  background: transparent;
+  color: #fff;
+  font: inherit;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+/* ---------- Driver: upload page ---------- */
+.photo-progress {
+  height: 8px;
+  margin: 0.5rem 0 1.25rem;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--color-light-grey);
+}
+
+.photo-progress span {
+  display: block;
+  height: 100%;
+  background: var(--color-primary);
+  transition: width 0.3s ease;
+}
+
+.photo-slots {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.9rem;
+  margin-bottom: 1.25rem;
+}
+
+.photo-slot {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.75rem;
+  border: 1px solid var(--color-light-grey);
+  border-radius: var(--radius-sm);
+  background: #fff;
+}
+
+.photo-slot-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+}
+
+.photo-slot-state {
+  color: var(--color-medium-grey);
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.photo-slot-state.is-done {
+  color: #15803d;
+}
+
+.photo-slot-preview {
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border-radius: 8px;
+  background: var(--color-off-white);
+  aspect-ratio: 4 / 3;
+}
+
+.photo-slot-preview img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.photo-slot-empty {
+  display: grid;
+  gap: 0.25rem;
+  justify-items: center;
+  color: var(--color-medium-grey);
+  font-size: 0.72rem;
+}
+
+.photo-slot-empty svg {
+  width: 30px;
+  height: 30px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.5;
+}
+
+.photo-slot-tip {
+  margin: 0;
+  color: var(--color-medium-grey);
+  font-size: 0.74rem;
+  line-height: 1.45;
+}
+
+.photo-slot-pick {
+  position: relative;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.photo-slot-pick:focus-within {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.photo-slot-file {
+  min-height: 1em;
+  overflow: hidden;
+  color: var(--color-dark-grey);
+  font-size: 0.72rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.photo-remove {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--color-danger);
+  font: inherit;
+  font-size: 0.74rem;
+  font-weight: 700;
+  text-align: left;
+  cursor: pointer;
+}
+
+.photo-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.9rem;
+}
+
+#photo-status {
+  font-size: 0.85rem;
+}
+
+#photo-status.is-error {
+  color: var(--color-danger);
+}
+
+.photo-guide {
+  margin: 0;
+  padding-left: 1.1rem;
+  color: var(--color-dark-grey);
+  font-size: 0.85rem;
+  line-height: 1.7;
+}
+
+@media (max-width: 640px) {
+  .spot-gallery,
+  .photo-slots {
+    grid-template-columns: 1fr;
+  }
+
+  .spot-gallery .spot-photo {
+    aspect-ratio: 16 / 10;
+  }
+
+  .spot-plate {
+    margin-left: 0;
+  }
+}
