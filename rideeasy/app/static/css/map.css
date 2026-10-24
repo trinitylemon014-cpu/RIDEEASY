@@ -393,3 +393,53 @@
 #route-map {
   isolation: isolate;
 }
+
+/* Use my current location */
+.route-locate {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: 0.55rem;
+  padding: 0.4rem 0.75rem;
+  border: 1px solid var(--route-border);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--route-ink);
+  font: inherit;
+  font-size: 0.76rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.route-locate:hover:not(:disabled) {
+  background: #f1f5f9;
+}
+
+.route-locate:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.route-locate[hidden] {
+  display: none;
+}
+
+.route-locate svg {
+  width: 15px;
+  height: 15px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-width: 1.8;
+}
+
+.route-locate-status {
+  margin: 0.45rem 0 0;
+  color: var(--route-muted);
+  font-size: 0.74rem;
+  line-height: 1.45;
+}
+
+.route-locate-status.is-error {
+  color: #b91c1c;
+}
