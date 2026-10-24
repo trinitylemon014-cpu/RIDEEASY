@@ -57,6 +57,11 @@
           <input id="route-start" name="start" class="form-control" type="text" maxlength="300"
                  value="{{ pickup }}" placeholder="e.g. Acacia Mall, Kampala" autocomplete="off" required>
         </div>
+        <button type="button" id="use-my-location" class="route-locate" {% if not locationiq_configured %}disabled{% endif %}>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.5"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/><circle cx="12" cy="12" r="7.5"/></svg>
+          <span class="route-locate-label">Use my current location</span>
+        </button>
+        <p id="route-locate-status" class="route-locate-status" role="status" aria-live="polite" hidden></p>
       </div>
       <div class="form-group">
         <label class="form-label" for="route-destination">Destination</label>
