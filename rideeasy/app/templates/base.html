@@ -85,6 +85,9 @@
                       <div style="padding: 0.5rem; border: 1px solid var(--color-light-grey); border-radius: var(--radius-sm); font-size: 0.75rem; background-color: var(--color-off-white);">
                         <div style="font-weight: 700; color: var(--color-black); margin-bottom: 0.15rem;">{{ n.title }}</div>
                         <div style="color: var(--color-dark-grey); line-height: 1.3;">{{ n.message }}</div>
+                        {% if current_user.role == 'DRIVER' and n.title == 'New trip awaiting your response' and n.related_entity_id %}
+                          <a href="/driver/requests" class="btn btn-primary btn-sm" style="margin-top: 0.4rem;">Review pending request</a>
+                        {% endif %}
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 0.35rem;">
                           <span class="text-subtle" style="font-size: 0.6875rem;">{{ n.created_at[:16] }}</span>
                           <form method="POST" action="/notifications/{{ n.id }}/dismiss" style="margin: 0;">
@@ -158,7 +161,9 @@
         {% elif current_user.role == 'DRIVER' %}
           <a href="/driver/dashboard" class="btn btn-secondary btn-sm">Overview</a>
           <a href="/map" class="btn btn-secondary btn-sm">Route Map</a>
-          <a href="/driver/requests" class="btn btn-secondary btn-sm">Awaiting Requests</a>
+          <a href="/driver/requests" class="btn btn-secondary btn-sm" {% if pending_driver_requests %}aria-label="Awaiting Requests, {{ pending_driver_requests }} pending"{% endif %}>
+            Awaiting Requests{% if pending_driver_requests %}<span class="status-dot" aria-hidden="true" style="display:inline-block;margin-left:0.35rem;"></span>{{ pending_driver_requests }}{% endif %}
+          </a>
           <a href="/driver/active-ride" class="btn btn-secondary btn-sm">Live Ride</a>
           <a href="/driver/trips" class="btn btn-secondary btn-sm">Completed Rides</a>
           <a href="/driver/verification" class="btn btn-secondary btn-sm">Verification</a>

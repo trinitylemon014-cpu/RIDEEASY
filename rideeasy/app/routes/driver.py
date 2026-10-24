@@ -111,6 +111,27 @@ def dashboard():
 
     earnings_summary = get_driver_earnings_summary(user["id"], db)
     photo_count = VehiclePhotoService.count_photos(vehicle["id"]) if vehicle else 0
+    pending_rides = []
+    active_ride = None
+    if profile and profile["is_online"] and profile["verification_status"] == "APPROVED":
+        pending_rides = db.fetchall(
+            """SELECT r.*, u.full_name AS passenger_name, u.phone AS passenger_phone
+               FROM rides r
+               JOIN users u ON u.id = r.passenger_id
+               WHERE r.driver_id = ? AND r.status = 'DRIVER_ASSIGNED'
+                 AND r.driver_response_status = 'PENDING'
+               ORDER BY r.created_at ASC""",
+            (user["id"],)
+        )
+    active_ride = db.fetchone(
+        """SELECT r.*, u.full_name AS passenger_name, u.phone AS passenger_phone
+           FROM rides r
+           JOIN users u ON u.id = r.passenger_id
+           WHERE r.driver_id = ? AND r.status NOT IN ('COMPLETED', 'CANCELLED')
+             AND r.driver_response_status = 'ACCEPTED'
+           ORDER BY r.created_at DESC LIMIT 1""",
+        (user["id"],)
+    )
 
     return render_template(
         "driver/dashboard.html",
@@ -120,7 +141,9 @@ def dashboard():
         total_earnings=total_earnings["total"],
         earnings_summary=earnings_summary,
         photo_count=photo_count,
-        show_dispatch_sections=False
+        pending_rides=pending_rides,
+        active_ride=active_ride,
+        show_dispatch_sections=True
     )
 
 @driver_bp.route("/api/earnings-summary")
@@ -148,6 +171,13 @@ def toggle_online():
     new_status = 0 if profile["is_online"] else 1
     if new_status:
         db.execute("UPDATE driver_profiles SET is_online = 1 WHERE user_id = ?", (user["id"],))
+        waiting_rides = db.fetchall(
+            """SELECT id FROM rides
+               WHERE driver_id IS NULL AND status IN ('REQUESTED', 'SEARCHING_FOR_DRIVER')
+               ORDER BY created_at ASC"""
+        )
+        for ride in waiting_rides:
+            RideDispatchService.dispatch_ride(ride["id"])
         msg = "You are now ONLINE and available for ride requests."
     else:
         pending_rides = db.fetchall(
@@ -198,14 +228,9 @@ def requests_list():
             WHERE (
                 (r.status = 'DRIVER_ASSIGNED' AND r.driver_id = ?
                     AND r.driver_response_status = 'PENDING')
-                OR (r.status IN ('REQUESTED', 'SEARCHING_FOR_DRIVER') AND r.driver_id IS NULL
-                    AND NOT EXISTS (
-                        SELECT 1 FROM rides active
-                        WHERE active.driver_id = ? AND active.status NOT IN ('COMPLETED', 'CANCELLED')
-                    ))
             )
-            ORDER BY CASE WHEN r.driver_id = ? THEN 0 ELSE 1 END, r.created_at DESC""",
-            (user["id"], user["id"], user["id"])
+            ORDER BY r.created_at ASC""",
+            (user["id"],)
         )
     return render_template(
         "driver/requests.html",
@@ -256,10 +281,8 @@ def accept_ride(ride_id):
             """UPDATE rides
                SET driver_id = ?, status = 'DRIVER_ASSIGNED',
                    driver_response_status = 'ACCEPTED', updated_at = CURRENT_TIMESTAMP
-               WHERE id = ? AND (
-                   (driver_id = ? AND status = 'DRIVER_ASSIGNED' AND driver_response_status = 'PENDING')
-                   OR (driver_id IS NULL AND status IN ('REQUESTED', 'SEARCHING_FOR_DRIVER'))
-               )
+               WHERE id = ? AND driver_id = ? AND status = 'DRIVER_ASSIGNED'
+                 AND driver_response_status = 'PENDING'
                  AND EXISTS (
                    SELECT 1 FROM driver_profiles d
                    WHERE d.user_id = ? AND d.is_online = 1 AND d.verification_status = 'APPROVED'

@@ -96,6 +96,15 @@ def test_driver_acceptance_starts_live_trip_state(client, app, db, isolated_disp
     offer_response = client.get("/driver/api/pending-offers")
     assert offer_response.get_json()["offers"][0]["id"] == ride_id
     assert b"do not have a live ride assigned" in client.get("/driver/active-ride").data
+    dashboard = client.get("/driver/dashboard")
+    assert b"1 pending trip request" in dashboard.data
+    assert b"Awaiting Requests" in dashboard.data
+    assert b"Accept trip" in dashboard.data
+    assert b"Decline" in dashboard.data
+    assert b"Review pending request" in dashboard.data
+    request_page = client.get("/driver/requests")
+    assert b"Assigned to you" in request_page.data
+    assert b"Decline" in request_page.data
 
     response = client.post(f"/driver/rides/{ride_id}/accept")
     assert response.status_code == 302
@@ -190,6 +199,45 @@ def test_no_online_driver_leaves_ride_searching(db, app, isolated_dispatch_drive
         (ride_id,)
     )
     assert ride == {"driver_id": None, "status": "SEARCHING_FOR_DRIVER"}
+
+
+def test_going_online_dispatches_waiting_ride_and_notifies_driver(client, db, isolated_dispatch_drivers):
+    driver_id = isolated_dispatch_drivers(uuid.uuid4().hex[:6], online=False)
+    db.execute(
+        """UPDATE rides SET status = 'CANCELLED'
+           WHERE driver_id IS NULL AND status IN ('REQUESTED', 'SEARCHING_FOR_DRIVER')"""
+    )
+    ride_id = _create_dispatch_ride(db)
+    assert db.fetchone(
+        """SELECT d.verification_status, v.is_active, v.is_verified
+           FROM driver_profiles d JOIN vehicles v ON v.driver_id = d.user_id
+           WHERE d.user_id = ?""",
+        (driver_id,)
+    ) == {"verification_status": "APPROVED", "is_active": 1, "is_verified": 1}
+
+    with client.session_transaction() as browser_session:
+        browser_session["user_id"] = driver_id
+        browser_session["user_role"] = "DRIVER"
+    response = client.post("/driver/toggle-online")
+
+    assert response.status_code == 302
+    assert db.fetchone("SELECT is_online FROM driver_profiles WHERE user_id = ?", (driver_id,))["is_online"] == 1
+    ride = db.fetchone(
+        "SELECT driver_id, status, driver_response_status FROM rides WHERE id = ?",
+        (ride_id,)
+    )
+    assert ride == {
+        "driver_id": driver_id,
+        "status": "DRIVER_ASSIGNED",
+        "driver_response_status": "PENDING",
+    }
+    notification = db.fetchone(
+        """SELECT title, message FROM notifications
+           WHERE user_id = ? AND related_entity_id = ? ORDER BY rowid DESC LIMIT 1""",
+        (driver_id, ride_id)
+    )
+    assert notification["title"] == "New trip awaiting your response"
+    assert "accept or decline" in notification["message"]
 
 
 def test_going_offline_releases_pending_offer_for_another_driver(client, app, db, isolated_dispatch_drivers):

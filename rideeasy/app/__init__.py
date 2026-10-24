@@ -34,12 +34,21 @@ def create_app(config_class=Config):
         user = AuthService.get_current_user()
         unread_count = 0
         recent_notifs = []
+        pending_driver_requests = 0
         csrf_token = ""
         if user:
             csrf_token = session.setdefault("payment_csrf_token", secrets.token_urlsafe(32))
             from app.services.notification_service import NotificationService
             unread_count = NotificationService.get_unread_count(user["id"])
             recent_notifs = NotificationService.get_user_notifications(user["id"], unread_only=True, limit=5)
+            if user["role"] == "DRIVER":
+                row = get_db().fetchone(
+                    """SELECT COUNT(*) AS count FROM rides
+                       WHERE driver_id = ? AND status = 'DRIVER_ASSIGNED'
+                         AND driver_response_status = 'PENDING'""",
+                    (user["id"],)
+                )
+                pending_driver_requests = row["count"] if row else 0
 
         return {
             "app_name": Config.APP_NAME,
@@ -48,6 +57,7 @@ def create_app(config_class=Config):
             "current_user": user,
             "unread_notifications_count": unread_count,
             "recent_notifications": recent_notifs,
+            "pending_driver_requests": pending_driver_requests,
             "payment_csrf_token": csrf_token,
             "support_phone": Config.SUPPORT_PHONE,
             "support_email": Config.SUPPORT_EMAIL

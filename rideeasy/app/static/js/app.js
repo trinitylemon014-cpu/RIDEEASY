@@ -61,7 +61,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
   const driverOfferWatcher = document.getElementById("driver-offer-watcher");
   if (driverOfferWatcher) {
-    const seenOfferIds = new Set();
+    const seenOfferIds = new Set(
+      Array.from(document.querySelectorAll("[data-driver-offer-id]"))
+        .map((row) => row.dataset.driverOfferId)
+    );
 
     function showDriverOffer(offer) {
       const toast = document.createElement("div");
@@ -99,6 +102,15 @@ document.addEventListener("DOMContentLoaded", () => {
         if (!result.success || !Array.isArray(result.offers)) return;
 
         const currentOfferIds = new Set(result.offers.map((offer) => offer.id));
+        const unseenOffer = result.offers.find((offer) => !seenOfferIds.has(offer.id));
+        if (unseenOffer && ["/driver/dashboard", "/driver/requests"].includes(window.location.pathname)) {
+          const offerIsRendered = Array.from(document.querySelectorAll("[data-driver-offer-id]"))
+            .some((row) => row.dataset.driverOfferId === unseenOffer.id);
+          if (!offerIsRendered) {
+            window.location.reload();
+            return;
+          }
+        }
         const removedOffer = Array.from(document.querySelectorAll("[data-driver-offer-id]"))
           .some((row) => !currentOfferIds.has(row.dataset.driverOfferId));
         if (removedOffer) {
