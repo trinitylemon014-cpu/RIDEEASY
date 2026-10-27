@@ -283,10 +283,12 @@ def test_driver_trip_status_requires_acceptance_and_advances_atomically(
     assert db.fetchone("SELECT status FROM rides WHERE id = ?", (ride_id,))["status"] == "DRIVER_ASSIGNED"
 
     client.post(f"/driver/rides/{ride_id}/accept")
+    trip_pin = db.fetchone("SELECT start_pin FROM rides WHERE id = ?", (ride_id,))["start_pin"]
+    assert trip_pin and len(trip_pin) == 4   # accepting a trip creates the passenger's start PIN
     for new_status in ("DRIVER_ARRIVING", "DRIVER_ARRIVED", "TRIP_STARTED", "TRIP_COMPLETED", "COMPLETED"):
         response = client.post(
             f"/driver/rides/{ride_id}/status",
-            data={"status": new_status},
+            data={"status": new_status, "pin": trip_pin},
         )
         assert response.status_code == 302
         assert db.fetchone("SELECT status FROM rides WHERE id = ?", (ride_id,))["status"] == new_status
