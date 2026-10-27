@@ -1,17 +1,10 @@
 import os
 import sqlite3
 import logging
-import threading
-import concurrent.futures
 from typing import Any, Dict, List, Optional
 from app.config import Config
 
 logger = logging.getLogger("rideeasy.database")
-
-# Hard cap (seconds) on any single Turso request. Without this, a dead connection
-# makes the sync client wait forever and gunicorn kills the whole worker.
-_QUERY_TIMEOUT = float(os.getenv("DB_QUERY_TIMEOUT", "10"))
-_POOL = concurrent.futures.ThreadPoolExecutor(max_workers=16, thread_name_prefix="db")
 
 # Guard statement used when running atomic batches over Turso's HTTP transport.
 # changes() returns the row count of the most recent INSERT/UPDATE/DELETE in the batch.
@@ -67,6 +60,65 @@ def _invalidate_request_cache() -> None:
         pass
 
 
+
+# Tables added for live tracking, trip sharing, SOS and web push. All idempotent.
+SAFETY_AND_REALTIME_TABLES = (
+    """CREATE TABLE IF NOT EXISTS ride_location_points (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        ride_id TEXT NOT NULL,
+        driver_id TEXT NOT NULL,
+        lat REAL NOT NULL,
+        lng REAL NOT NULL,
+        heading REAL,
+        recorded_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )""",
+    "CREATE INDEX IF NOT EXISTS idx_ride_location_points_ride ON ride_location_points(ride_id, id)",
+    """CREATE TABLE IF NOT EXISTS trip_shares (
+        id TEXT PRIMARY KEY,
+        ride_id TEXT NOT NULL,
+        token TEXT UNIQUE NOT NULL,
+        created_by TEXT NOT NULL,
+        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        expires_at TIMESTAMP NOT NULL,
+        revoked INTEGER NOT NULL DEFAULT 0
+    )""",
+    "CREATE INDEX IF NOT EXISTS idx_trip_shares_ride ON trip_shares(ride_id)",
+    """CREATE TABLE IF NOT EXISTS emergency_contacts (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL,
+        name TEXT NOT NULL,
+        phone TEXT NOT NULL,
+        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )""",
+    "CREATE INDEX IF NOT EXISTS idx_emergency_contacts_user ON emergency_contacts(user_id)",
+    """CREATE TABLE IF NOT EXISTS safety_incidents (
+        id TEXT PRIMARY KEY,
+        ride_id TEXT NOT NULL,
+        reporter_id TEXT NOT NULL,
+        reporter_role TEXT NOT NULL,
+        kind TEXT NOT NULL DEFAULT 'SOS',
+        message TEXT,
+        lat REAL,
+        lng REAL,
+        status TEXT NOT NULL DEFAULT 'OPEN',
+        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        resolved_at TIMESTAMP,
+        resolved_by TEXT,
+        resolution_note TEXT
+    )""",
+    "CREATE INDEX IF NOT EXISTS idx_safety_incidents_status ON safety_incidents(status, created_at)",
+    """CREATE TABLE IF NOT EXISTS push_subscriptions (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL,
+        endpoint TEXT UNIQUE NOT NULL,
+        p256dh TEXT NOT NULL,
+        auth TEXT NOT NULL,
+        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )""",
+    "CREATE INDEX IF NOT EXISTS idx_push_subscriptions_user ON push_subscriptions(user_id)",
+)
+
+
 class Database:
     """
     Unified Database abstraction layer supporting:
@@ -77,11 +129,6 @@ class Database:
     By default libsql:// / wss:// / ws:// URLs are connected to over HTTPS, which avoids
     the WebSocket handshake failures (HTTP 400) seen with the legacy libsql-client.
     Set TURSO_TRANSPORT=websocket to force the WebSocket transport instead.
-
-    Resilience:
-    Every Turso request runs with a hard timeout (DB_QUERY_TIMEOUT, default 10s).
-    On timeout the client is discarded and recreated. Reads are retried once on a
-    fresh client; writes are NOT retried (a timed-out write may have been applied).
     """
     _instance = None
 
@@ -99,60 +146,20 @@ class Database:
             self.db_url and self.db_url.startswith(("libsql://", "https://", "ws://", "wss://"))
         )
         self._connect_url = self._resolve_connect_url(self.db_url) if self.is_turso else ""
-        self._client_lock = threading.Lock()
         self._libsql_client = None
 
         if self.is_turso:
             try:
+                import libsql_client
                 logger.info("Connecting to remote Turso libSQL database: %s", self._connect_url)
-                self._libsql_client = self._create_client()
+                self._libsql_client = libsql_client.create_client_sync(
+                    url=self._connect_url,
+                    auth_token=self.auth_token
+                )
                 logger.info("Turso client created.")
             except Exception as e:
                 logger.error("Failed to connect to configured Turso database: %s", e)
                 raise RuntimeError("Configured Turso database is unavailable; refusing local fallback.") from e
-
-    # ------------------------------------------------------------------
-    # Turso client management
-    # ------------------------------------------------------------------
-    def _create_client(self):
-        import libsql_client
-        return libsql_client.create_client_sync(
-            url=self._connect_url,
-            auth_token=self.auth_token
-        )
-
-    @staticmethod
-    def _safe_close(client) -> None:
-        try:
-            client.close()
-        except Exception:
-            pass
-
-    def _reset_client(self, failed_client) -> None:
-        """Replace a client that stopped responding (only once, even if many threads time out)."""
-        with self._client_lock:
-            if self._libsql_client is not failed_client:
-                return  # another thread already replaced it
-            logger.warning("Turso request timed out; recreating client.")
-            self._libsql_client = self._create_client()
-        # Close the old client off-thread so a hung close() can't block requests.
-        threading.Thread(target=self._safe_close, args=(failed_client,), daemon=True).start()
-
-    def _turso(self, method: str, *args, retry: bool = False):
-        """
-        Call a libsql client method with a hard timeout.
-        Retries once on a fresh client only when retry=True (reads).
-        """
-        attempts = 2 if retry else 1
-        for attempt in range(attempts):
-            client = self._libsql_client
-            future = _POOL.submit(getattr(client, method), *args)
-            try:
-                return future.result(timeout=_QUERY_TIMEOUT)
-            except concurrent.futures.TimeoutError:
-                self._reset_client(client)
-                if attempt == attempts - 1:
-                    raise RuntimeError("Database request timed out") from None
 
     @staticmethod
     def _resolve_connect_url(url: str) -> str:
@@ -196,8 +203,7 @@ class Database:
         """Executes INSERT/UPDATE/DELETE query and returns rowcount or 1."""
         _invalidate_request_cache()
         if self.is_turso and self._libsql_client:
-            # No retry for writes: a timed-out write may already have been applied.
-            rs = self._turso("execute", query, list(params))
+            rs = self._libsql_client.execute(query, list(params))
             return rs.rows_affected if hasattr(rs, "rows_affected") else 1
         else:
             with self._get_sqlite_conn() as conn:
@@ -228,7 +234,7 @@ class Database:
                 statements.append(libsql_client.Statement(_PRECONDITION_SQL, [int(operation[2])]))
 
         try:
-            results = self._turso("batch", statements)
+            results = self._libsql_client.batch(statements)
         except Exception as e:
             if "malformed json" in str(e).lower():
                 raise RuntimeError(_PRECONDITION_MESSAGE) from e
@@ -276,7 +282,7 @@ class Database:
     def fetchone(self, query: str, params: tuple = ()) -> Optional[Dict[str, Any]]:
         """Executes SELECT query and returns a single row as a dictionary."""
         if self.is_turso and self._libsql_client:
-            rs = self._turso("execute", query, list(params), retry=True)
+            rs = self._libsql_client.execute(query, list(params))
             if not rs.rows:
                 return None
             columns = rs.columns
@@ -291,7 +297,7 @@ class Database:
     def fetchall(self, query: str, params: tuple = ()) -> List[Dict[str, Any]]:
         """Executes SELECT query and returns all matching rows as a list of dictionaries."""
         if self.is_turso and self._libsql_client:
-            rs = self._turso("execute", query, list(params), retry=True)
+            rs = self._libsql_client.execute(query, list(params))
             columns = rs.columns
             return [{columns[i]: r[i] for i in range(len(columns))} for r in rs.rows]
         else:
@@ -299,6 +305,26 @@ class Database:
                 cur = conn.execute(query, params)
                 rows = cur.fetchall()
                 return [dict(r) for r in rows]
+
+    def schema_is_current(self, fingerprint: str) -> bool:
+        """
+        True if one-time setup (schema, migrations, static seed rows) already ran for
+        this exact fingerprint. Any error (e.g. app_meta missing on an older database,
+        or a transient network failure) returns False, so setup simply runs again.
+        """
+        try:
+            row = self.fetchone("SELECT value FROM app_meta WHERE key = 'schema_fingerprint'")
+        except Exception:
+            return False
+        return bool(row) and row["value"] == fingerprint
+
+    def mark_schema_current(self, fingerprint: str) -> None:
+        """Record that one-time setup finished successfully for this fingerprint."""
+        self.execute("CREATE TABLE IF NOT EXISTS app_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)")
+        self.execute(
+            "INSERT OR REPLACE INTO app_meta (key, value) VALUES ('schema_fingerprint', ?)",
+            (fingerprint,)
+        )
 
     def init_db(self, schema_file: Optional[str] = None):
         """Initializes tables using the schema SQL file."""
@@ -319,7 +345,7 @@ class Database:
             # Execute statements one by one for Turso libSQL
             # (splitter is trigger- and string-literal-aware)
             for statement in split_sql_statements(sql_script):
-                self._turso("execute", statement)
+                self._libsql_client.execute(statement)
         else:
             with self._get_sqlite_conn() as conn:
                 conn.executescript(sql_script)
@@ -331,14 +357,22 @@ class Database:
             ("rides", "driver_response_status", "TEXT NOT NULL DEFAULT 'ACCEPTED' CHECK(driver_response_status IN ('PENDING', 'ACCEPTED', 'DECLINED'))"),
             ("rides", "submission_key", "TEXT"),
             ("rides", "estimated_duration_minutes", "REAL"),
-            ("driver_profiles", "date_of_birth", "TEXT"),
             ("users", "avatar_cloudinary_public_id", "TEXT"),
             ("vehicle_photos", "cloudinary_public_id", "TEXT"),
-            ("vehicle_photos", "cloudinary_url", "TEXT")
+            ("vehicle_photos", "cloudinary_url", "TEXT"),
+            ("driver_profiles", "location_updated_at", "TIMESTAMP"),
+            ("driver_profiles", "location_heading", "REAL"),
+            ("driver_profiles", "location_accuracy_m", "REAL"),
+            ("rides", "start_pin", "TEXT"),
+            ("rides", "pickup_eta_minutes", "REAL"),
+            ("driver_documents", "expires_at", "DATE")
         ):
             columns = self.fetchall(f"PRAGMA table_info({table})")
             if not any(item["name"] == column for item in columns):
                 self.execute(f"ALTER TABLE {table} ADD COLUMN {column} {definition}")
+
+        for statement in SAFETY_AND_REALTIME_TABLES:
+            self.execute(statement)
 
         self.execute(
             "CREATE INDEX IF NOT EXISTS idx_rides_dispatch_offer "
