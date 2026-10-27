@@ -1,8 +1,9 @@
 import os
 import secrets
-from flask import Flask, render_template, session
+from flask import Flask, render_template, request, session
 from app.config import Config
 from app.repositories.database import get_db
+from app.repositories.turso_http import DatabaseUnavailableError
 from app.services.auth_service import AuthService
 from app.services.push_service import PushService
 
@@ -154,5 +155,12 @@ def create_app(config_class=Config):
     @app.errorhandler(500)
     def internal_error(e):
         return render_template("errors/500.html"), 500
+
+    @app.errorhandler(DatabaseUnavailableError)
+    def database_unavailable(e):
+        # The database timed out or is unreachable: answer quickly with 503 instead of
+        # letting the request hang until the Gunicorn worker is killed.
+        app.logger.error("Database unavailable while handling %s: %s", request.path, e)
+        return render_template("errors/500.html"), 503
 
     return app
