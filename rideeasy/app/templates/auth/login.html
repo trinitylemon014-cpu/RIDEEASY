@@ -18,7 +18,7 @@
       <form method="POST" action="/auth/login">
         <div class="form-group">
           <label class="form-label" for="email">Email Address</label>
-          <input type="email" id="email" name="email" class="form-control" placeholder="name@domain.ug" value="{{ email or '' }}" required autofocus>
+          <input type="email" id="email" name="email" autocomplete="username" class="form-control" placeholder="name@domain.ug" value="{{ email or '' }}" required autofocus>
         </div>
 
         <div class="form-group">
@@ -26,7 +26,7 @@
             <label class="form-label" for="password">Password</label>
             <a href="/auth/forgot-password" style="font-size: 0.75rem; color: var(--color-medium-grey);">Forgot Password?</a>
           </div>
-          <input type="password" id="password" name="password" class="form-control" placeholder="••••••••" required>
+          <input type="password" id="password" name="password" autocomplete="current-password" class="form-control" placeholder="••••••••" required>
         </div>
 
         <button type="submit" class="btn btn-primary btn-block" style="margin-top: 1rem;">Sign In</button>
