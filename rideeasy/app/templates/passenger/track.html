@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="referrer" content="no-referrer">
+  <title>Follow {{ trip.passenger_first_name }}'s trip — RideEasy</title>
+  <link rel="stylesheet" href="/static/css/base.css">
+  <link rel="stylesheet" href="/static/css/components.css">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+</head>
+<body class="share-page">
+  <main class="container section" style="max-width: 680px; margin: 0 auto;">
+    <p class="text-subtle" style="margin-bottom: 0.25rem;">RideEasy live trip</p>
+    <h1 style="margin-top: 0;">Following {{ trip.passenger_first_name }}'s trip</h1>
+    <p id="trip-status-text" style="font-weight: 700; font-size: 1.125rem;">
+      {% if trip.active %}Trip in progress{% else %}This trip has ended{% endif %}
+    </p>
+    <p id="trip-eta" class="text-subtle" role="status" aria-live="polite">
+      {% if trip.active %}Looking for the driver's location…{% else %}This trip has ended.{% endif %}
+    </p>
+
+    <div id="trip-map" class="trip-map"
+         data-pickup-lat="{{ trip.pickup.lat if trip.pickup else '' }}" data-pickup-lng="{{ trip.pickup.lng if trip.pickup else '' }}"
+         data-destination-lat="{{ trip.destination.lat if trip.destination else '' }}" data-destination-lng="{{ trip.destination.lng if trip.destination else '' }}"
+         data-tile-url="{{ ('/track/' ~ token ~ '/tiles/{z}/{x}/{y}.png') if locationiq_configured else '' }}"
+         {% if trip.active %}data-status-url="{{ url_for('share.status', token=token) }}"{% endif %}></div>
+
+    <div class="card" style="margin-top: 1rem;">
+      <dl class="share-details">
+        {% if trip.driver_first_name %}<div><dt>Driver</dt><dd>{{ trip.driver_first_name }}</dd></div>{% endif %}
+        {% if trip.vehicle %}<div><dt>Vehicle</dt><dd>{{ trip.vehicle }}{% if trip.plate_number %} · <strong>{{ trip.plate_number }}</strong>{% endif %}</dd></div>{% endif %}
+        <div><dt>From</dt><dd>{{ trip.pickup_address }}</dd></div>
+        <div><dt>To</dt><dd>{{ trip.destination_address }}</dd></div>
+      </dl>
+    </div>
+    <p class="text-subtle" style="margin-top: 1rem;">
+      Worried? Call {{ trip.passenger_first_name }} first. In an emergency call <a href="tel:{{ emergency_number }}">{{ emergency_number }}</a>.
+      This link works only until the trip ends and can be switched off by {{ trip.passenger_first_name }} at any time.
+    </p>
+  </main>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  <script src="/static/js/trip-map.js"></script>
+</body>
+</html>

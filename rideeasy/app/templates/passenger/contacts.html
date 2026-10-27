@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+
+{% block title %}Safety &amp; emergency contacts — RideEasy{% endblock %}
+
+{% block content %}
+<div class="container section" style="max-width: 680px; margin: 0 auto;">
+  <h2>Safety &amp; emergency contacts</h2>
+  <p class="text-subtle">If you press <strong>SOS</strong> during a trip, RideEasy safety staff are alerted right away and we text these people your live location and a tracking link.</p>
+
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-title">Your emergency contacts</div>
+    {% if contacts %}
+      <ul class="contact-list">
+        {% for contact in contacts %}
+          <li>
+            <span><strong>{{ contact.name }}</strong> · {{ contact.phone }}</span>
+            <form method="POST" action="{{ url_for('trip_safety.delete_contact', contact_id=contact.id) }}">
+              <input type="hidden" name="csrf_token" value="{{ payment_csrf_token }}">
+              <button type="submit" class="btn btn-secondary btn-sm">Remove</button>
+            </form>
+          </li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <p class="text-subtle">You have not added anyone yet.</p>
+    {% endif %}
+  </div>
+
+  {% if contacts|length < 5 %}
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-title">Add a contact</div>
+    <form method="POST" action="{{ url_for('trip_safety.contacts') }}">
+      <input type="hidden" name="csrf_token" value="{{ payment_csrf_token }}">
+      <div class="form-group">
+        <label class="form-label" for="contact-name">Name</label>
+        <input id="contact-name" name="name" class="form-control" maxlength="80" required autocomplete="off">
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="contact-phone">Phone number</label>
+        <input id="contact-phone" name="phone" class="form-control" type="tel" inputmode="tel" placeholder="+256 700 000000" required autocomplete="off">
+      </div>
+      <button type="submit" class="btn btn-primary">Save contact</button>
+    </form>
+  </div>
+  {% endif %}
+
+  <div class="card">
+    <div class="card-title">How trip safety works</div>
+    <ul>
+      <li><strong>Trip PIN:</strong> passengers get a 4-digit PIN; the driver can only start the trip after you give it to them.</li>
+      <li><strong>Share my trip:</strong> send a live tracking link to family or friends while a trip is active.</li>
+      <li><strong>SOS:</strong> alerts RideEasy staff and texts your contacts. In danger, always call <a href="tel:{{ emergency_number }}">{{ emergency_number }}</a> first.</li>
+    </ul>
+  </div>
+</div>
+{% endblock %}
