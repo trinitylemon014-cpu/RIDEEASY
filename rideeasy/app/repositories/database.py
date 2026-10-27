@@ -3,6 +3,11 @@ import sqlite3
 import logging
 from typing import Any, Dict, List, Optional
 from app.config import Config
+from app.repositories.turso_http import (
+    DatabaseQueryError,
+    DatabaseUnavailableError,
+    TursoHTTPClient,
+)
 
 logger = logging.getLogger("rideeasy.database")
 
@@ -122,13 +127,12 @@ SAFETY_AND_REALTIME_TABLES = (
 class Database:
     """
     Unified Database abstraction layer supporting:
-    1. Production: Turso libSQL client (via libsql_client sync driver)
+    1. Production: Turso libSQL over its HTTP API (app.repositories.turso_http), with
+       bounded connect/read timeouts so a stalled database can never hang a worker.
     2. Local Development: Local SQLite database file when no remote URL is configured
 
-    Turso transport:
-    By default libsql:// / wss:// / ws:// URLs are connected to over HTTPS, which avoids
-    the WebSocket handshake failures (HTTP 400) seen with the legacy libsql-client.
-    Set TURSO_TRANSPORT=websocket to force the WebSocket transport instead.
+    Timeouts (seconds) can be tuned with TURSO_CONNECT_TIMEOUT (default 3.05) and
+    TURSO_READ_TIMEOUT (default 10).
     """
     _instance = None
 
@@ -146,34 +150,26 @@ class Database:
             self.db_url and self.db_url.startswith(("libsql://", "https://", "ws://", "wss://"))
         )
         self._connect_url = self._resolve_connect_url(self.db_url) if self.is_turso else ""
-        self._libsql_client = None
+        self._turso: Optional[TursoHTTPClient] = None
 
         if self.is_turso:
             try:
-                import libsql_client
                 logger.info("Connecting to remote Turso libSQL database: %s", self._connect_url)
-                self._libsql_client = libsql_client.create_client_sync(
-                    url=self._connect_url,
-                    auth_token=self.auth_token
+                self._turso = TursoHTTPClient(
+                    self._connect_url,
+                    self.auth_token,
+                    connect_timeout=float(os.getenv("TURSO_CONNECT_TIMEOUT", "3.05")),
+                    read_timeout=float(os.getenv("TURSO_READ_TIMEOUT", "10")),
                 )
                 logger.info("Turso client created.")
             except Exception as e:
-                logger.error("Failed to connect to configured Turso database: %s", e)
+                logger.error("Failed to configure Turso database client: %s", e)
                 raise RuntimeError("Configured Turso database is unavailable; refusing local fallback.") from e
 
     @staticmethod
     def _resolve_connect_url(url: str) -> str:
-        """Map the configured URL to the URL actually used by the client."""
+        """Map libsql:// / wss:// / ws:// URLs to the HTTPS(HTTP) endpoint the client uses."""
         url = url.strip()
-        transport = os.getenv("TURSO_TRANSPORT", "http").strip().lower()
-
-        if transport in ("ws", "websocket"):
-            for prefix in ("libsql://", "https://"):
-                if url.startswith(prefix):
-                    return "wss://" + url[len(prefix):]
-            return url
-
-        # Default: HTTP(S)
         for prefix in ("libsql://", "wss://"):
             if url.startswith(prefix):
                 return "https://" + url[len(prefix):]
@@ -186,10 +182,9 @@ class Database:
         """
         True when execute_transaction() is atomic.
 
-        Local SQLite uses a real transaction, the WebSocket transport uses an
-        interactive transaction, and the HTTP transport uses a single atomic
-        batch (BEGIN ... COMMIT with automatic ROLLBACK), with row-count
-        preconditions enforced by guard statements. All three qualify.
+        Local SQLite uses a real transaction; Turso uses a single atomic HTTP
+        batch (BEGIN ... COMMIT with ROLLBACK on error), with row-count
+        preconditions enforced by guard statements. Both qualify.
         """
         return True
 
@@ -202,8 +197,8 @@ class Database:
     def execute(self, query: str, params: tuple = ()) -> int:
         """Executes INSERT/UPDATE/DELETE query and returns rowcount or 1."""
         _invalidate_request_cache()
-        if self.is_turso and self._libsql_client:
-            rs = self._libsql_client.execute(query, list(params))
+        if self.is_turso and self._turso:
+            rs = self._turso.execute(query, list(params))
             return rs.rows_affected if hasattr(rs, "rows_affected") else 1
         else:
             with self._get_sqlite_conn() as conn:
@@ -213,14 +208,12 @@ class Database:
 
     def _execute_batch_transaction(self, operations: List[tuple]) -> List[int]:
         """
-        Atomic transaction for the HTTP transport using a single batch request.
+        Atomic transaction over the HTTP transport: one BEGIN ... COMMIT batch request.
 
-        A batch runs in one implicit transaction: if any statement fails, everything
-        is rolled back. Optional row-count preconditions (third tuple element) are
-        enforced with a guard statement placed right after the operation.
+        If any statement fails, everything is rolled back. Optional row-count
+        preconditions (third tuple element) are enforced with a guard statement placed
+        right after the operation.
         """
-        import libsql_client
-
         if not operations:
             return []
 
@@ -229,44 +222,24 @@ class Database:
         for operation in operations:
             query, params = operation[:2]
             result_positions.append(len(statements))
-            statements.append(libsql_client.Statement(query, list(params)))
+            statements.append((query, list(params)))
             if len(operation) > 2 and operation[2] is not None:
-                statements.append(libsql_client.Statement(_PRECONDITION_SQL, [int(operation[2])]))
+                statements.append((_PRECONDITION_SQL, [int(operation[2])]))
 
         try:
-            results = self._libsql_client.batch(statements)
-        except Exception as e:
+            results = self._turso.batch_atomic(statements)
+        except DatabaseQueryError as e:
             if "malformed json" in str(e).lower():
                 raise RuntimeError(_PRECONDITION_MESSAGE) from e
             raise
 
-        return [
-            results[i].rows_affected if hasattr(results[i], "rows_affected") else 1
-            for i in result_positions
-        ]
+        return [results[i].rows_affected for i in result_positions]
 
     def execute_transaction(self, operations: List[tuple]) -> List[int]:
         """Run a sequence of parameterized statements atomically."""
         _invalidate_request_cache()
-        if self.is_turso and self._libsql_client:
-            if self._connect_url.startswith(("http://", "https://")):
-                return self._execute_batch_transaction(operations)
-
-            transaction = self._libsql_client.transaction()
-            try:
-                rowcounts = []
-                for operation in operations:
-                    query, params = operation[:2]
-                    result = transaction.execute(query, list(params))
-                    rowcount = result.rows_affected if hasattr(result, "rows_affected") else 1
-                    rowcounts.append(rowcount)
-                    if len(operation) > 2 and operation[2] is not None and rowcount != operation[2]:
-                        raise RuntimeError(_PRECONDITION_MESSAGE)
-                transaction.commit()
-                return rowcounts
-            except Exception:
-                transaction.rollback()
-                raise
+        if self.is_turso and self._turso:
+            return self._execute_batch_transaction(operations)
 
         with self._get_sqlite_conn() as conn:
             rowcounts = []
@@ -281,8 +254,8 @@ class Database:
 
     def fetchone(self, query: str, params: tuple = ()) -> Optional[Dict[str, Any]]:
         """Executes SELECT query and returns a single row as a dictionary."""
-        if self.is_turso and self._libsql_client:
-            rs = self._libsql_client.execute(query, list(params))
+        if self.is_turso and self._turso:
+            rs = self._turso.execute(query, list(params))
             if not rs.rows:
                 return None
             columns = rs.columns
@@ -296,8 +269,8 @@ class Database:
 
     def fetchall(self, query: str, params: tuple = ()) -> List[Dict[str, Any]]:
         """Executes SELECT query and returns all matching rows as a list of dictionaries."""
-        if self.is_turso and self._libsql_client:
-            rs = self._libsql_client.execute(query, list(params))
+        if self.is_turso and self._turso:
+            rs = self._turso.execute(query, list(params))
             columns = rs.columns
             return [{columns[i]: r[i] for i in range(len(columns))} for r in rs.rows]
         else:
@@ -341,11 +314,11 @@ class Database:
         with open(schema_file, "r", encoding="utf-8") as f:
             sql_script = f.read()
 
-        if self.is_turso and self._libsql_client:
+        if self.is_turso and self._turso:
             # Execute statements one by one for Turso libSQL
             # (splitter is trigger- and string-literal-aware)
             for statement in split_sql_statements(sql_script):
-                self._libsql_client.execute(statement)
+                self._turso.execute(statement)
         else:
             with self._get_sqlite_conn() as conn:
                 conn.executescript(sql_script)
