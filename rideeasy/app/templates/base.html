@@ -13,10 +13,10 @@
   <meta name="theme-color" content="#000000">
 
   <!-- Core Monochrome Stylesheets -->
-  <link rel="stylesheet" href="/static/css/base.css">
-  <link rel="stylesheet" href="/static/css/components.css">
-  <link rel="stylesheet" href="/static/css/dashboard.css">
-  <link rel="stylesheet" href="/static/css/responsive.css">
+  <link rel="stylesheet" href="/static/css/base.css?v={{ asset_v }}">
+  <link rel="stylesheet" href="/static/css/components.css?v={{ asset_v }}">
+  <link rel="stylesheet" href="/static/css/dashboard.css?v={{ asset_v }}">
+  <link rel="stylesheet" href="/static/css/responsive.css?v={{ asset_v }}">
 </head>
 <body>
   {% from "macros/user_identity.html" import avatar %}
@@ -373,8 +373,8 @@
       </button>
   </div>
 
-  <script src="/static/js/map-links.js" defer></script>
-  <script src="/static/js/app.js"></script>
-  {% if current_user %}<script src="/static/js/realtime.js" defer></script>{% endif %}
+  <script src="/static/js/map-links.js?v={{ asset_v }}" defer></script>
+  <script src="/static/js/app.js?v={{ asset_v }}"></script>
+  {% if current_user %}<script src="/static/js/realtime.js?v={{ asset_v }}" defer></script>{% endif %}
 </body>
 </html>
