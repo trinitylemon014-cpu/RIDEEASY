@@ -44,6 +44,12 @@
         {% endif %}
         <div class="stat-card"><div class="stat-label">Estimated fare</div><div class="stat-value" style="font-size: 1rem;">{{ ride.final_fare_ugx or ride.estimated_fare_ugx | ugx }}</div></div>
       </div>
+      <p id="driver-eta" class="text-subtle" role="status" aria-live="polite">Waiting for your GPS position…</p>
+      {% set goal_lat = ride.destination_lat if ride.status == 'TRIP_STARTED' else ride.pickup_lat %}
+      {% set goal_lng = ride.destination_lng if ride.status == 'TRIP_STARTED' else ride.pickup_lng %}
+      {% if goal_lat and goal_lng %}
+        <a class="btn btn-primary btn-sm" target="_blank" rel="noopener" href="https://www.google.com/maps/dir/?api=1&destination={{ goal_lat }},{{ goal_lng }}&travelmode=driving">Navigate to {{ 'destination' if ride.status == 'TRIP_STARTED' else 'pickup' }}</a>
+      {% endif %}
       <a class="btn btn-secondary btn-sm" href="/map?pickup={{ ride.pickup_address | urlencode }}&destination={{ ride.destination_address | urlencode }}">View route on map</a>
       <div id="driver-live-ride-controls" style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; border-top: 1px solid var(--color-light-grey); padding-top: 1rem;">
         {% if ride.status == 'DRIVER_ASSIGNED' %}
@@ -51,7 +57,7 @@
         {% elif ride.status == 'DRIVER_ARRIVING' %}
           <form method="POST" action="/driver/rides/{{ ride.id }}/status"><input type="hidden" name="status" value="DRIVER_ARRIVED"><button class="btn btn-primary" type="submit">Arrived at pickup</button></form>
         {% elif ride.status == 'DRIVER_ARRIVED' %}
-          <form method="POST" action="/driver/rides/{{ ride.id }}/status"><input type="hidden" name="status" value="TRIP_STARTED"><button class="btn btn-primary" type="submit">Start ride</button></form>
+          <form method="POST" action="/driver/rides/{{ ride.id }}/status" class="pin-form"><input type="hidden" name="status" value="TRIP_STARTED">{% if pin_required and ride.start_pin %}<label for="trip-pin-input" class="text-subtle">Passenger's 4-digit PIN</label><input id="trip-pin-input" class="form-control pin-input" name="pin" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" autocomplete="off" required placeholder="0000">{% endif %}<button class="btn btn-primary" type="submit">Start ride</button></form>
         {% elif ride.status == 'TRIP_STARTED' %}
           <form method="POST" action="/driver/rides/{{ ride.id }}/status"><input type="hidden" name="status" value="TRIP_COMPLETED"><button class="btn btn-primary" type="submit">Complete ride</button></form>
         {% elif ride.status == 'TRIP_COMPLETED' %}
@@ -59,6 +65,14 @@
         {% endif %}
         <a href="tel:{{ ride.passenger_phone }}" class="btn btn-secondary">Call passenger</a>
       </div>
+      <div class="safety-card" style="margin-top: 1rem; border-top: 1px solid var(--color-light-grey); padding-top: 1rem;">
+        <div class="safety-actions">
+          <button type="button" class="btn sos-btn btn-sm" data-sos-url="{{ url_for('trip_safety.sos', ride_id=ride.id) }}" data-emergency-number="{{ emergency_number }}">SOS emergency</button>
+          <a class="btn btn-secondary btn-sm" href="tel:{{ emergency_number }}">Call {{ emergency_number }}</a>
+        </div>
+        <div id="sos-result" role="alert" hidden></div>
+      </div>
+      <script src="/static/js/trip-safety.js" defer></script>
     </div>
   {% else %}
     <div class="card" style="text-align: center; padding: 3rem 1rem;">
