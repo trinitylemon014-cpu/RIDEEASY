@@ -48,6 +48,18 @@ class NotificationService:
         )
 
     @staticmethod
+    def get_unread_summary(user_id: str, limit: int = 5):
+        """Unread total and the latest unread notifications in ONE database round trip."""
+        db = get_db()
+        rows = db.fetchall(
+            """SELECT *, (SELECT COUNT(*) FROM notifications WHERE user_id = ? AND is_read = 0) AS unread_total
+               FROM notifications WHERE user_id = ? AND is_read = 0
+               ORDER BY created_at DESC, rowid DESC LIMIT ?""",
+            (user_id, user_id, limit)
+        )
+        return (rows[0]["unread_total"] if rows else 0), rows
+
+    @staticmethod
     def get_unread_count(user_id: str) -> int:
         db = get_db()
         row = db.fetchone("SELECT COUNT(*) as c FROM notifications WHERE user_id = ? AND is_read = 0", (user_id,))
