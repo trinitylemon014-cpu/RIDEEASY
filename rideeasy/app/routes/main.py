@@ -1,4 +1,6 @@
-from flask import Blueprint, render_template
+import os
+
+from flask import Blueprint, current_app, make_response, render_template, send_from_directory
 from app.repositories.database import get_db
 from app.services.auth_service import AuthService
 
@@ -30,3 +32,13 @@ def pricing():
 def contact():
     user = AuthService.get_current_user()
     return render_template("contact.html", user=user)
+
+
+@main_bp.route("/sw.js")
+def service_worker():
+    """Served from the site root so the worker can control every page (needed for push)."""
+    response = make_response(send_from_directory(os.path.join(current_app.root_path, "static"), "sw.js"))
+    response.headers["Content-Type"] = "application/javascript; charset=utf-8"
+    response.headers["Cache-Control"] = "no-cache"
+    response.headers["Service-Worker-Allowed"] = "/"
+    return response
