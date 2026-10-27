@@ -1,6 +1,17 @@
-from flask import current_app
+import uuid
+
+from flask import current_app, has_app_context
 from app.repositories.database import get_db
+from app.services.geo import eta_minutes, haversine_km, valid_point
 from app.services.notification_service import NotificationService
+
+
+def _config(key, default=None):
+    """App config when a Flask app is active, otherwise the module-level Config."""
+    if has_app_context():
+        return current_app.config.get(key, default)
+    from app.config import Config
+    return getattr(Config, key, default)
 
 
 class RideDispatchService:
@@ -15,7 +26,7 @@ class RideDispatchService:
     def _dispatch_ride(ride_id: str, excluded_driver_ids=None) -> str | None:
         db = get_db()
         existing_ride = db.fetchone(
-            "SELECT driver_id, status FROM rides WHERE id = ?",
+            "SELECT driver_id, status, pickup_lat, pickup_lng FROM rides WHERE id = ?",
             (ride_id,)
         )
         if not existing_ride or existing_ride["status"] not in ("REQUESTED", "SEARCHING_FOR_DRIVER"):
@@ -26,8 +37,20 @@ class RideDispatchService:
             )
 
         excluded = set(excluded_driver_ids or ())
-        candidates = db.fetchall(
-            """SELECT d.user_id, u.full_name, v.plate_number, v.make, v.model
+        required_documents = tuple(_config("DISPATCH_REQUIRED_DOC_TYPES") or ())
+        document_checks = "".join(
+            """ AND EXISTS (
+                   SELECT 1 FROM driver_documents dd
+                   WHERE dd.driver_id = d.user_id AND dd.doc_type = ? AND dd.status = 'APPROVED'
+                     AND (dd.expires_at IS NULL OR dd.expires_at >= date('now'))
+                 )"""
+            for _ in required_documents
+        )
+        raw_candidates = db.fetchall(
+            """SELECT d.user_id, u.full_name, v.plate_number, v.make, v.model,
+                      d.current_lat, d.current_lng, d.rating_avg, d.total_trips,
+                      CAST((julianday('now') - julianday(d.location_updated_at)) * 86400 AS INTEGER)
+                          AS location_age_seconds
                FROM driver_profiles d
                JOIN users u ON u.id = d.user_id
                JOIN vehicles v ON v.driver_id = d.user_id
@@ -41,9 +64,12 @@ class RideDispatchService:
                    SELECT 1 FROM rides active
                    WHERE active.driver_id = d.user_id
                      AND active.status NOT IN ('COMPLETED', 'CANCELLED')
-                 )
-               ORDER BY d.rating_avg DESC, d.total_trips ASC""",
-            (ride_id,)
+                 )"""
+            + document_checks,
+            (ride_id, *required_documents)
+        )
+        candidates = RideDispatchService.rank_candidates(
+            raw_candidates, existing_ride.get("pickup_lat"), existing_ride.get("pickup_lng")
         )
 
         for candidate in candidates:
@@ -141,12 +167,18 @@ class RideDispatchService:
             vehicle = " ".join(filter(None, (
                 candidate.get("plate_number"), candidate.get("make"), candidate.get("model")
             )))
+            distance_km = candidate.get("pickup_distance_km")
+            distance_note = ""
+            if distance_km is not None:
+                pickup_eta = round(eta_minutes(distance_km, _config("ETA_AVERAGE_SPEED_KMH", 25.0)), 1)
+                db.execute("UPDATE rides SET pickup_eta_minutes = ? WHERE id = ?", (pickup_eta, ride_id))
+                distance_note = f" You are about {distance_km:.1f} km from the pickup (~{round(pickup_eta)} min)."
             NotificationService.create_notification(
                 user_id=driver_id,
                 title="New trip awaiting your response",
                 message=(
                     f"{ride['passenger_name']} requested a ride. Review the trip and accept or "
-                    f"decline it. Pickup: {ride['pickup_address']}."
+                    f"decline it. Pickup: {ride['pickup_address']}.{distance_note}"
                 ),
                 notif_type="SYSTEM",
                 related_entity_id=ride_id
@@ -161,6 +193,115 @@ class RideDispatchService:
             return driver_id
 
         return None
+
+    @staticmethod
+    def rank_candidates(candidates, pickup_lat, pickup_lng):
+        """Order eligible drivers nearest-first.
+
+        Drivers are grouped by how far they are from the pickup in 0.5 km steps, and
+        ties inside a step go to the better-rated driver with fewer trips. Drivers who
+        are beyond DISPATCH_MAX_RADIUS_KM, or whose location is missing or stale, are
+        skipped (or placed last when DISPATCH_REQUIRE_DRIVER_LOCATION is off).
+        Without usable pickup coordinates the previous rating-based order is kept.
+        """
+        max_age = int(_config("DISPATCH_LOCATION_MAX_AGE_SECONDS", 180))
+        radius_km = float(_config("DISPATCH_MAX_RADIUS_KM", 15))
+        require_location = bool(_config("DISPATCH_REQUIRE_DRIVER_LOCATION", True))
+        has_pickup = valid_point(pickup_lat, pickup_lng)
+
+        ranked = []
+        for candidate in candidates:
+            candidate = dict(candidate)
+            distance = None
+            if (
+                has_pickup
+                and valid_point(candidate.get("current_lat"), candidate.get("current_lng"))
+                and candidate.get("location_age_seconds") is not None
+                and candidate["location_age_seconds"] <= max_age
+            ):
+                distance = haversine_km(
+                    candidate["current_lat"], candidate["current_lng"], pickup_lat, pickup_lng
+                )
+            group, bucket = 0, 0
+            if has_pickup:
+                if distance is None:
+                    if require_location:
+                        continue
+                    group = 1
+                else:
+                    if distance > radius_km:
+                        continue
+                    bucket = round(distance / 0.5)
+            candidate["pickup_distance_km"] = round(distance, 2) if distance is not None else None
+            sort_key = (
+                group, bucket,
+                -(candidate.get("rating_avg") or 0), candidate.get("total_trips") or 0,
+                candidate["pickup_distance_km"] if candidate["pickup_distance_km"] is not None else 0,
+            )
+            ranked.append((sort_key, candidate))
+        ranked.sort(key=lambda item: item[0])
+        return [candidate for _, candidate in ranked]
+
+    @staticmethod
+    def expire_unmatched_rides(ride_id: str | None = None) -> int:
+        """Cancel rides that have searched for RIDE_SEARCH_TIMEOUT_MINUTES without a driver.
+
+        Mirrors a passenger cancellation: pending offers are closed and any reward
+        voucher used on the ride is released.
+        """
+        minutes = int(_config("RIDE_SEARCH_TIMEOUT_MINUTES", 10))
+        if minutes <= 0:
+            return 0
+        db = get_db()
+        query = """SELECT id, passenger_id FROM rides
+                   WHERE driver_id IS NULL AND status = 'SEARCHING_FOR_DRIVER'
+                     AND created_at <= datetime(CURRENT_TIMESTAMP, ?)"""
+        params = (f"-{minutes} minutes",)
+        if ride_id is not None:
+            query += " AND id = ?"
+            params += (ride_id,)
+        cancelled = 0
+        reason = f"No driver was available within {minutes} minutes"
+        for ride in db.fetchall(query, params):
+            try:
+                db.execute_transaction([
+                    (
+                        """UPDATE rides SET status = 'CANCELLED', cancellation_reason = ?,
+                                  cancelled_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+                           WHERE id = ? AND driver_id IS NULL AND status = 'SEARCHING_FOR_DRIVER'""",
+                        (reason, ride["id"]),
+                        1
+                    ),
+                    (
+                        """UPDATE ride_driver_offers SET status = 'CANCELLED', responded_at = CURRENT_TIMESTAMP
+                           WHERE ride_id = ? AND status = 'PENDING'""",
+                        (ride["id"],)
+                    ),
+                    (
+                        """UPDATE rewards_redemptions SET status = 'ACTIVE', ride_id = NULL
+                           WHERE ride_id = ? AND status = 'USED'""",
+                        (ride["id"],)
+                    ),
+                    (
+                        """INSERT INTO audit_logs (id, user_id, action, resource_type, resource_id, details)
+                           VALUES (?, NULL, 'RIDE_AUTO_CANCELLED_NO_DRIVER', 'RIDE', ?, ?)""",
+                        (f"aud_{uuid.uuid4().hex[:8]}", ride["id"], reason)
+                    ),
+                ])
+            except RuntimeError:
+                continue       # a driver was assigned or the ride changed in the meantime
+            cancelled += 1
+            NotificationService.create_notification(
+                user_id=ride["passenger_id"],
+                title="No driver available",
+                message=(
+                    f"We could not find a driver for ride #{ride['id'][:8].upper()} within {minutes} "
+                    "minutes, so the request was cancelled. Please try again shortly."
+                ),
+                notif_type="CANCELLATION",
+                related_entity_id=ride["id"]
+            )
+        return cancelled
 
     @staticmethod
     def expire_stale_offers(ride_id: str | None = None) -> int:
