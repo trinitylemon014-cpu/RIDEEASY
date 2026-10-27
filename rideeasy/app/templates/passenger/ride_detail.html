@@ -111,6 +111,53 @@
       </div>
     </div>
 
+    {% if trip_active %}
+    <!-- Live map, start PIN and safety tools -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+    <div class="card" style="margin-bottom: 1.5rem;">
+      <div class="card-title" style="margin-bottom: 0.5rem;">Live trip map</div>
+      <p id="trip-eta" class="text-subtle" role="status" aria-live="polite">Waiting for your driver's location…</p>
+      <div id="trip-map" class="trip-map"
+           data-ride-id="{{ ride.id }}"
+           data-pickup-lat="{{ ride.pickup_lat }}" data-pickup-lng="{{ ride.pickup_lng }}"
+           data-destination-lat="{{ ride.destination_lat }}" data-destination-lng="{{ ride.destination_lng }}"
+           data-tile-url="{{ '/map/tiles/{z}/{x}/{y}.png' if locationiq_configured else '' }}"></div>
+    </div>
+
+    {% if start_pin and ride.status in ('DRIVER_ASSIGNED', 'DRIVER_ARRIVING', 'DRIVER_ARRIVED') %}
+    <div class="card safety-card" style="margin-bottom: 1.5rem;">
+      <div class="card-title">Your trip PIN</div>
+      <div class="trip-pin" aria-label="Trip PIN {{ start_pin|list|join(' ') }}">{{ start_pin }}</div>
+      <p class="text-subtle" style="margin: 0;">Before you get in, check the plate <strong>{{ ride.plate_number }}</strong> and that the driver matches the photo above. Give this PIN to the driver only then. They cannot start the trip without it.</p>
+    </div>
+    {% endif %}
+
+    <div class="card safety-card" style="margin-bottom: 1.5rem;">
+      <div class="card-title">Trip safety</div>
+      <div class="safety-actions">
+        <button type="button" class="btn btn-secondary btn-sm" data-share-url="{{ url_for('trip_safety.share', ride_id=ride.id) }}">Share my trip</button>
+        <button type="button" class="btn sos-btn btn-sm" data-sos-url="{{ url_for('trip_safety.sos', ride_id=ride.id) }}" data-emergency-number="{{ emergency_number }}">SOS emergency</button>
+        <a class="btn btn-secondary btn-sm" href="tel:{{ emergency_number }}">Call {{ emergency_number }}</a>
+      </div>
+      <div id="share-box" class="share-box" {% if not share_url %}hidden{% endif %}>
+        <label class="text-subtle" for="share-link">Anyone with this link can follow your trip until it ends.</label>
+        <div class="share-row">
+          <input id="share-link" class="form-control" type="text" readonly value="{{ share_url or '' }}">
+          <button type="button" id="share-copy" class="btn btn-secondary btn-sm">Copy</button>
+          <button type="button" id="share-revoke" class="btn btn-secondary btn-sm" data-revoke-url="{{ url_for('trip_safety.revoke_share', ride_id=ride.id) }}">Stop sharing</button>
+        </div>
+      </div>
+      <div id="sos-result" role="alert" hidden></div>
+      {% if contact_count == 0 %}
+        <p class="text-subtle" style="margin: 0.75rem 0 0;">Tip: <a href="{{ url_for('trip_safety.contacts') }}">add emergency contacts</a> and we will text them if you press SOS.</p>
+      {% endif %}
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin="" defer></script>
+    <script src="/static/js/trip-map.js" defer></script>
+    <script src="/static/js/trip-safety.js" defer></script>
+    {% endif %}
+
     {% if ride.status == 'CANCELLED' %}
     <div class="card" role="status" style="margin-bottom: 1.5rem; border-left: 3px solid var(--color-danger);">
       <strong>Ride cancelled</strong>
