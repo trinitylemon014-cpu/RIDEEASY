@@ -52,3 +52,25 @@ class SmsService:
             (message_id, payment_id, phone, message, status, provider_message_id, error_message)
         )
         return status
+
+    @staticmethod
+    def send_safety_sms(phone: str, message: str) -> str:
+        """Send an emergency text. Returns SENT, FAILED or NOT_CONFIGURED; never raises."""
+        endpoint = current_app.config.get("EGOSMS_API_URL", "")
+        api_key = current_app.config.get("EGOSMS_API_KEY", "")
+        parsed_endpoint = urlparse(endpoint)
+        if not (endpoint and api_key and parsed_endpoint.scheme == "https" and parsed_endpoint.hostname):
+            current_app.logger.warning("EgoSMS is not configured; safety SMS was not sent.")
+            return "NOT_CONFIGURED"
+        try:
+            response = requests.post(
+                endpoint,
+                json={"to": phone, "message": message},
+                headers={"Authorization": f"Bearer {api_key}"},
+                timeout=(1, 3)
+            )
+            response.raise_for_status()
+            return "SENT"
+        except requests.RequestException as exc:
+            current_app.logger.error("Safety SMS delivery failed (%s).", type(exc).__name__)
+            return "FAILED"
