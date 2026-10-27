@@ -3,6 +3,7 @@ import uuid
 from flask import Blueprint, abort, current_app, render_template, request, redirect, url_for, flash, session
 from werkzeug.security import generate_password_hash
 from app.repositories.database import get_db
+from app.repositories.turso_http import DatabaseUnavailableError
 from app.services.auth_service import AuthService
 
 auth_bp = Blueprint("auth", __name__)
@@ -16,7 +17,12 @@ def login():
         email = request.form.get("email", "").strip()
         password = request.form.get("password", "")
 
-        user, err = AuthService.authenticate(email, password)
+        try:
+            user, err = AuthService.authenticate(email, password)
+        except DatabaseUnavailableError:
+            current_app.logger.exception("Login failed: database unavailable")
+            flash("We can't reach the service right now. Please try again in a moment.", "error")
+            return render_template("auth/login.html", email=email), 503
         if err:
             flash(err, "error")
             return render_template("auth/login.html", email=email)
