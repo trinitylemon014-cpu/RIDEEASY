@@ -88,8 +88,13 @@ def route_planner():
 
 @maps_bp.route("/map/tiles/<int:z>/<int:x>/<int:y>.png")
 def map_tile(z, x, y):
+    return serve_tile(z, x, y)
+
+
+def serve_tile(z, x, y):
     """Serve map tiles through the server so the LocationIQ key stays private
-    and the browser never hits OpenStreetMap's restricted tile servers."""
+    and the browser never hits OpenStreetMap's restricted tile servers.
+    (Also used by the public trip-share page after it checks its share token.)"""
     api_key = (current_app.config.get("LOCATIONIQ_API_KEY") or "").strip()
     if not api_key:
         abort(404)
