@@ -5,26 +5,32 @@ from flask import current_app, has_app_context
 from app.repositories.database import get_db
 from app.config import Config
 
-def seed_database(include_demo_data=None):
-    """Initialize shared pricing and provision accounts or test fixtures."""
-    db = get_db()
-    db.init_db()
-    if include_demo_data is None:
-        include_demo_data = has_app_context() and current_app.testing
-    if has_app_context():
-        collection_phone = current_app.config["PAYSTACK_COLLECTION_PHONE"]
-        admin_payout_phone = current_app.config["PAYSTACK_ADMIN_PAYOUT_PHONE"]
-        admin_email = current_app.config["ADMIN_EMAIL"]
-        admin_name = current_app.config["ADMIN_NAME"]
-        admin_password = current_app.config["ADMIN_PASSWORD"]
-        admin_phone = current_app.config["ADMIN_PHONE"]
-    else:
-        collection_phone = Config.PAYSTACK_COLLECTION_PHONE
-        admin_payout_phone = Config.PAYSTACK_ADMIN_PAYOUT_PHONE
-        admin_email = Config.ADMIN_EMAIL
-        admin_name = Config.ADMIN_NAME
-        admin_password = Config.ADMIN_PASSWORD
-        admin_phone = Config.ADMIN_PHONE
+def _schema_fingerprint():
+    """Hash of every file that defines the schema or its migrations.
+
+    Editing schema.sql, seed_data.py or database.py changes it, which makes the next
+    start re-run the (idempotent) one-time setup once and then record the new value.
+    """
+    import hashlib
+    import os
+    here = os.path.dirname(os.path.abspath(__file__))
+    root = os.path.dirname(os.path.dirname(here))
+    digest = hashlib.sha256()
+    for path in (
+        os.path.join(root, "database", "schema", "schema.sql"),
+        os.path.abspath(__file__),
+        os.path.join(root, "app", "repositories", "database.py"),
+    ):
+        try:
+            with open(path, "rb") as handle:
+                digest.update(handle.read())
+        except OSError:
+            digest.update(b"missing:" + path.encode())
+    return digest.hexdigest()[:16]
+
+
+def _one_time_setup(db, collection_phone, admin_payout_phone):
+    """Idempotent static setup (payment settings, column migrations, tables, pricing)."""
     for setting_key, setting_value in (
         ("collection_phone", collection_phone),
         ("admin_payout_phone", admin_payout_phone),
@@ -96,6 +102,36 @@ def seed_database(include_demo_data=None):
             "INSERT OR IGNORE INTO pricing_configs (category, base_fare_ugx, per_km_ugx, per_min_ugx, min_fare_ugx) VALUES (?, ?, ?, ?, ?)",
             (cat, base, per_km, per_min, min_f)
         )
+
+
+def seed_database(include_demo_data=None):
+    """Initialize shared pricing and provision accounts or test fixtures."""
+    db = get_db()
+    # The schema, column migrations and static rows only need to run when something
+    # changed. Skipping them saves ~70 network round trips on every start/wake-up.
+    fingerprint = _schema_fingerprint()
+    setup_needed = not db.schema_is_current(fingerprint)
+    if setup_needed:
+        db.init_db()
+    if include_demo_data is None:
+        include_demo_data = has_app_context() and current_app.testing
+    if has_app_context():
+        collection_phone = current_app.config["PAYSTACK_COLLECTION_PHONE"]
+        admin_payout_phone = current_app.config["PAYSTACK_ADMIN_PAYOUT_PHONE"]
+        admin_email = current_app.config["ADMIN_EMAIL"]
+        admin_name = current_app.config["ADMIN_NAME"]
+        admin_password = current_app.config["ADMIN_PASSWORD"]
+        admin_phone = current_app.config["ADMIN_PHONE"]
+    else:
+        collection_phone = Config.PAYSTACK_COLLECTION_PHONE
+        admin_payout_phone = Config.PAYSTACK_ADMIN_PAYOUT_PHONE
+        admin_email = Config.ADMIN_EMAIL
+        admin_name = Config.ADMIN_NAME
+        admin_password = Config.ADMIN_PASSWORD
+        admin_phone = Config.ADMIN_PHONE
+    if setup_needed:
+        _one_time_setup(db, collection_phone, admin_payout_phone)
+        db.mark_schema_current(fingerprint)
 
     if not include_demo_data:
         if not admin_password:
