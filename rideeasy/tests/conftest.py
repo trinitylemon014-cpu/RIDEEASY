@@ -21,6 +21,9 @@ class TestConfig(Config):
     LOCAL_DB_PATH = os.path.join(os.path.dirname(__file__), "test_rideeasy.db")
     TURSO_DATABASE_URL = ""
     TURSO_AUTH_TOKEN = ""
+    # Existing fixtures create drivers without GPS positions; new location tests switch this on.
+    DISPATCH_REQUIRE_DRIVER_LOCATION = False
+    RIDE_SEARCH_TIMEOUT_MINUTES = 0
 
 @pytest.fixture(scope="session")
 def app():
