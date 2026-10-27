@@ -4,7 +4,7 @@ services:
     runtime: python
     plan: free
     buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn --chdir rideeasy --bind 0.0.0.0:$PORT --workers 1 --threads 4 --timeout 120 wsgi:app
+    startCommand: gunicorn --chdir rideeasy --bind 0.0.0.0:$PORT --workers 1 --threads 32 --timeout 120 wsgi:app
     healthCheckPath: /
     envVars:
       - key: PYTHON_VERSION
@@ -23,3 +23,16 @@ services:
         sync: false
       - key: TURSO_AUTH_TOKEN
         sync: false
+      # Live trips and safety (all optional; sensible defaults are built in)
+      - key: VAPID_PUBLIC_KEY
+        sync: false
+      - key: VAPID_PRIVATE_KEY
+        sync: false
+      - key: VAPID_SUBJECT
+        value: mailto:support@rideeasy.ug
+      - key: REALTIME_MAX_STREAMS
+        value: "20"
+      - key: DISPATCH_MAX_RADIUS_KM
+        value: "15"
+      - key: EMERGENCY_NUMBER
+        value: "999"
