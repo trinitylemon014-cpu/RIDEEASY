@@ -8,6 +8,7 @@ from app.services.pricing_service import PricingService
 from app.services.payment_service import PaymentService
 from app.services.notification_service import NotificationService
 from app.services.vehicle_photo_service import VehiclePhotoService
+from app.services.safety_service import ACTIVE_STATUSES as SAFETY_ACTIVE_STATUSES, SafetyService
 from app.services.location_service import (
     LocationIQConfigurationError,
     LocationIQNoResultsError,
@@ -694,6 +695,16 @@ def ride_detail(ride_id):
         abort(404)
     can_cancel = ride["status"] not in ("TRIP_STARTED", "TRIP_COMPLETED", "COMPLETED", "CANCELLED")
     car_photos = VehiclePhotoService.photo_status(ride["vehicle_id"]) if ride.get("vehicle_id") else []
+
+    trip_active = ride["status"] in SAFETY_ACTIVE_STATUSES and ride["driver_response_status"] == "ACCEPTED"
+    start_pin = share_url = None
+    contact_count = 0
+    if trip_active:
+        if SafetyService.pin_required():
+            start_pin = ride.get("start_pin") or SafetyService.ensure_pin(ride_id)
+        share = SafetyService.active_share(ride_id)
+        share_url = SafetyService.share_url(share["token"]) if share else None
+        contact_count = len(SafetyService.list_contacts(user["id"]))
     return render_template(
         "passenger/ride_detail.html",
         user=user,
@@ -701,6 +712,12 @@ def ride_detail(ride_id):
         can_cancel=can_cancel,
         car_photos=car_photos,
         car_color_hex=VehiclePhotoService.color_hex(ride.get("color")),
+        trip_active=trip_active,
+        start_pin=start_pin,
+        share_url=share_url,
+        contact_count=contact_count,
+        emergency_number=current_app.config.get("EMERGENCY_NUMBER", "999"),
+        locationiq_configured=bool((current_app.config.get("LOCATIONIQ_API_KEY") or "").strip()),
     )
 
 @passenger_bp.route("/rides/<ride_id>/cancel", methods=["GET", "POST"])
