@@ -5,6 +5,7 @@ from flask import Blueprint, render_template, request, redirect, url_for, flash,
 from app.repositories.database import get_db
 from app.services.auth_service import login_required, role_required, AuthService
 from app.services import driver_profile_service
+from app.services.safety_service import SafetyService
 
 admin_bp = Blueprint("admin", __name__, url_prefix="/admin")
 
@@ -353,3 +354,25 @@ def mark_ledger_entry_paid(entry_id):
         )
         flash("Payout marked paid and recorded in the audit log.", "success")
     return redirect(url_for("admin.payments"))
+
+
+@admin_bp.route("/safety")
+def safety_alerts():
+    user = AuthService.get_current_user()
+    status = request.args.get("status", "OPEN").upper()
+    if status not in ("OPEN", "RESOLVED", "ALL"):
+        status = "OPEN"
+    incidents = SafetyService.list_incidents(None if status == "ALL" else status)
+    return render_template("admin/safety.html", user=user, incidents=incidents, status=status)
+
+
+@admin_bp.route("/safety/<incident_id>/resolve", methods=["POST"])
+def resolve_safety_alert(incident_id):
+    if not _valid_payment_csrf():
+        flash("Your session expired. Please try again.", "error")
+        return redirect(url_for("admin.safety_alerts"))
+    if SafetyService.resolve_incident(incident_id, session["user_id"], request.form.get("note")):
+        flash("Safety alert marked as resolved.", "success")
+    else:
+        flash("That alert was already resolved or does not exist.", "warning")
+    return redirect(url_for("admin.safety_alerts"))
