@@ -42,3 +42,12 @@ def service_worker():
     response.headers["Cache-Control"] = "no-cache"
     response.headers["Service-Worker-Allowed"] = "/"
     return response
+
+
+@main_bp.route("/favicon.ico")
+def favicon():
+    """Browsers request /favicon.ico from the site root regardless of <link rel="icon"> tags."""
+    response = make_response(send_from_directory(os.path.join(current_app.root_path, "static"), "favicon.ico"))
+    response.headers["Content-Type"] = "image/x-icon"
+    response.headers["Cache-Control"] = "public, max-age=86400"
+    return response
