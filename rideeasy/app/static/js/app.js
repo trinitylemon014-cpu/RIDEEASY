@@ -4,6 +4,80 @@
  * MOVE. TRAVEL. ARRIVE.
  */
 
+/**
+ * Visibility-aware poller shared by the live status checks.
+ *
+ * - Does nothing (no timer, no network) while the tab is hidden, and checks again
+ *   immediately when the person comes back.
+ * - task() returns "changed" (reset to the fast rate), "idle" (nothing new: slow down
+ *   gradually, up to maxMs, if stepMs > 0), "error" (retry with exponential backoff,
+ *   capped at 60s, and return to the normal rate after the next success) or
+ *   "stop" (stop polling for good).
+ */
+function createPoller(task, { baseMs, maxMs = baseMs, stepMs = 0 }) {
+  let idleDelay = baseMs;
+  let errors = 0;
+  let timer = null;
+  let stopped = false;
+  let running = false;
+
+  function schedule(waitMs) {
+    window.clearTimeout(timer);
+    if (stopped || document.hidden) return;
+    // While the live stream (SSE) is connected, polling is only a safety net.
+    const live = window.__rideeasyStreamLive === true;
+    timer = window.setTimeout(run, live ? Math.min(waitMs * 3, 60000) : waitMs);
+  }
+
+  async function run() {
+    if (stopped || running || document.hidden) return;
+    running = true;
+    let outcome;
+    try {
+      outcome = (await task()) || "idle";
+    } catch (error) {
+      outcome = "error";
+    }
+    running = false;
+    if (outcome === "stop") {
+      stopped = true;
+      return;
+    }
+    let waitMs;
+    if (outcome === "error") {
+      errors += 1;
+      waitMs = Math.min(baseMs * 2 ** errors, 60000);
+    } else {
+      errors = 0;
+      if (outcome === "changed") idleDelay = baseMs;
+      waitMs = idleDelay;
+      idleDelay = Math.min(idleDelay + stepMs, maxMs);
+    }
+    schedule(waitMs);
+  }
+
+  document.addEventListener("visibilitychange", () => {
+    window.clearTimeout(timer);
+    if (document.hidden) return;
+    idleDelay = baseMs;
+    errors = 0;
+    run();
+  });
+
+  run();
+  return {
+    stop() { stopped = true; window.clearTimeout(timer); },
+    // Check right now (used when the server says something changed).
+    nudge() {
+      if (stopped) return;
+      idleDelay = baseMs;
+      errors = 0;
+      window.clearTimeout(timer);
+      run();
+    },
+  };
+}
+
 document.addEventListener("DOMContentLoaded", () => {
   // 1. Mobile Navigation Drawer Toggle
   const mobileBtn = document.getElementById("mobile-menu-toggle");
@@ -72,7 +146,10 @@ document.addEventListener("DOMContentLoaded", () => {
       toast.setAttribute("role", "alert");
       toast.style.cssText = "position:fixed;right:1rem;top:1rem;z-index:1100;max-width:min(24rem,calc(100vw - 2rem));box-shadow:var(--shadow-lg);";
       const message = document.createElement("span");
-      message.textContent = `New trip offer: ${offer.pickup_address} to ${offer.destination_address}.`;
+      const nearby = Number.isFinite(offer.pickup_distance_km)
+        ? ` Pickup is ${offer.pickup_distance_km} km away (about ${offer.pickup_eta_minutes} min).`
+        : "";
+      message.textContent = `New trip offer: ${offer.pickup_address} to ${offer.destination_address}.${nearby}`;
       const link = document.createElement("a");
       link.href = "/driver/requests";
       link.className = "btn btn-primary btn-sm";
@@ -97,9 +174,9 @@ document.addEventListener("DOMContentLoaded", () => {
           headers: { "Accept": "application/json" },
           cache: "no-store"
         });
-        if (!response.ok) return;
+        if (!response.ok) return "error";
         const result = await response.json();
-        if (!result.success || !Array.isArray(result.offers)) return;
+        if (!result.success || !Array.isArray(result.offers)) return "error";
 
         const currentOfferIds = new Set(result.offers.map((offer) => offer.id));
         const unseenOffer = result.offers.find((offer) => !seenOfferIds.has(offer.id));
@@ -108,28 +185,33 @@ document.addEventListener("DOMContentLoaded", () => {
             .some((row) => row.dataset.driverOfferId === unseenOffer.id);
           if (!offerIsRendered) {
             window.location.reload();
-            return;
+            return "changed";
           }
         }
         const removedOffer = Array.from(document.querySelectorAll("[data-driver-offer-id]"))
           .some((row) => !currentOfferIds.has(row.dataset.driverOfferId));
         if (removedOffer) {
           window.location.reload();
-          return;
+          return "changed";
         }
 
+        let foundNewOffer = false;
         result.offers.forEach((offer) => {
           if (seenOfferIds.has(offer.id)) return;
           seenOfferIds.add(offer.id);
+          foundNewOffer = true;
           showDriverOffer(offer);
         });
+        return foundNewOffer ? "changed" : "idle";
       } catch (error) {
         console.warn("Unable to check RideEasy trip offers.", error);
+        return "error";
       }
     }
 
-    checkDriverOffers();
-    window.setInterval(checkDriverOffers, 8000);
+    // Fixed 8s rate on purpose: an idle driver must notice a new offer quickly.
+    const offerPoller = createPoller(checkDriverOffers, { baseMs: 8000 });
+    window.addEventListener("rideeasy:ride", () => offerPoller.nudge());
   }
 
   const rideBookingForm = document.getElementById("ride-booking-form");
@@ -630,6 +712,9 @@ document.addEventListener("DOMContentLoaded", () => {
           const data = await response.json();
           if (!data.success || !data.ride) throw new Error("Ride status response was invalid.");
           if (connectionStatus) connectionStatus.hidden = true;
+          if (window.rideeasyTripMap && data.ride.driver_location) {
+            window.rideeasyTripMap.update(data.ride.driver_location, data.ride.status);
+          }
           const driverChanged = rideTrackingBox.dataset.driverId !== (data.ride.driver_id || "");
           const responseChanged = rideTrackingBox.dataset.driverResponseStatus !== data.ride.driver_response_status;
           if (
@@ -638,16 +723,23 @@ document.addEventListener("DOMContentLoaded", () => {
             responseChanged
           ) {
             window.location.reload();
+            return "changed";
           }
+          return "idle";
         } catch (error) {
           if (connectionStatus) connectionStatus.hidden = false;
           console.warn("Unable to refresh the passenger ride status.", error);
+          return "error";
         } finally {
           passengerPollActive = false;
         }
       };
-      pollPassengerRide();
-      window.setInterval(pollPassengerRide, 5000);
+      // 5s at first, easing to 12s while nothing changes.
+      const passengerPoller = createPoller(pollPassengerRide, { baseMs: 5000, maxMs: 12000, stepMs: 1500 });
+      window.addEventListener("rideeasy:ride", (event) => {
+        const id = event.detail && event.detail.ride_id;
+        if (!id || id === rideId) passengerPoller.nudge();
+      });
     }
   }
 
@@ -679,24 +771,30 @@ document.addEventListener("DOMContentLoaded", () => {
           if (statusLabel) statusLabel.textContent = "CANCELLED";
           if (controls) controls.hidden = true;
           if (cancelledAlert) cancelledAlert.hidden = false;
-          return;
+          return "stop";
         }
         if (ride.driver_id !== driverRideTracker.dataset.driverId) {
           window.location.reload();
-          return;
+          return "changed";
         }
         if (ride.status !== driverRideTracker.dataset.status) {
           window.location.reload();
+          return "changed";
         }
+        return "idle";
       } catch (error) {
         if (connectionStatus) connectionStatus.hidden = false;
         console.warn("Unable to refresh the live ride status.", error);
+        return "error";
       } finally {
         driverPollActive = false;
       }
     };
-    pollDriverRide();
-    window.setInterval(pollDriverRide, 5000);
+    const driverRidePoller = createPoller(pollDriverRide, { baseMs: 5000, maxMs: 12000, stepMs: 1500 });
+    window.addEventListener("rideeasy:ride", (event) => {
+      const id = event.detail && event.detail.ride_id;
+      if (!id || id === rideId) driverRidePoller.nudge();
+    });
   }
 
   // 6. Notification Dropdown Toggle and Dismiss Handlers
