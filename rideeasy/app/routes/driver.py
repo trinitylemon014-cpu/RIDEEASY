@@ -5,6 +5,9 @@ from flask import Blueprint, current_app, render_template, request, redirect, ur
 from app.repositories.database import get_db
 from app.services.auth_service import login_required, role_required, AuthService
 from app.services.ride_dispatch_service import RideDispatchService
+from app.services.driver_location_service import DriverLocationService
+from app.services.geo import eta_minutes, haversine_km, valid_point
+from app.services.safety_service import SafetyService
 from app.services.notification_service import NotificationService
 from app.services.vehicle_photo_service import VehiclePhotoService
 from app.services import driver_profile_service as profile_rules
@@ -271,7 +274,7 @@ def api_pending_offers():
     offers = get_db().fetchall(
         """SELECT r.id, r.pickup_address, r.destination_address, r.category,
                   r.estimated_distance_km, r.final_fare_ugx, r.estimated_fare_ugx,
-                  o.expires_at
+                  r.pickup_lat, r.pickup_lng, o.expires_at
            FROM rides r
            JOIN ride_driver_offers o ON o.ride_id = r.id AND o.driver_id = r.driver_id
            WHERE r.driver_id = ? AND r.status = 'DRIVER_ASSIGNED'
@@ -285,6 +288,18 @@ def api_pending_offers():
            ORDER BY r.created_at DESC""",
         (user["id"],)
     )
+    if offers:
+        position = DriverLocationService.location_for_driver(
+            user["id"], int(current_app.config.get("DISPATCH_LOCATION_MAX_AGE_SECONDS", 180)) * 2
+        )
+        speed = current_app.config.get("ETA_AVERAGE_SPEED_KMH", 25.0)
+        for offer in offers:
+            if position and valid_point(offer["pickup_lat"], offer["pickup_lng"]):
+                distance = haversine_km(position["lat"], position["lng"], offer["pickup_lat"], offer["pickup_lng"])
+                offer["pickup_distance_km"] = round(distance, 1)
+                offer["pickup_eta_minutes"] = round(eta_minutes(distance, speed))
+            offer.pop("pickup_lat", None)
+            offer.pop("pickup_lng", None)
     return jsonify({"success": True, "offers": offers})
 
 @driver_bp.route("/active-ride")
@@ -300,7 +315,13 @@ def active_ride():
         ORDER BY r.created_at DESC LIMIT 1""",
         (user["id"],)
     )
-    return render_template("driver/active_ride.html", user=user, ride=ride)
+    return render_template(
+        "driver/active_ride.html",
+        user=user,
+        ride=ride,
+        pin_required=SafetyService.pin_required(),
+        emergency_number=current_app.config.get("EMERGENCY_NUMBER", "999"),
+    )
 
 @driver_bp.route("/rides/<ride_id>/accept", methods=["POST"])
 def accept_ride(ride_id):
@@ -397,6 +418,8 @@ def accept_ride(ride_id):
 
     ride = db.fetchone("SELECT passenger_id FROM rides WHERE id = ?", (ride_id,))
     vehicle = db.fetchone("SELECT id, plate_number, make, model FROM vehicles WHERE driver_id = ?", (user["id"],))
+    if SafetyService.pin_required():
+        SafetyService.ensure_pin(ride_id)
     if ride:
         veh_str = f" ({vehicle['plate_number']} {vehicle['make']} {vehicle['model']})" if vehicle else ""
         photos_hint = ""
@@ -405,7 +428,7 @@ def accept_ride(ride_id):
         NotificationService.create_notification(
             user_id=ride["passenger_id"],
             title="Driver accepted your ride",
-            message=f"{user['full_name']}{veh_str} accepted your ride #{ride_id[:8].upper()}. Live trip updates are now active.{photos_hint}",
+            message=f"{user['full_name']}{veh_str} accepted your ride #{ride_id[:8].upper()}. Live trip updates are now active.{photos_hint} Open the trip to see your 4-digit start PIN and give it to the driver only when you board.",
             notif_type="DRIVER_ASSIGNED",
             related_entity_id=ride_id
         )
@@ -484,6 +507,12 @@ def update_ride_status(ride_id):
     if new_status != expected:
         flash(f"Invalid status transition from {ride['status']} to {new_status}.", "error")
         return redirect(url_for("driver.active_ride"))
+
+    if new_status == "TRIP_STARTED":
+        pin_ok, pin_message = SafetyService.verify_pin(ride, request.form.get("pin", ""))
+        if not pin_ok:
+            flash(pin_message, "error")
+            return redirect(url_for("driver.active_ride"))
 
     transition = (
         """UPDATE rides SET status = ?, updated_at = CURRENT_TIMESTAMP
