@@ -4,6 +4,7 @@ from flask import Flask, render_template, session
 from app.config import Config
 from app.repositories.database import get_db
 from app.services.auth_service import AuthService
+from app.services.push_service import PushService
 
 def create_app(config_class=Config):
     """Application factory for RideEasy platform."""
@@ -57,6 +58,8 @@ def create_app(config_class=Config):
         unread_count = 0
         recent_notifs = []
         pending_driver_requests = 0
+        driver_online = False
+        driver_active_trips = 0
         csrf_token = ""
         if user:
             csrf_token = session.setdefault("payment_csrf_token", secrets.token_urlsafe(32))
@@ -65,12 +68,20 @@ def create_app(config_class=Config):
             recent_notifs = NotificationService.get_user_notifications(user["id"], unread_only=True, limit=5)
             if user["role"] == "DRIVER":
                 row = get_db().fetchone(
-                    """SELECT COUNT(*) AS count FROM rides
+                    """SELECT COUNT(*) AS count,
+                              (SELECT is_online FROM driver_profiles WHERE user_id = ?) AS is_online,
+                              (SELECT COUNT(*) FROM rides
+                                WHERE driver_id = ? AND driver_response_status = 'ACCEPTED'
+                                  AND status IN ('DRIVER_ASSIGNED', 'DRIVER_ARRIVING',
+                                                 'DRIVER_ARRIVED', 'TRIP_STARTED')) AS active_trips
+                       FROM rides
                        WHERE driver_id = ? AND status = 'DRIVER_ASSIGNED'
                          AND driver_response_status = 'PENDING'""",
-                    (user["id"],)
+                    (user["id"], user["id"], user["id"])
                 )
                 pending_driver_requests = row["count"] if row else 0
+                driver_online = bool(row and row["is_online"])
+                driver_active_trips = row["active_trips"] if row else 0
 
         return {
             "app_name": Config.APP_NAME,
@@ -80,6 +91,9 @@ def create_app(config_class=Config):
             "unread_notifications_count": unread_count,
             "recent_notifications": recent_notifs,
             "pending_driver_requests": pending_driver_requests,
+            "driver_online": driver_online,
+            "driver_active_trips": driver_active_trips,
+            "push_public_key": PushService.public_key() if user and PushService.enabled() else "",
             "payment_csrf_token": csrf_token,
             "support_phone": Config.SUPPORT_PHONE,
             "support_email": Config.SUPPORT_EMAIL
@@ -98,6 +112,8 @@ def create_app(config_class=Config):
     from app.routes.payments import payments_bp
     from app.routes.maps import maps_bp
     from app.routes.vehicle_photos import vehicle_photos_bp
+    from app.routes.safety import safety_bp
+    from app.routes.share import share_bp
 
     app.register_blueprint(main_bp)
     app.register_blueprint(auth_bp, url_prefix="/auth")
@@ -111,6 +127,8 @@ def create_app(config_class=Config):
     app.register_blueprint(payments_bp)
     app.register_blueprint(maps_bp)
     app.register_blueprint(vehicle_photos_bp)
+    app.register_blueprint(safety_bp)
+    app.register_blueprint(share_bp)
 
     # Health check that actually exercises the database connection.
     # Point UptimeRobot here (not Render's healthCheckPath, so a Turso outage
